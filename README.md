@@ -1,6 +1,14 @@
 # SlopScraper
 
-**SlopScraper** is a Python CLI tool for scraping Steam launch options from various sources (PCGamingWiki, Steam Community guides, and game-specific knowledge) and aggregating the data into a Supabase database.
+
+**SlopScraper** is a Python CLI tool for scraping Steam launch options from various sources and aggregating the data into a Supabase database. 
+The Slop Scraper was built to support the [Vanilla Slops](https://github.com/soundwanders/vanilla-slops) project. 
+
+While I have built security measures into this program to prevent abuse due to the general nature of repeated API calls and web scraping, I'm no Alan Turing and it's up to you to do the right thing.
+
+So, if you find yourself alone, riding in green fields with the sun on your face, with access to the Slop Scraper, do not be troubled. 
+Use your power wisely. 😊
+
 
 ## 📦 Features
 
@@ -50,7 +58,7 @@ slop-scraper --test --limit 5
 
 ```bash
 # Navigate to the source directory
-cd src/scripts/slop_scraper
+cd slop_scraper
 
 # Run directly
 python3 main.py --test --limit 5
@@ -163,7 +171,7 @@ slop-scraper --limit 200 --rate 3.0
 
 #### **If you're running the script directly (Option B):**
 
-*Make sure you're in the `src/scripts/slop_scraper` directory first*
+*Make sure you're in the `slop_scraper` directory first*
 
 ```bash
 # Test the database connection
@@ -199,7 +207,7 @@ python3 main.py --limit 200 --rate 3.0
    slop-scraper --test-db
    
    # Option B:
-   cd src/scripts/slop_scraper
+   cd slop_scraper
    python3 main.py --test-db
    ```
 
@@ -248,9 +256,7 @@ When using `--test`, the tool creates these files in your output directory:
 }
 ```
 
-## 🏗️ Architecture
-
-The project follows a modular architecture:
+## 🏗️ Project Architecture
 
 ```
 slop_scraper/
@@ -281,7 +287,7 @@ slop_scraper/
 
 **Command not found error?**
 - If using Option A: Make sure you ran `pip install -e .` from the project root
-- If using Option B: Make sure you're in the `src/scripts/slop_scraper` directory and using `python3 main.py`
+- If using Option B: Make sure you're in the `slop_scraper` directory and using `python3 main.py`
 
 **Import errors?**
 - For Option A: Try reinstalling with `pip install -e . --force-reinstall`
