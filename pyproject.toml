@@ -1,0 +1,154 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slop-scraper"
+version = "0.1.0"
+description = "Steam Launch Options (SLOP) Scraper CLI - A tool for gathering Steam game launch options from various sources"
+authors = [{name = "soundwanders"}]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+keywords = ["steam", "gaming", "launch-options", "scraper", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    "requests>=2.25.0",
+    "beautifulsoup4>=4.9.0",
+    "tqdm>=4.60.0",
+    "supabase>=2.0.0",
+    "python-dotenv>=0.19.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+    "mypy>=1.0.0",
+    "pre-commit>=2.20.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "responses>=0.20.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/soundwanders/vanilla-slops/tree/python"
+Repository = "https://github.com/soundwanders/vanilla-slops"
+Issues = "https://github.com/soundwanders/vanilla-slops/issues"
+Documentation = "https://github.com/soundwanders/vanilla-slops#readme"
+
+[project.scripts]
+slop-scraper = "slop_scraper.main:main"
+slopscraper = "slop_scraper.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["slop_scraper*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--cov=slop_scraper",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--strict-markers",
+    "-v"
+]
+
+[tool.mypy]
+python_version = "3.8"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+no_implicit_optional = false
+strict_equality = false
+
+[[tool.mypy.overrides]]
+module = [
+    "supabase.*",
+    "bs4.*",
+    "tqdm.*",
+]
+ignore_missing_imports = true
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".eggs",
+    "*.egg-info",
+    ".venv",
+    ".tox"
+]
+
+[tool.coverage.run]
+source = ["slop_scraper"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__init__.py"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
