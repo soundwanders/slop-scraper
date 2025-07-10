@@ -13,7 +13,9 @@ try:
         setup_supabase_connection, 
         test_database_connection,
         fetch_steam_launch_options_from_db,
-        save_to_database
+        save_to_database,
+        SupabaseClient,  # Import the wrapper class
+        get_database_stats  # Import stats function
     )
     from ..scrapers.steampowered import get_steam_game_list
     from ..scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options
@@ -31,7 +33,9 @@ except ImportError:
         setup_supabase_connection, 
         test_database_connection,
         fetch_steam_launch_options_from_db,
-        save_to_database
+        save_to_database,
+        SupabaseClient,  # Import the wrapper class
+        get_database_stats  # Import stats function
     )
     from scrapers.steampowered import get_steam_game_list
     from scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options
@@ -42,7 +46,7 @@ except ImportError:
 class SlopScraper:
     def __init__(self, test_mode=False, cache_file='appdetails_cache.json', 
                  rate_limit=None, force_refresh=False, max_games=100, 
-                 output_dir="./test-output", debug=False):
+                 output_dir="./test-output", debug=False, skip_existing=True):  # skip_existing parameter
         """Initialize with configuration options and security validation"""
         
         # Security validation first
@@ -55,6 +59,8 @@ class SlopScraper:
         self.failed_cache = set()
         self.debug = debug
         self.supabase = None
+        self.skip_existing = skip_existing  # Store skip_existing setting
+        self.db_client = None  # Database client wrapper
 
         # Security monitoring and rate limiting
         self.session_monitor = SessionMonitor()
@@ -64,6 +70,7 @@ class SlopScraper:
         print(f"   Session monitoring: ✅")
         print(f"   Rate limiting: {self.rate_limit}s between requests")
         print(f"   Resource limits: max {self.max_games} games")
+        print(f"   Skip existing games: {'✅' if self.skip_existing else '❌'}")  # Show skip setting
 
         # Validate cache size and handle if too large
         if not SecurityConfig.validate_cache_size(self.cache_file):
@@ -93,12 +100,25 @@ class SlopScraper:
         
         # Initialize Supabase connection if not in test mode
         if not self.test_mode:
-            self.supabase = setup_supabase_connection()
-            if self.supabase:
-                print("✅ Connected to Supabase successfully")
-            else:
+            # Try to initialize database client wrapper for better functionality
+            try:
+                if self.skip_existing:
+                    self.db_client = SupabaseClient()
+                    self.supabase = self.db_client.supabase
+                    print("✅ Connected to Supabase with enhanced client successfully")
+                    
+                    # Show database statistics on startup
+                    if self.debug:
+                        stats = self.db_client.get_database_stats()
+                        print(f"🔒 Database stats: {stats['total_games']} games, {stats['total_option_relationships']} options")
+                else:
+                    self.supabase = setup_supabase_connection()
+                    print("✅ Connected to Supabase successfully")
+            except Exception as e:
+                print(f"⚠️ Database connection failed: {e}")
                 print("🔒 Falling back to test mode for security.")
                 self.test_mode = True
+                self.skip_existing = False  # Can't skip without database
         
         # Initialize test results dict if test mode is on
         if self.test_mode:
@@ -136,16 +156,45 @@ class SlopScraper:
             supabase=self.supabase
         )
 
+    def show_database_stats(self):  # Method to show database statistics
+        """Show comprehensive database statistics"""
+        if self.test_mode:
+            print("ℹ️ Database stats not available in test mode")
+            return
+        
+        if not self.db_client:
+            print("⚠️ Database client not available")
+            return
+        
+        try:
+            stats = self.db_client.get_database_stats()
+            print("\n📊 Database Statistics:")
+            print(f"   Total games: {stats.get('total_games', 0)}")
+            print(f"   Total option relationships: {stats.get('total_option_relationships', 0)}")
+            print(f"   Unique launch options: {stats.get('unique_launch_options', 0)}")
+            print(f"   Average options per game: {stats.get('avg_options_per_game', 0)}")
+            print("   Options by source:")
+            for source, count in stats.get('options_by_source', {}).items():
+                print(f"     {source}: {count}")
+            print()
+        except Exception as e:
+            print(f"⚠️ Error getting database stats: {e}")
+
     def run(self):
         """Main method to run the scraper with security monitoring"""
         print(f"Running in {'TEST' if self.test_mode else 'PRODUCTION'} mode")
         print(f"🔒 Security: Rate limit={self.rate_limit}s, Max games={self.max_games}")
+        
+        # Show database stats if in debug mode
+        if self.debug and not self.test_mode:
+            self.show_database_stats()
         
         try:
             # Initial runtime check
             self.session_monitor.check_runtime_limit()
             
             # Get list of games (limited by max_games) with security monitoring
+            # Pass database client and skip_existing to get_steam_game_list
             games = get_steam_game_list(
                 limit=self.max_games,
                 force_refresh=self.force_refresh,
@@ -154,8 +203,14 @@ class SlopScraper:
                 debug=self.debug,
                 cache_file=self.cache_file,
                 rate_limiter=self.rate_limiter,
-                session_monitor=self.session_monitor
+                session_monitor=self.session_monitor,
+                db_client=self.db_client,  # Pass database client
+                skip_existing=self.skip_existing  # Pass skip_existing flag
             )
+            
+            if not games:
+                print("⚠️ No games to process. All games may already be in the database.")
+                return
             
             # Process each game with better progress indication and security checks
             with tqdm(games, desc="Processing games", unit="game") as game_pbar:
@@ -170,16 +225,24 @@ class SlopScraper:
                     # Update progress bar description
                     game_pbar.set_description(f"Processing {title}")
                     
-                    # Check if we already have data in database
-                    existing_options = [] if self.test_mode else fetch_steam_launch_options_from_db(
-                        app_id=app_id,
-                        supabase=self.supabase
-                    )
-                    
-                    # If we already have data and not forcing refresh, skip
-                    if existing_options and not self.force_refresh:
-                        game_pbar.write(f"Skipping {title} - already have {len(existing_options)} options in database")
-                        continue
+                    # Enhanced database checking with skip_existing logic
+                    existing_options = []
+                    if not self.test_mode:
+                        if self.skip_existing and self.db_client:
+                            # Use the enhanced client to check if game exists
+                            if self.db_client.check_game_exists(app_id):
+                                option_count = self.db_client.get_game_option_count(app_id)
+                                if not self.force_refresh:
+                                    game_pbar.write(f"⏭️  Skipping {title} - already have {option_count} options in database")
+                                    continue
+                                else:
+                                    game_pbar.write(f"🔄 Force refreshing {title} (had {option_count} options)")
+                        
+                        # Fetch existing options for comparison
+                        existing_options = fetch_steam_launch_options_from_db(
+                            app_id=app_id,
+                            supabase=self.supabase
+                        )
                     
                     # Collect options from different sources
                     all_options = []
@@ -278,7 +341,7 @@ class SlopScraper:
                             self.session_monitor.record_error()
                             game_pbar.write(f"  Database error for {title}: {e}")
                     
-                    game_pbar.write(f"Found {len(unique_options)} unique launch options for {title}")
+                    game_pbar.write(f"✅ Found {len(unique_options)} unique launch options for app_id {app_id}")
                     
                     # Periodically save cache during execution
                     if game['appid'] % 3 == 0:  # Save every 3 games
@@ -295,6 +358,11 @@ class SlopScraper:
             print(f"   Total requests: {self.session_monitor.request_count}")
             print(f"   Total errors: {self.session_monitor.error_count}")
             print(f"   Runtime: {(time.time() - self.session_monitor.start_time)/60:.1f} minutes")
+            
+            # Show final database stats if in debug mode
+            if self.debug and not self.test_mode:
+                print("\n📊 Final Database State:")
+                self.show_database_stats()
                 
         except Exception as e:
             self.session_monitor.record_error()

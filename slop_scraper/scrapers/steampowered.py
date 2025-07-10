@@ -13,10 +13,91 @@ except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from utils.cache import save_cache
     from utils.security_config import SecureRequestHandler
-# In steampowered.py, update the rate limiter calls:
+
+def extract_first_from_list(data_list):
+    """Safely extract the first item from a list, handling various data types"""
+    if not data_list:
+        return ""
+    
+    if isinstance(data_list, list) and len(data_list) > 0:
+        first_item = data_list[0]
+        if isinstance(first_item, str):
+            return first_item
+        elif isinstance(first_item, dict):
+            return first_item.get("name", "") or first_item.get("description", "")
+        else:
+            return str(first_item)
+    elif isinstance(data_list, str):
+        return data_list
+    
+    return ""
+
+def detect_game_engine(store_data, game_name):
+    """Detect game engine based on available Steam API data"""
+    
+    # Check categories for engine hints
+    categories = store_data.get("categories", [])
+    category_names = [cat.get("description", "").lower() for cat in categories if isinstance(cat, dict)]
+    
+    # Check genres for engine hints
+    genres = store_data.get("genres", [])
+    genre_names = [genre.get("description", "").lower() for genre in genres if isinstance(genre, dict)]
+    
+    # Check developers and publishers for engine clues
+    developers = store_data.get("developers", [])
+    publishers = store_data.get("publishers", [])
+    
+    game_name_lower = game_name.lower()
+    all_text = " ".join([game_name_lower] + category_names + genre_names + developers + publishers).lower()
+    
+    # Engine detection based on comzmon patterns
+    if any(keyword in all_text for keyword in ["source", "valve", "counter-strike", "half-life", "portal", "team fortress", "left 4 dead", "dota"]):
+        return "Source Engine"
+    
+    if any(keyword in all_text for keyword in ["unreal", "epic games", "unreal engine"]):
+        return "Unreal Engine"
+    
+    if any(keyword in all_text for keyword in ["unity", "unity technologies"]):
+        return "Unity"
+    
+    if any(keyword in all_text for keyword in ["id tech", "id software", "doom", "quake", "wolfenstein"]):
+        return "id Tech"
+    
+    if any(keyword in all_text for keyword in ["cryengine", "crytek", "far cry", "crysis"]):
+        return "CryEngine"
+    
+    if any(keyword in all_text for keyword in ["frostbite", "battlefield", "fifa", "need for speed"]):
+        return "Frostbite"
+    
+    if any(keyword in all_text for keyword in ["creation engine", "gamebryo", "bethesda", "elder scrolls", "fallout"]):
+        return "Creation Engine"
+    
+    if any(keyword in all_text for keyword in ["anvil", "assassin's creed", "ubisoft"]):
+        return "Anvil"
+    
+    if any(keyword in all_text for keyword in ["rage engine", "rockstar", "grand theft auto", "red dead"]):
+        return "RAGE"
+    
+    # Check for indie engines
+    if any(keyword in all_text for keyword in ["godot"]):
+        return "Godot"
+    
+    if any(keyword in all_text for keyword in ["construct", "clickteam", "game maker", "gamemaker"]):
+        return "Game Maker Studio"
+    
+    # Check for web technologies
+    if any(keyword in all_text for keyword in ["html5", "javascript", "web browser"]):
+        return "HTML5/Web"
+    
+    # Check for mobile engines
+    if any(keyword in all_text for keyword in ["cocos2d", "corona", "solar2d"]):
+        return "Mobile Engine"
+    
+    # Default fallback
+    return "Unknown"
 
 def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_file='appdetails_cache.json', 
-                       rate_limiter=None, session_monitor=None):
+                       rate_limiter=None, session_monitor=None, db_client=None, **kwargs):
     """Fetch Steam game list with security controls"""
     print(f"🔒 Fetching game list securely (force_refresh={force_refresh})...")
     print(f"Debug: Attempting to fetch up to {limit} games")
@@ -24,11 +105,11 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
     if test_mode and limit <= 10:
         print("🔒 Using test mode data for security")
         return [
-            {"appid": 570, "name": "Dota 2"},
-            {"appid": 730, "name": "Counter-Strike 2"},
-            {"appid": 264710, "name": "Subnautica"},
-            {"appid": 377840, "name": "Final Fantasy IX"},
-            {"appid": 1868140, "name": "Dave the Diver"},
+            {"appid": 570, "name": "Dota 2", "developer": "Valve Corporation", "publisher": "Valve Corporation", "engine": "Source Engine"},
+            {"appid": 730, "name": "Counter-Strike 2", "developer": "Valve Corporation", "publisher": "Valve Corporation", "engine": "Source Engine"},
+            {"appid": 264710, "name": "Subnautica", "developer": "Unknown Worlds Entertainment", "publisher": "Unknown Worlds Entertainment", "engine": "Unity"},
+            {"appid": 377840, "name": "Final Fantasy IX", "developer": "Square Enix", "publisher": "Square Enix", "engine": "Unknown"},
+            {"appid": 1868140, "name": "Dave the Diver", "developer": "MINTROCKET", "publisher": "NEXON", "engine": "Unity"},
         ][:limit]
 
     url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
@@ -141,22 +222,43 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
                     pbar.write(f"⚠️ Game name too long, skipping: {game_name[:50]}...")
                     continue
 
-                # Validate developers list
-                developers = store_data.get("developers", [""])
-                if not isinstance(developers, list):
-                    developers = ["Unknown"]
-                developer = developers[0] if developers else "Unknown"
+                # Extract developer using our helper function
+                developer = extract_first_from_list(store_data.get("developers", []))
+                if not developer:
+                    developer = "Unknown"
                 if len(developer) > 100:  # Limit developer name length
                     developer = developer[:100]
+
+                # Extract publisher using our helper function
+                publisher = extract_first_from_list(store_data.get("publishers", []))
+                if not publisher:
+                    publisher = "Unknown"
+                if len(publisher) > 100:  # Limit publisher name length
+                    publisher = publisher[:100]
+                
+                # Detect engine using our helper function
+                engine = detect_game_engine(store_data, game_name)
+                if len(engine) > 50:  # Limit engine name length
+                    engine = engine[:50]
 
                 # Add the game to the filtered list if it passes all checks
                 filtered_games.append({
                     "appid": int(app_id),
                     "name": game_name[:200],  # Limit name length
                     "developer": developer,
+                    "publisher": publisher, 
                     "release_date": str(store_data.get("release_date", {}).get("date", ""))[:50],
-                    "engine": str(store_data.get("engine", "Unknown"))[:50]
+                    "engine": engine 
                 })
+
+                # Optional debug output to verify data extraction
+                if debug:
+                    print(f"✅ Game: {game_name}")
+                    print(f"  Developer: {developer}")
+                    print(f"  Publisher: {publisher}")
+                    print(f"  Engine: {engine}")
+                    print(f"  Raw developers: {store_data.get('developers', [])}")
+                    print(f"  Raw publishers: {store_data.get('publishers', [])}")
 
                 pbar.write(f"✔️ Added: {game_name}")
 

@@ -1,6 +1,7 @@
 import os
 import json
 from supabase import create_client
+from typing import Set, Optional, List, Dict
 
 def get_supabase_credentials():
     """Get Supabase credentials from environment or credentials file"""
@@ -71,14 +72,13 @@ def verify_db_structure(supabase):
         return False
 
 def seed_sources(supabase):
-    """Seed the sources table with common sources if empty"""
+    """Seed the sources table with sources if empty"""
     try:
         # Check if sources table is empty
         result = supabase.table("sources").select("count", count="exact").execute()
         count = result.count if hasattr(result, 'count') else 0
         
         if count == 0:
-            # Add common sources
             sources = [
                 {
                     "name": "PCGamingWiki",
@@ -91,22 +91,22 @@ def seed_sources(supabase):
                     "reliability_score": 0.7
                 },
                 {
-                    "name": "Common Source Engine",
-                    "description": "Common launch options for Source engine games",
+                    "name": "Source Engine",
+                    "description": "launch options for Source engine games",
                     "reliability_score": 0.8
                 },
                 {
-                    "name": "Common Unity Engine",
-                    "description": "Common launch options for Unity engine games",
+                    "name": "Unity Engine",
+                    "description": "launch options for Unity engine games",
                     "reliability_score": 0.8
                 },
                 {
-                    "name": "Common Unreal Engine",
-                    "description": "Common launch options for Unreal engine games",
+                    "name": "Unreal Engine",
+                    "description": "launch options for Unreal engine games",
                     "reliability_score": 0.8
                 },
                 {
-                    "name": "Common Launch Option",
+                    "name": "Launch Option",
                     "description": "Generic launch options that work across many games",
                     "reliability_score": 0.6
                 }
@@ -144,6 +144,198 @@ def test_database_connection(test_mode=False, supabase=None):
         print(f"⚠️ Database connection test failed: {e}")
         return False
 
+# METHODS FOR CHECKING EXISTING GAMES
+def get_existing_app_ids(supabase) -> Set[int]:
+    """
+    Get all app_ids that already exist in the database
+    Returns a set of app_ids for fast lookup
+    """
+    try:
+        response = supabase.table("games").select("app_id").execute()
+        
+        if response.data:
+            # Extract unique app_ids
+            app_ids = {row["app_id"] for row in response.data}
+            return app_ids
+        else:
+            return set()
+            
+    except Exception as e:
+        print(f"⚠️ Error fetching existing app_ids: {e}")
+        return set()
+
+def check_game_exists(supabase, app_id: int) -> bool:
+    """
+    Check if a specific game already exists in the database
+    """
+    try:
+        response = supabase.table("games")\
+            .select("app_id")\
+            .eq("app_id", app_id)\
+            .limit(1)\
+            .execute()
+        
+        return len(response.data) > 0
+        
+    except Exception as e:
+        print(f"⚠️ Error checking if game exists: {e}")
+        return False
+
+def get_game_option_count(supabase, app_id: int) -> int:
+    """
+    Get the number of launch options for a specific game
+    """
+    try:
+        response = supabase.table("game_launch_options")\
+            .select("*", count="exact")\
+            .eq("game_app_id", app_id)\
+            .execute()
+        
+        return response.count or 0
+        
+    except Exception as e:
+        print(f"⚠️ Error getting option count for game {app_id}: {e}")
+        return 0
+
+def get_games_needing_update(supabase, days_old: int = 30) -> List[int]:
+    """
+    Get app_ids of games that haven't been updated in X days
+    Useful for refreshing old data
+    """
+    try:
+        from datetime import datetime, timedelta
+        cutoff_date = datetime.now() - timedelta(days=days_old)
+        
+        response = supabase.table("games")\
+            .select("app_id")\
+            .lt("updated_at", cutoff_date.isoformat())\
+            .execute()
+        
+        if response.data:
+            return list({row["app_id"] for row in response.data})
+        else:
+            return []
+            
+    except Exception as e:
+        print(f"⚠️ Error getting games needing update: {e}")
+        return []
+
+def get_database_stats(supabase) -> Dict:
+    """
+    Get statistics about the database contents
+    """
+    try:
+        # Total games
+        games_response = supabase.table("games")\
+            .select("app_id", count="exact")\
+            .execute()
+        
+        total_games = games_response.count or 0
+        
+        # Total launch options relationships
+        options_response = supabase.table("game_launch_options")\
+            .select("*", count="exact")\
+            .execute()
+        
+        total_option_relationships = options_response.count or 0
+        
+        # Unique launch options
+        unique_options_response = supabase.table("launch_options")\
+            .select("id", count="exact")\
+            .execute()
+        
+        unique_options = unique_options_response.count or 0
+        
+        # Options by source (get source distribution)
+        sources_response = supabase.table("launch_options")\
+            .select("source")\
+            .execute()
+        
+        source_counts = {}
+        if sources_response.data:
+            for row in sources_response.data:
+                source = row.get("source", "Unknown")
+                source_counts[source] = source_counts.get(source, 0) + 1
+        
+        return {
+            "total_games": total_games,
+            "total_option_relationships": total_option_relationships,
+            "unique_launch_options": unique_options,
+            "avg_options_per_game": round(total_option_relationships / total_games, 2) if total_games > 0 else 0,
+            "options_by_source": source_counts
+        }
+        
+    except Exception as e:
+        print(f"⚠️ Error getting database stats: {e}")
+        return {}
+
+def get_games_with_few_options(supabase, max_options: int = 3) -> List[Dict]:
+    """
+    Get games that have few launch options (candidates for re-scraping)
+    """
+    try:
+        # This is a more complex query - we need to count options per game
+        response = supabase.rpc('get_games_with_option_count').execute()
+        
+        if response.data:
+            return [game for game in response.data if game.get('option_count', 0) <= max_options]
+        else:
+            # Fallback method if RPC doesn't exist
+            print("ℹ️ Using fallback method for games with few options")
+            all_games = supabase.table("games").select("app_id, title").execute()
+            candidates = []
+            
+            for game in all_games.data:
+                option_count = get_game_option_count(supabase, game['app_id'])
+                if option_count <= max_options:
+                    candidates.append({
+                        'app_id': game['app_id'],
+                        'title': game['title'],
+                        'option_count': option_count
+                    })
+            
+            return candidates
+            
+    except Exception as e:
+        print(f"⚠️ Error getting games with few options: {e}")
+        return []
+
+# WRAPPER CLASS FOR EASIER USAGE
+class SupabaseClient:
+    """Wrapper class for easier database operations"""
+    
+    def __init__(self):
+        """Initialize the Supabase client"""
+        self.supabase = setup_supabase_connection()
+        if not self.supabase:
+            raise ValueError("Failed to establish Supabase connection")
+    
+    def get_existing_app_ids(self) -> Set[int]:
+        """Get all existing app_ids"""
+        return get_existing_app_ids(self.supabase)
+    
+    def check_game_exists(self, app_id: int) -> bool:
+        """Check if game exists"""
+        return check_game_exists(self.supabase, app_id)
+    
+    def get_game_option_count(self, app_id: int) -> int:
+        """Get option count for game"""
+        return get_game_option_count(self.supabase, app_id)
+    
+    def get_database_stats(self) -> Dict:
+        """Get database statistics"""
+        return get_database_stats(self.supabase)
+    
+    def save_game_options(self, game_data: Dict) -> bool:
+        """Save game and options to database"""
+        try:
+            save_to_database(game_data, game_data.get('options', []), self.supabase)
+            return True
+        except Exception as e:
+            print(f"⚠️ Error in save_game_options: {e}")
+            return False
+
+# EXISTING FUNCTIONS (preserved as-is)
 def fetch_steam_launch_options_from_db(app_id, supabase):
     try:
         # Query the junction table, embed related launch_options
@@ -184,8 +376,12 @@ def save_to_database(game, options, supabase):
             "engine": game.get('engine', 'Unknown')
         }
         
-        # Insert game info
-        res = supabase.table("games").upsert(game_data).execute()
+        # Insert game info, using upsert to handle existing games
+        # on_conflict will update existing game if app_id matches
+        res = supabase.table("games").upsert(
+            game_data, 
+            on_conflict="app_id" 
+        ).execute()
         
         # Check response
         if hasattr(res, 'error') and res.error:

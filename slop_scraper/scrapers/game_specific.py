@@ -1,36 +1,36 @@
 def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mode=False):
-    """Fetch game-specific launch options based on common patterns"""
+    """Fetch game-specific launch options based on patterns"""
     options = []
     
     # Derive title from cache or app_id
     title = cache.get(str(app_id), {}).get('title', 'Unknown Game Title')
 
-    # Source engine games often share common options
+    # Source engine games often share options
     source_engine_options = [
         {
             'command': '-novid',
             'description': 'Skip intro videos when starting the game',
-            'source': 'Common Source Engine'
+            'source': 'Source Engine'
         },
         {
             'command': '-console',
             'description': 'Enable developer console',
-            'source': 'Common Source Engine'
+            'source': 'Source Engine'
         },
         {
             'command': '-windowed',
             'description': 'Run the game in windowed mode',
-            'source': 'Common Source Engine'
+            'source': 'Source Engine'
         },
         {
             'command': '-fullscreen',
             'description': 'Run the game in fullscreen mode',
-            'source': 'Common Source Engine'
+            'source': 'Source Engine'
         },
         {
             'command': '-noborder',
             'description': 'Run the game in borderless windowed mode',
-            'source': 'Common Source Engine'
+            'source': 'Source Engine'
         }
     ]
     
@@ -39,22 +39,22 @@ def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mo
         {
             'command': '-screen-width',
             'description': 'Set screen width (e.g., -screen-width 1920)',
-            'source': 'Common Unity Engine'
+            'source': 'Unity Engine'
         },
         {
             'command': '-screen-height',
             'description': 'Set screen height (e.g., -screen-height 1080)',
-            'source': 'Common Unity Engine'
+            'source': 'Unity Engine'
         },
         {
             'command': '-popupwindow',
             'description': 'Run in borderless windowed mode',
-            'source': 'Common Unity Engine'
+            'source': 'Unity Engine'
         },
         {
             'command': '-window-mode',
             'description': 'Set window mode (values: exclusive, windowed, borderless)',
-            'source': 'Common Unity Engine'
+            'source': 'Unity Engine'
         }
     ]
     
@@ -63,27 +63,27 @@ def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mo
         {
             'command': '-windowed',
             'description': 'Run the game in windowed mode',
-            'source': 'Common Unreal Engine'
+            'source': 'Unreal Engine'
         },
         {
             'command': '-fullscreen',
             'description': 'Run the game in fullscreen mode',
-            'source': 'Common Unreal Engine'
+            'source': 'Unreal Engine'
         },
         {
             'command': '-presets=',
             'description': 'Specify graphics preset (e.g., -presets=high)',
-            'source': 'Common Unreal Engine'
+            'source': 'Unreal Engine'
         },
         {
             'command': '-dx12',
             'description': 'Force DirectX 12 rendering',
-            'source': 'Common Unreal Engine'
+            'source': 'Unreal Engine'
         },
         {
             'command': '-dx11',
             'description': 'Force DirectX 11 rendering',
-            'source': 'Common Unreal Engine'
+            'source': 'Unreal Engine'
         }
     ]
     
@@ -107,17 +107,17 @@ def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mo
         {
             'command': '-fps_max',
             'description': 'Limit maximum FPS (e.g., -fps_max 144)',
-            'source': 'Common Launch Option'
+            'source': 'Launch Option'
         },
         {
             'command': '-nojoy',
             'description': 'Disable joystick/controller support',
-            'source': 'Common Launch Option'
+            'source': 'Launch Option'
         },
         {
             'command': '-nosplash',
             'description': 'Skip splash/intro screens',
-            'source': 'Common Launch Option'
+            'source': 'Launch Option'
         }
     ]
     

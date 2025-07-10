@@ -8,10 +8,12 @@ try:
     # Try relative imports first (when run as module)
     from .core.scraper import SlopScraper
     from .utils.security_config import SecurityConfig, validate_usage_pattern
+    from .database.supabase import SupabaseClient, get_database_stats  # Import for stats
 except ImportError:
     # Fall back to absolute imports (when run directly)
     from core.scraper import SlopScraper
     from utils.security_config import SecurityConfig, validate_usage_pattern
+    from database.supabase import SupabaseClient, get_database_stats  # Import for stats
  
 def get_script_dir():
     """Get directory where this script (slop_scraper) is located"""
@@ -34,7 +36,55 @@ def setup_argument_parser():
                        help='Force refresh of game data cache')
     parser.add_argument('--test-db', action='store_true', 
                        help='Test database connection and exit')
+    
+    # Database filtering options
+    parser.add_argument('--skip-existing', action='store_true', default=True,
+                       help='Skip games already in database (default: enabled)')
+    parser.add_argument('--no-skip-existing', dest='skip_existing', action='store_false',
+                       help='Process all games, including those already in database')
+    parser.add_argument('--db-stats', action='store_true',
+                       help='Show database statistics and exit')
+    parser.add_argument('--debug', action='store_true',
+                       help='Enable debug output including database stats')
+    
     return parser
+
+def show_database_statistics():
+    """Show comprehensive database statistics and exit"""
+    try:
+        db_client = SupabaseClient()
+        stats = db_client.get_database_stats()
+        
+        print("📊 Database Statistics:")
+        print(f"   Total games: {stats.get('total_games', 0)}")
+        print(f"   Total option relationships: {stats.get('total_option_relationships', 0)}")
+        print(f"   Unique launch options: {stats.get('unique_launch_options', 0)}")
+        print(f"   Average options per game: {stats.get('avg_options_per_game', 0)}")
+        print("   Options by source:")
+        for source, count in stats.get('options_by_source', {}).items():
+            print(f"     {source}: {count}")
+        
+        # Additional helpful statistics
+        from database.supabase import get_games_with_few_options
+        sparse_games = get_games_with_few_options(db_client.supabase, max_options=2)
+        print(f"\n🔍 Analysis:")
+        print(f"   Games with ≤2 options: {len(sparse_games)} (candidates for re-scraping)")
+        
+        if len(sparse_games) > 0 and len(sparse_games) <= 10:
+            print("   Games with few options:")
+            for game in sparse_games[:10]:
+                print(f"     {game.get('title', 'Unknown')} (App ID: {game.get('app_id', 'N/A')}) - {game.get('option_count', 0)} options")
+        elif len(sparse_games) > 10:
+            print(f"   First 5 games with few options:")
+            for game in sparse_games[:5]:
+                print(f"     {game.get('title', 'Unknown')} (App ID: {game.get('app_id', 'N/A')}) - {game.get('option_count', 0)} options")
+            print(f"     ... and {len(sparse_games) - 5} more")
+                
+        return True
+    except Exception as e:
+        print(f"⚠️ Error getting database statistics: {e}")
+        print("Make sure you have valid Supabase credentials and database access.")
+        return False
 
 def main():
     """Main entry point for the application"""
@@ -61,6 +111,11 @@ def main():
     parser = setup_argument_parser()
     args = parser.parse_args()
     
+    # Handle database statistics request
+    if args.db_stats:
+        success = show_database_statistics()
+        sys.exit(0 if success else 1)
+    
     # Apply security validation to all parameters
     print("🔒 Applying security validation...")
     args.rate = SecurityConfig.validate_rate_limit(args.rate)
@@ -72,6 +127,19 @@ def main():
     print(f"   Rate limit: {args.rate}s")
     print(f"   Games limit: {args.limit}")
     print(f"   Output directory: {args.output}")
+    print(f"   Skip existing games: {'✅' if args.skip_existing else '❌'}")  # Show skip setting
+    print(f"   Force refresh: {'✅' if args.force_refresh else '❌'}")
+    print(f"   Debug mode: {'✅' if args.debug else '❌'}")  # Show debug setting
+    
+    # Provide guidance on skip_existing behavior
+    if not args.test and not args.skip_existing:
+        print("⚠️  Warning: You're processing ALL games, including those already in the database.")
+        print("   This may result in duplicate processing and longer run times.")
+        print("   Consider using --skip-existing to avoid re-processing existing games.")
+        confirm = input("   Continue anyway? (y/N): ").lower()
+        if confirm != 'y':
+            print("Exiting.")
+            sys.exit(0)
     
     # Initialize scraper with validated parameters
     scraper = SlopScraper(
@@ -80,7 +148,8 @@ def main():
         test_mode=args.test,
         output_dir=args.output,
         force_refresh=args.force_refresh,
-        debug=False
+        debug=args.debug,  # Pass debug flag
+        skip_existing=args.skip_existing  # Pass skip_existing flag
     )
     
     # Only test the database connection if requested

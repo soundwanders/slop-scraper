@@ -199,7 +199,7 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
             
             # Update test statistics
             if test_mode and test_results is not None:
-                source = 'Steam Community'  # Fixed: was incorrectly 'PCGamingWiki'
+                source = 'Steam Community' 
                 test_results.setdefault('options_by_source', {})
                 test_results['options_by_source'].setdefault(source, 0)
                 test_results['options_by_source'][source] += len(options)
