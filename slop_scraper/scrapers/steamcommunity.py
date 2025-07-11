@@ -28,7 +28,7 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
         return []
     
     if rate_limiter:
-        rate_limiter.wait_if_needed("scraping")  # ← "Scraping" type
+        rate_limiter.wait_if_needed("scraping", domain="steamcommunity.com")
     elif rate_limit:
         time.sleep(rate_limit)
     
@@ -88,7 +88,7 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                     
                     # Apply scraping rate limiting between guide requests
                     if rate_limiter:
-                        rate_limiter.wait_if_needed("scraping")  # ← Scraping type
+                        rate_limiter.wait_if_needed("scraping", domain="steamcommunity.com")
                     elif rate_limit:
                         time.sleep(rate_limit)
                     

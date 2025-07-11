@@ -41,7 +41,7 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
         return []
     
     if rate_limiter:
-        rate_limiter.wait_if_needed("scraping")  # ← "Scraping" type
+        rate_limiter.wait_if_needed("scraping", domain="pcgamingwiki.com")
     elif rate_limit:
         time.sleep(rate_limit)
     

@@ -21,6 +21,8 @@ try:
     from ..scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options
     from ..scrapers.steamcommunity import fetch_steam_community_launch_options
     from ..scrapers.game_specific import fetch_game_specific_options
+    from ..scrapers.protondb import fetch_protondb_launch_options
+    from ..scrapers.reddit_wiki import fetch_reddit_wiki_launch_options
     from ..utils.results_utils import save_test_results, save_game_results
 except ImportError:
     # Fall back to absolute imports (when run directly)
@@ -41,6 +43,8 @@ except ImportError:
     from scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options
     from scrapers.steamcommunity import fetch_steam_community_launch_options
     from scrapers.game_specific import fetch_game_specific_options
+    from scrapers.protondb import fetch_protondb_launch_options
+    from scrapers.reddit_wiki import fetch_reddit_wiki_launch_options
     from utils.results_utils import save_test_results, save_game_results
 
 class SlopScraper:
@@ -105,7 +109,7 @@ class SlopScraper:
                 if self.skip_existing:
                     self.db_client = SupabaseClient()
                     self.supabase = self.db_client.supabase
-                    print("✅ Connected to Supabase with enhanced client successfully")
+                    print("✅ Connected to Supabase with a fancy client successfully")
                     
                     # Show database statistics on startup
                     if self.debug:
@@ -223,14 +227,19 @@ class SlopScraper:
                     app_id = game['appid']
                     title = game['name']
                     
-                    game_pbar.set_description(f"Processing {title}")
+                    game_pbar.set_description(f"Games processed")
                     
                     # Collect options from different sources
                     all_options = []
                     
+                    game_pbar.write(f"\n📋 Processing {title} (App ID: {app_id})")
+                    
                     # Add game-specific options from our knowledge base
                     try:
-                        # Correct parameter order and include required cache parameter
+                        game_pbar.write(f"  🔍 Checking game-specific options...")
+                        if self.session_monitor:
+                            self.session_monitor.start_scraper_timing("Game-specific")
+                        
                         game_specific_options = fetch_game_specific_options(
                             app_id=app_id, 
                             title=title, 
@@ -238,42 +247,124 @@ class SlopScraper:
                             test_results=getattr(self, 'test_results', None),
                             test_mode=self.test_mode
                         )
+                        
+                        if self.session_monitor:
+                            elapsed = self.session_monitor.end_scraper_timing("Game-specific")
+                            game_pbar.write(f"  ✅ Game-specific: {len(game_specific_options)} options found ({elapsed:.1f}s)")
+                        else:
+                            game_pbar.write(f"  ✅ Game-specific: {len(game_specific_options)} options found")
+                        
                         if game_specific_options:
                             all_options.extend(game_specific_options)
-                            game_pbar.write(f"  Added {len(game_specific_options)} game-specific options")
                     except Exception as e:
-                        game_pbar.write(f"  Error getting game-specific options: {e}")
+                        game_pbar.write(f"  ❌ Game-specific: Error - {e}")
 
-                    # Fetch from external sources
+                    # Fetch from PCGamingWiki
                     try:
-                        # Try the basic function call - adjust if signature is different
-                        pcgaming_options = fetch_pcgamingwiki_launch_options(title)
+                        game_pbar.write(f"  🔍 Searching PCGamingWiki...")
+                        if self.session_monitor:
+                            self.session_monitor.start_scraper_timing("PCGamingWiki")
+                        
+                        pcgaming_options = fetch_pcgamingwiki_launch_options(
+                            title, 
+                            rate_limit=self.rate_limit,
+                            debug=self.debug,
+                            test_results=getattr(self, 'test_results', None),
+                            test_mode=self.test_mode,
+                            rate_limiter=self.rate_limiter,
+                            session_monitor=self.session_monitor
+                        )
+                        
+                        if self.session_monitor:
+                            elapsed = self.session_monitor.end_scraper_timing("PCGamingWiki")
+                            game_pbar.write(f"  ✅ PCGamingWiki: {len(pcgaming_options)} options found ({elapsed:.1f}s)")
+                        else:
+                            game_pbar.write(f"  ✅ PCGamingWiki: {len(pcgaming_options)} options found")
+                        
                         all_options.extend(pcgaming_options)
-                        if pcgaming_options:
-                            game_pbar.write(f"  Found {len(pcgaming_options)} options on PCGamingWiki")
-                    except TypeError as e:
-                        if "missing" in str(e) or "takes" in str(e):
-                            game_pbar.write(f"  Function signature mismatch for PCGamingWiki: {e}")
-                            # You may need to check the actual function signature
-                        else:
-                            game_pbar.write(f"  Error fetching from PCGamingWiki: {e}")
                     except Exception as e:
-                        game_pbar.write(f"  Error fetching from PCGamingWiki: {e}")
+                        game_pbar.write(f"  ❌ PCGamingWiki: Error - {e}")
                     
+                    # Fetch from Steam Community
                     try:
-                        # Try the basic function call - adjust if signature is different  
-                        steam_community_options = fetch_steam_community_launch_options(title, app_id)
-                        all_options.extend(steam_community_options)
-                        if steam_community_options:
-                            game_pbar.write(f"  Found {len(steam_community_options)} options on Steam Community")
-                    except TypeError as e:
-                        if "missing" in str(e) or "takes" in str(e):
-                            game_pbar.write(f"  Function signature mismatch for Steam Community: {e}")
-                            # You may need to check the actual function signature
+                        game_pbar.write(f"  🔍 Searching Steam Community guides...")
+                        if self.session_monitor:
+                            self.session_monitor.start_scraper_timing("Steam Community")
+                        
+                        steam_community_options = fetch_steam_community_launch_options(
+                            app_id, 
+                            game_title=title,
+                            rate_limit=self.rate_limit,
+                            debug=self.debug,
+                            test_results=getattr(self, 'test_results', None),
+                            test_mode=self.test_mode,
+                            rate_limiter=self.rate_limiter,
+                            session_monitor=self.session_monitor
+                        )
+                        
+                        if self.session_monitor:
+                            elapsed = self.session_monitor.end_scraper_timing("Steam Community")
+                            game_pbar.write(f"  ✅ Steam Community: {len(steam_community_options)} options found ({elapsed:.1f}s)")
                         else:
-                            game_pbar.write(f"  Error fetching from Steam Community: {e}")
+                            game_pbar.write(f"  ✅ Steam Community: {len(steam_community_options)} options found")
+                        
+                        all_options.extend(steam_community_options)
                     except Exception as e:
-                        game_pbar.write(f"  Error fetching from Steam Community: {e}")
+                        game_pbar.write(f"  ❌ Steam Community: Error - {e}")
+                    
+                    # Fetch from ProtonDB
+                    try:
+                        game_pbar.write(f"  🔍 Checking ProtonDB...")
+                        if self.session_monitor:
+                            self.session_monitor.start_scraper_timing("ProtonDB")
+                        
+                        protondb_options = fetch_protondb_launch_options(
+                            app_id,
+                            game_title=title,
+                            rate_limit=self.rate_limit,
+                            debug=self.debug,
+                            test_results=getattr(self, 'test_results', None),
+                            test_mode=self.test_mode,
+                            rate_limiter=self.rate_limiter,
+                            session_monitor=self.session_monitor
+                        )
+                        
+                        if self.session_monitor:
+                            elapsed = self.session_monitor.end_scraper_timing("ProtonDB")
+                            game_pbar.write(f"  ✅ ProtonDB: {len(protondb_options)} options found ({elapsed:.1f}s)")
+                        else:
+                            game_pbar.write(f"  ✅ ProtonDB: {len(protondb_options)} options found")
+                        
+                        all_options.extend(protondb_options)
+                    except Exception as e:
+                        game_pbar.write(f"  ❌ ProtonDB: Error - {e}")
+                    
+                    # Fetch from Reddit Gaming Wikis
+                    try:
+                        game_pbar.write(f"  🔍 Searching Reddit wikis...")
+                        if self.session_monitor:
+                            self.session_monitor.start_scraper_timing("Reddit Wikis")
+                        
+                        reddit_options = fetch_reddit_wiki_launch_options(
+                            title,
+                            app_id=app_id,
+                            rate_limit=self.rate_limit,
+                            debug=self.debug,
+                            test_results=getattr(self, 'test_results', None),
+                            test_mode=self.test_mode,
+                            rate_limiter=self.rate_limiter,
+                            session_monitor=self.session_monitor
+                        )
+                        
+                        if self.session_monitor:
+                            elapsed = self.session_monitor.end_scraper_timing("Reddit Wikis")
+                            game_pbar.write(f"  ✅ Reddit wikis: {len(reddit_options)} options found ({elapsed:.1f}s)")
+                        else:
+                            game_pbar.write(f"  ✅ Reddit wikis: {len(reddit_options)} options found")
+                        
+                        all_options.extend(reddit_options)
+                    except Exception as e:
+                        game_pbar.write(f"  ❌ Reddit wikis: Error - {e}")
 
                     # Deduplicate options by command
                     unique_options = []
@@ -315,7 +406,7 @@ class SlopScraper:
                         else:
                             game_pbar.write(f"⚠️ Database connection not available")
                     
-                    game_pbar.write(f"✅ Processed {title}: {len(unique_options)} unique options")
+                    game_pbar.write(f"\n✅ Completed {title}: {len(unique_options)} unique options found\n")
                     
                     # Periodically save cache during execution
                     if app_id % 3 == 0:
