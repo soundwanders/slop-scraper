@@ -402,7 +402,7 @@ def validate_usage_pattern():
             with open(pid_file, 'r') as f:
                 last_run = float(f.read().strip())
                 if time.time() - last_run < 30:  # Less than 30 seconds since last run
-                    print("⚠️ Rapid successive executions detected. Please wait at least 1 minute between runs.")
+                    print("⚠️ Rapid successive executions detected. Please wait at least 30 seconds between runs.")
                     return False
         
         # Write current timestamp

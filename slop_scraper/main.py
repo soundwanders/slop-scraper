@@ -4,6 +4,11 @@ import sys
 import argparse
 from dotenv import load_dotenv
 
+# Add the project root to Python path to enable absolute imports
+project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 try:
     # Try relative imports first (when run as module)
     from .core.scraper import SlopScraper

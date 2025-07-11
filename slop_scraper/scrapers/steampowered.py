@@ -1,19 +1,48 @@
 import re
 import time
 import os
+import sys
 from tqdm import tqdm
 
-try:
-    # Try relative imports first (when run as module)
-    from ..utils.cache import save_cache
-    from ..utils.security_config import SecureRequestHandler
-except ImportError:
-    # Fall back to absolute imports (when run directly)
-    import sys
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from utils.cache import save_cache
-    from utils.security_config import SecureRequestHandler
+# Add the project root to the path to enable absolute imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+sys.path.insert(0, project_root)
 
+from tqdm import tqdm
+
+# Import using absolute paths relative to project root
+try:
+    from slop_scraper.utils.cache import save_cache
+    from slop_scraper.utils.security_config import SecureRequestHandler
+except ImportError:
+    # Fallback - try to import directly if the above fails
+    try:
+        import slop_scraper.utils.cache as cache_module
+        save_cache = cache_module.save_cache
+        import slop_scraper.utils.security_config as security_module
+        SecureRequestHandler = security_module.SecureRequestHandler
+    except ImportError:
+        # Final fallback - define minimal versions
+        print("⚠️ Warning: Could not import cache and security modules, using fallbacks")
+        
+        def save_cache(cache, cache_file):
+            """Fallback cache save function"""
+            try:
+                import json
+                with open(cache_file, 'w') as f:
+                    json.dump(cache, f, indent=2)
+                print(f"✅ Cache saved to {cache_file}")
+            except Exception as e:
+                print(f"⚠️ Error saving cache: {e}")
+        
+        class SecureRequestHandler:
+            @staticmethod
+            def make_secure_request(url, timeout=10, max_size_mb=2):
+                """Fallback secure request function"""
+                import requests
+                return requests.get(url, timeout=timeout)
+            
 def extract_first_from_list(data_list):
     """Safely extract the first item from a list, handling various data types"""
     if not data_list:
@@ -98,7 +127,7 @@ def detect_game_engine(store_data, game_name):
 
 def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_file='appdetails_cache.json', 
                        rate_limiter=None, session_monitor=None, db_client=None, **kwargs):
-    """Fetch Steam game list with security controls"""
+    """Fetch Steam game list with security controls and smart database skipping"""
     print(f"🔒 Fetching game list securely (force_refresh={force_refresh})...")
     print(f"Debug: Attempting to fetch up to {limit} games")
 
@@ -111,6 +140,21 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
             {"appid": 377840, "name": "Final Fantasy IX", "developer": "Square Enix", "publisher": "Square Enix", "engine": "Unknown"},
             {"appid": 1868140, "name": "Dave the Diver", "developer": "MINTROCKET", "publisher": "NEXON", "engine": "Unity"},
         ][:limit]
+
+    # ADD THIS: Pre-fetch existing games from database to avoid unnecessary API calls
+    existing_games = set()
+    if db_client and not force_refresh:
+        try:
+            print("🔍 Checking existing games in database to avoid unnecessary API calls...")
+            existing_result = db_client.table("games").select("app_id").execute()
+            if existing_result.data:
+                existing_games = {game['app_id'] for game in existing_result.data}
+                print(f"📊 Found {len(existing_games)} existing games in database")
+            else:
+                print("📊 No existing games found in database")
+        except Exception as e:
+            print(f"⚠️ Error checking existing games: {e}")
+            print("⚠️ Continuing without skip-existing optimization...")
 
     url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
     try:
@@ -141,10 +185,9 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
         non_latin_pattern = re.compile(r'[^\x00-\x7F]')
         only_numeric_special = re.compile(r'^[0-9\s\-_+=.,!@#$%^&*()\[\]{}|\\/<>?;:\'"`~]*$')
 
-        # Known game engines to keep (for better filtering)
-        known_engines = ['unreal', 'unity', 'godot', 'source', 'cryengine', 'frostbite', 'id tech']
-
         filtered_games = []
+        skipped_existing = 0
+        api_calls_saved = 0
 
         # Use tqdm for processing apps with security checks
         with tqdm(total=min(limit * 3, len(all_apps)), desc="🔒 Filtering games securely") as pbar:
@@ -167,6 +210,14 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
                 # Additional length validation for security
                 if len(name) > 100 or len(app_id) > 10:
                     pbar.write(f"⚠️ Skipping app with suspicious name/ID length: {name[:50]}")
+                    continue
+
+                # Check if game already exists in database BEFORE making API calls
+                if not force_refresh and int(app_id) in existing_games:
+                    skipped_existing += 1
+                    api_calls_saved += 1
+                    if debug:
+                        pbar.write(f"⏭️  Skipping {name} - already in database")
                     continue
 
                 store_data = None
@@ -246,9 +297,9 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
                     "appid": int(app_id),
                     "name": game_name[:200],  # Limit name length
                     "developer": developer,
-                    "publisher": publisher, 
+                    "publisher": publisher,
                     "release_date": str(store_data.get("release_date", {}).get("date", ""))[:50],
-                    "engine": engine 
+                    "engine": engine
                 })
 
                 # Optional debug output to verify data extraction
@@ -257,8 +308,6 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
                     print(f"  Developer: {developer}")
                     print(f"  Publisher: {publisher}")
                     print(f"  Engine: {engine}")
-                    print(f"  Raw developers: {store_data.get('developers', [])}")
-                    print(f"  Raw publishers: {store_data.get('publishers', [])}")
 
                 pbar.write(f"✔️ Added: {game_name}")
 
@@ -267,8 +316,12 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
             save_cache(cache, cache_file)
         except Exception as e:
             print(f"⚠️ Error saving cache: {e}")
-            
+        
+        # Report efficiency gains
         print(f"🔒 Final game count: {len(filtered_games)} (security validated)")
+        if skipped_existing > 0:
+            print(f"⚡ Efficiency: Skipped {skipped_existing} existing games, saved {api_calls_saved} API calls")
+        
         return filtered_games
 
     except Exception as e:

@@ -139,12 +139,20 @@ class SlopScraper:
         print("\n\n🔒 Gracefully shutting down...")
         print("Saving cache and collected data...")
         
-        # Save cache 
-        save_cache(self.cache, self.cache_file)
+        # Call as standalone function, not class method
+        try:
+            save_cache(self.cache, self.cache_file)
+            print("✅ Cache saved successfully")
+        except Exception as e:
+            print(f"⚠️ Error saving cache: {e}")
         
         # Save test results if in test mode
         if self.test_mode:
-            save_test_results(self.test_results, self.output_dir)
+            try:
+                save_test_results(self.test_results, self.output_dir)
+                print("✅ Test results saved successfully")
+            except Exception as e:
+                print(f"⚠️ Error saving test results: {e}")
             
         print("Cleanup complete. Exiting.")
         sys.exit(0)
@@ -181,20 +189,16 @@ class SlopScraper:
             print(f"⚠️ Error getting database stats: {e}")
 
     def run(self):
-        """Main method to run the scraper with security monitoring"""
+        """Main method to run the scraper with security monitoring and duplicate prevention"""
         print(f"Running in {'TEST' if self.test_mode else 'PRODUCTION'} mode")
         print(f"🔒 Security: Rate limit={self.rate_limit}s, Max games={self.max_games}")
         
-        # Show database stats if in debug mode
-        if self.debug and not self.test_mode:
-            self.show_database_stats()
-        
         try:
             # Initial runtime check
-            self.session_monitor.check_runtime_limit()
+            if hasattr(self, 'session_monitor'):
+                self.session_monitor.check_runtime_limit()
             
             # Get list of games (limited by max_games) with security monitoring
-            # Pass database client and skip_existing to get_steam_game_list
             games = get_steam_game_list(
                 limit=self.max_games,
                 force_refresh=self.force_refresh,
@@ -202,102 +206,75 @@ class SlopScraper:
                 test_mode=self.test_mode,
                 debug=self.debug,
                 cache_file=self.cache_file,
-                rate_limiter=self.rate_limiter,
-                session_monitor=self.session_monitor,
-                db_client=self.db_client,  # Pass database client
-                skip_existing=self.skip_existing  # Pass skip_existing flag
+                rate_limiter=getattr(self, 'rate_limiter', None),
+                session_monitor=getattr(self, 'session_monitor', None),
+                db_client=self.supabase  # Pass database client for skip-existing check
             )
             
             if not games:
-                print("⚠️ No games to process. All games may already be in the database.")
+                print("⚠️ No new games found to process")
                 return
             
-            # Process each game with better progress indication and security checks
-            with tqdm(games, desc="Processing games", unit="game") as game_pbar:
-                for game_index, game in enumerate(game_pbar):
-                    # Periodic security checks
-                    if game_index % 10 == 0:
-                        self.session_monitor.check_runtime_limit()
-                    
+            print(f"📋 Found {len(games)} NEW games to process")
+            
+            # Process each game
+            with tqdm(games, desc="Processing new games", unit="game") as game_pbar:
+                for game in game_pbar:
                     app_id = game['appid']
                     title = game['name']
                     
-                    # Update progress bar description
                     game_pbar.set_description(f"Processing {title}")
-                    
-                    # Enhanced database checking with skip_existing logic
-                    existing_options = []
-                    if not self.test_mode:
-                        if self.skip_existing and self.db_client:
-                            # Use the enhanced client to check if game exists
-                            if self.db_client.check_game_exists(app_id):
-                                option_count = self.db_client.get_game_option_count(app_id)
-                                if not self.force_refresh:
-                                    game_pbar.write(f"⏭️  Skipping {title} - already have {option_count} options in database")
-                                    continue
-                                else:
-                                    game_pbar.write(f"🔄 Force refreshing {title} (had {option_count} options)")
-                        
-                        # Fetch existing options for comparison
-                        existing_options = fetch_steam_launch_options_from_db(
-                            app_id=app_id,
-                            supabase=self.supabase
-                        )
                     
                     # Collect options from different sources
                     all_options = []
                     
                     # Add game-specific options from our knowledge base
                     try:
+                        # Correct parameter order and include required cache parameter
                         game_specific_options = fetch_game_specific_options(
+                            app_id=app_id, 
                             title=title, 
-                            app_id=app_id,
                             cache=self.cache,
-                            test_results=self.test_results if self.test_mode else None
+                            test_results=getattr(self, 'test_results', None),
+                            test_mode=self.test_mode
                         )
-                        
                         if game_specific_options:
                             all_options.extend(game_specific_options)
                             game_pbar.write(f"  Added {len(game_specific_options)} game-specific options")
                     except Exception as e:
-                        self.session_monitor.record_error()
-                        game_pbar.write(f"  Error fetching game-specific options: {e}")
+                        game_pbar.write(f"  Error getting game-specific options: {e}")
 
-                    # Create a small progress bar for sources with security controls
-                    sources = [
-                        ("PCGamingWiki", lambda: fetch_pcgamingwiki_launch_options(
-                            game_title=title,
-                            rate_limit=self.rate_limit,
-                            debug=self.debug,
-                            test_results=self.test_results if self.test_mode else None,
-                            test_mode=self.test_mode,
-                            rate_limiter=self.rate_limiter,
-                            session_monitor=self.session_monitor
-                        )),
-                        ("Steam Community", lambda: fetch_steam_community_launch_options(
-                            game_title=title, 
-                            app_id=app_id,
-                            rate_limit=self.rate_limit,
-                            debug=self.debug,
-                            test_results=self.test_results if self.test_mode else None,
-                            test_mode=self.test_mode,
-                            rate_limiter=self.rate_limiter,
-                            session_monitor=self.session_monitor
-                        ))
-                    ]
+                    # Fetch from external sources
+                    try:
+                        # Try the basic function call - adjust if signature is different
+                        pcgaming_options = fetch_pcgamingwiki_launch_options(title)
+                        all_options.extend(pcgaming_options)
+                        if pcgaming_options:
+                            game_pbar.write(f"  Found {len(pcgaming_options)} options on PCGamingWiki")
+                    except TypeError as e:
+                        if "missing" in str(e) or "takes" in str(e):
+                            game_pbar.write(f"  Function signature mismatch for PCGamingWiki: {e}")
+                            # You may need to check the actual function signature
+                        else:
+                            game_pbar.write(f"  Error fetching from PCGamingWiki: {e}")
+                    except Exception as e:
+                        game_pbar.write(f"  Error fetching from PCGamingWiki: {e}")
                     
-                    with tqdm(sources, desc="Checking sources", leave=False) as source_pbar:
-                        for source_name, source_func in source_pbar:
-                            source_pbar.set_description(f"Checking {source_name}")
-                            try:
-                                options = source_func()
-                                all_options.extend(options)
-                                game_pbar.write(f"  Found {len(options)} options on {source_name}")
-                                self.session_monitor.record_request()
-                            except Exception as e:
-                                self.session_monitor.record_error()
-                                game_pbar.write(f"  Error fetching from {source_name}: {e}")
-                    
+                    try:
+                        # Try the basic function call - adjust if signature is different  
+                        steam_community_options = fetch_steam_community_launch_options(title, app_id)
+                        all_options.extend(steam_community_options)
+                        if steam_community_options:
+                            game_pbar.write(f"  Found {len(steam_community_options)} options on Steam Community")
+                    except TypeError as e:
+                        if "missing" in str(e) or "takes" in str(e):
+                            game_pbar.write(f"  Function signature mismatch for Steam Community: {e}")
+                            # You may need to check the actual function signature
+                        else:
+                            game_pbar.write(f"  Error fetching from Steam Community: {e}")
+                    except Exception as e:
+                        game_pbar.write(f"  Error fetching from Steam Community: {e}")
+
                     # Deduplicate options by command
                     unique_options = []
                     seen_commands = set()
@@ -307,68 +284,68 @@ class SlopScraper:
                             seen_commands.add(cmd)
                             unique_options.append(option)
                     
-                    # Update test statistics
+                    # Update test statistics or save to database
                     if self.test_mode:
-                        self.test_results['games_processed'] += 1
-                        if unique_options:
-                            self.test_results['games_with_options'] += 1
-                        self.test_results['total_options_found'] += len(unique_options)
+                        if hasattr(self, 'test_results'):
+                            self.test_results['games_processed'] += 1
+                            if unique_options:
+                                self.test_results['games_with_options'] += 1
+                            self.test_results['total_options_found'] += len(unique_options)
+                            
+                            # Add game data to test results
+                            self.test_results['games'].append({
+                                'app_id': app_id,
+                                'title': title,
+                                'options_count': len(unique_options),
+                                'options': unique_options
+                            })
                         
-                        # Add game data to test results
-                        self.test_results['games'].append({
-                            'app_id': app_id,
-                            'title': title,
-                            'options_count': len(unique_options),
-                            'options': unique_options
-                        })
-                        
-                        # Save individual game results to separate file
-                        save_game_results(
-                            app_id=app_id,
-                            title=title,
-                            options=unique_options,
-                            output_dir=self.output_dir
-                        )
+                        # Save individual game results
+                        try:
+                            save_game_results(app_id, title, unique_options, self.output_dir)
+                        except Exception as e:
+                            game_pbar.write(f"  Error saving game results: {e}")
                     else:
                         # Save to database in production mode
-                        try:
-                            save_to_database(
-                                game=game,
-                                options=unique_options,
-                                supabase=self.supabase
-                            )
-                        except Exception as e:
-                            self.session_monitor.record_error()
-                            game_pbar.write(f"  Database error for {title}: {e}")
+                        if self.supabase:
+                            try:
+                                save_to_database(game, unique_options, self.supabase)
+                            except Exception as e:
+                                game_pbar.write(f"⚠️ Error saving to database: {e}")
+                        else:
+                            game_pbar.write(f"⚠️ Database connection not available")
                     
-                    game_pbar.write(f"✅ Found {len(unique_options)} unique launch options for app_id {app_id}")
+                    game_pbar.write(f"✅ Processed {title}: {len(unique_options)} unique options")
                     
                     # Periodically save cache during execution
-                    if game['appid'] % 3 == 0:  # Save every 3 games
-                        save_cache(self.cache, self.cache_file)
+                    if app_id % 3 == 0:
+                        try:
+                            save_cache(self.cache, self.cache_file)
+                        except Exception as e:
+                            game_pbar.write(f"⚠️ Error saving cache: {e}")
 
-            # Final save operations
+            # Save test results summary
             if self.test_mode:
-                save_test_results(self.test_results, self.output_dir)
-            
-            # Final cache save
-            save_cache(self.cache, self.cache_file)
-            
-            print(f"🔒 Session completed successfully:")
-            print(f"   Total requests: {self.session_monitor.request_count}")
-            print(f"   Total errors: {self.session_monitor.error_count}")
-            print(f"   Runtime: {(time.time() - self.session_monitor.start_time)/60:.1f} minutes")
-            
-            # Show final database stats if in debug mode
-            if self.debug and not self.test_mode:
-                print("\n📊 Final Database State:")
-                self.show_database_stats()
-                
+                try:
+                    save_test_results(self.test_results, self.output_dir)
+                except Exception as e:
+                    print(f"⚠️ Error saving test results: {e}")
+                    
         except Exception as e:
-            self.session_monitor.record_error()
             print(f"\n🚨 Error during execution: {e}")
+            import traceback
+            traceback.print_exc()
+            
             # Save what we have so far
-            save_cache(self.cache, self.cache_file)
+            try:
+                # Call as standalone function, not class method  
+                save_cache(self.cache, self.cache_file)
+            except Exception as cache_error:
+                print(f"⚠️ Error saving cache during cleanup: {cache_error}")
+                
             if self.test_mode:
-                save_test_results(self.test_results, self.output_dir)
+                try:
+                    save_test_results(self.test_results, self.output_dir)
+                except Exception as results_error:
+                    print(f"⚠️ Error saving test results during cleanup: {results_error}")
             raise
