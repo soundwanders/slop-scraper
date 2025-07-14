@@ -141,19 +141,28 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
             {"appid": 1868140, "name": "Dave the Diver", "developer": "MINTROCKET", "publisher": "NEXON", "engine": "Unity"},
         ][:limit]
 
-    # ADD THIS: Pre-fetch existing games from database to avoid unnecessary API calls
+    # Pre-fetch existing games from database to avoid unnecessary API calls
     existing_games = set()
     if db_client and not force_refresh:
         try:
-            print("🔍 Checking existing games in database to avoid unnecessary API calls...")
-            existing_result = db_client.table("games").select("app_id").execute()
-            if existing_result.data:
-                existing_games = {game['app_id'] for game in existing_result.data}
-                print(f"📊 Found {len(existing_games)} existing games in database")
+            print("🔍 Using smart database logic for skip-existing...")
+            
+            # Check if we have the enhanced database wrapper
+            if hasattr(kwargs, 'db_client_wrapper') and kwargs['db_client_wrapper']:
+                existing_games = kwargs['db_client_wrapper'].get_smart_existing_app_ids(
+                    skip_existing=kwargs.get('skip_existing', True)
+                )
+                print(f"📊 Smart skip logic: will skip {len(existing_games)} games")
             else:
-                print("📊 No existing games found in database")
+                # Fallback to simple existing games check
+                existing_result = db_client.table("games").select("app_id").execute()
+                if existing_result.data:
+                    existing_games = {game['app_id'] for game in existing_result.data}
+                    print(f"📊 Standard skip logic: will skip {len(existing_games)} existing games")
+                else:
+                    print("📊 No existing games found in database")
         except Exception as e:
-            print(f"⚠️ Error checking existing games: {e}")
+            print(f"⚠️ Error in smart skip logic: {e}")
             print("⚠️ Continuing without skip-existing optimization...")
 
     url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
@@ -217,7 +226,7 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
                     skipped_existing += 1
                     api_calls_saved += 1
                     if debug:
-                        pbar.write(f"⏭️  Skipping {name} - already in database")
+                        pbar.write(f"⏭️  Skipping {name} - in skip list (may need reprocessing)")
                     continue
 
                 store_data = None
@@ -320,7 +329,7 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
         # Report efficiency gains
         print(f"🔒 Final game count: {len(filtered_games)} (security validated)")
         if skipped_existing > 0:
-            print(f"⚡ Efficiency: Skipped {skipped_existing} existing games, saved {api_calls_saved} API calls")
+            print(f"⚡ Efficiency: Skipped {skipped_existing} existing games")
         
         return filtered_games
 

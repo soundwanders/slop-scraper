@@ -143,11 +143,11 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                                             options.append({
                                                 'command': cmd,
                                                 'description': desc,
-                                                'source': 'Steam Community'
+                                                'source': 'Steam Community Guides'
                                             })
                             
                             # Method 2: Look for paragraphs with launch options patterns
-                            if not any(opt['source'] == 'Steam Community' for opt in options):
+                            if not any(opt['source'] == 'Steam Community Guides' for opt in options):
                                 paragraphs = guide_content.find_all(['p', 'li'])[:15]  # Limit for security
                                 for p in paragraphs:
                                     text = p.get_text(strip=True)
@@ -168,7 +168,7 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                                                 options.append({
                                                     'command': cmd,
                                                     'description': desc,
-                                                    'source': 'Steam Community'
+                                                    'source': 'Steam Community Guides' 
                                                 })
                         
                 except Exception as guide_e:
@@ -194,12 +194,12 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                     options.append({
                         'command': f"See guide: {guide['title'][:50]}",
                         'description': f"This guide may contain launch options: {guide['url']}",
-                        'source': 'Steam Community'
+                        'source': 'Steam Community Guides' 
                     })
             
             # Update test statistics
             if test_mode and test_results is not None:
-                source = 'Steam Community' 
+                source = 'Steam Community Guides' 
                 test_results.setdefault('options_by_source', {})
                 test_results['options_by_source'].setdefault(source, 0)
                 test_results['options_by_source'][source] += len(options)
