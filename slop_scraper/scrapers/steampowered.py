@@ -79,7 +79,7 @@ def detect_game_engine(store_data, game_name):
     game_name_lower = game_name.lower()
     all_text = " ".join([game_name_lower] + category_names + genre_names + developers + publishers).lower()
     
-    # Engine detection based on comzmon patterns
+    # Engine detection based on common patterns
     if any(keyword in all_text for keyword in ["source", "valve", "counter-strike", "half-life", "portal", "team fortress", "left 4 dead", "dota"]):
         return "Source Engine"
     
@@ -127,10 +127,13 @@ def detect_game_engine(store_data, game_name):
 
 def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_file='appdetails_cache.json', 
                        rate_limiter=None, session_monitor=None, db_client=None, **kwargs):
-    """Fetch Steam game list with security controls and smart database skipping"""
+    """Fetch Steam game list with FIXED skip-existing logic"""
     print(f"🔒 Fetching game list securely (force_refresh={force_refresh})...")
     print(f"Debug: Attempting to fetch up to {limit} games")
 
+    # Get skip_existing setting from kwargs
+    skip_existing = kwargs.get('skip_existing', True)
+    
     if test_mode and limit <= 10:
         print("🔒 Using test mode data for security")
         return [
@@ -141,19 +144,28 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
             {"appid": 1868140, "name": "Dave the Diver", "developer": "MINTROCKET", "publisher": "NEXON", "engine": "Unity"},
         ][:limit]
 
-    # ADD THIS: Pre-fetch existing games from database to avoid unnecessary API calls
+    # Pre-fetch existing games from database INDEPENDENTLY of force_refresh
     existing_games = set()
-    if db_client and not force_refresh:
+    if db_client and skip_existing:
         try:
-            print("🔍 Checking existing games in database to avoid unnecessary API calls...")
-            existing_result = db_client.table("games").select("app_id").execute()
-            if existing_result.data:
-                existing_games = {game['app_id'] for game in existing_result.data}
-                print(f"📊 Found {len(existing_games)} existing games in database")
+            print("🔍 Using smart database logic for skip-existing...")
+            
+            # Check if we have the database wrapper
+            if hasattr(kwargs, 'db_client_wrapper') and kwargs['db_client_wrapper']:
+                existing_games = kwargs['db_client_wrapper'].get_smart_existing_app_ids(
+                    skip_existing=skip_existing
+                )
+                print(f"📊 Smart skip logic: will skip {len(existing_games)} games")
             else:
-                print("📊 No existing games found in database")
+                # Fallback to simple existing games check
+                existing_result = db_client.table("games").select("app_id").execute()
+                if existing_result.data:
+                    existing_games = {game['app_id'] for game in existing_result.data}
+                    print(f"📊 Standard skip logic: will skip {len(existing_games)} existing games")
+                else:
+                    print("📊 No existing games found in database")
         except Exception as e:
-            print(f"⚠️ Error checking existing games: {e}")
+            print(f"⚠️ Error in smart skip logic: {e}")
             print("⚠️ Continuing without skip-existing optimization...")
 
     url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
@@ -212,8 +224,8 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
                     pbar.write(f"⚠️ Skipping app with suspicious name/ID length: {name[:50]}")
                     continue
 
-                # Check if game already exists in database BEFORE making API calls
-                if not force_refresh and int(app_id) in existing_games:
+                # FIXED: Check if game already exists in database INDEPENDENTLY of force_refresh
+                if skip_existing and int(app_id) in existing_games:
                     skipped_existing += 1
                     api_calls_saved += 1
                     if debug:
@@ -221,14 +233,19 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
                     continue
 
                 store_data = None
+                
+                # FIXED: Cache logic separated from database skip logic
+                # Check cache first (unless force_refresh is True)
                 if not force_refresh and app_id in cache:
                     store_data = cache[app_id]
+                    if debug:
+                        pbar.write(f"💾 Using cached data for {name}")
                 else:
                     # Apply Steam API rate limiting before making request
                     if rate_limiter:
                         rate_limiter.wait_if_needed("steam_api") 
                     
-                    # Fetch detailed data from store if not cached or forced refresh
+                    # Fetch detailed data from store API
                     store_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}&cc=us&l=en"
                     try:
                         # Use secure request handler for store API
@@ -244,6 +261,8 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
 
                         if store_data:
                             cache[app_id] = store_data
+                            if debug:
+                                pbar.write(f"🌐 Fetched fresh data for {name}")
                         else:
                             pbar.write(f"⚠️ No valid data for app_id {app_id}. Skipping.")
                             continue

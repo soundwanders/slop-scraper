@@ -28,7 +28,7 @@ def fetch_protondb_launch_options(app_id, game_title=None, rate_limit=None, debu
         return []
     
     if rate_limiter:
-        rate_limiter.wait_if_needed("scraping")
+        rate_limiter.wait_if_needed("scraping", domain="protondb.com")
     elif rate_limit:
         time.sleep(rate_limit)
     
@@ -60,7 +60,7 @@ def fetch_protondb_launch_options(app_id, game_title=None, rate_limit=None, debu
             reports_url = f"https://www.protondb.com/api/v1/reports/summaries/{app_id_int}/reports"
             
             if rate_limiter:
-                rate_limiter.wait_if_needed("scraping")
+                rate_limiter.wait_if_needed("scraping", domain="protondb.com")
             elif rate_limit:
                 time.sleep(rate_limit)
             

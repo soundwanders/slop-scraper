@@ -129,7 +129,6 @@ class RateLimiter:
             'pcgamingwiki.com': 15,
             'steamcommunity.com': 20,
             'protondb.com': 15,
-            'reddit.com': 10,
             'default': 10
         }
         self.domain_window = 60  # 60 second window for domain tracking

@@ -52,6 +52,12 @@ def setup_argument_parser():
     parser.add_argument('--debug', action='store_true',
                        help='Enable debug output including database stats')
     
+    # Add scraper-specific debug options
+    parser.add_argument('--debug-scrapers', action='store_true',
+                       help='Enable detailed debug output for all scrapers')
+    parser.add_argument('--test-single-game', type=str, 
+                       help='Test scrapers on a single game by name (debug mode)')
+    
     return parser
 
 def show_database_statistics():
@@ -68,6 +74,18 @@ def show_database_statistics():
         print("   Options by source:")
         for source, count in stats.get('options_by_source', {}).items():
             print(f"     {source}: {count}")
+        
+        # Show problematic options analysis
+        problematic_stats = stats.get('problematic_options', {})
+        if problematic_stats:
+            print("\n🚨 Problematic Options Analysis:")
+            for cmd, info in problematic_stats.items():
+                if info.get('exists', False):
+                    games_count = info.get('games_count', 0)
+                    source = info.get('source', 'Unknown')
+                    print(f"   {cmd}: {games_count} games (source: {source})")
+                    if games_count > 10:
+                        print(f"     ⚠️ HIGH PRIORITY for cleanup!")
         
         # Additional helpful statistics
         from database.supabase import get_games_with_few_options
@@ -90,6 +108,91 @@ def show_database_statistics():
         print(f"⚠️ Error getting database statistics: {e}")
         print("Make sure you have valid Supabase credentials and database access.")
         return False
+
+def test_single_game_scrapers(game_name, debug=True):
+    """Test all scrapers on a single game for debugging purposes"""
+    print(f"\n🧪 Testing all scrapers on '{game_name}'...")
+    
+    try:
+        # Import scrapers
+        from scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options
+        from scrapers.steamcommunity import fetch_steam_community_launch_options
+        from scrapers.protondb import fetch_protondb_launch_options
+        from scrapers.game_specific import fetch_game_specific_options
+        
+        # Mock app_id for testing (use Counter-Strike as default)
+        test_app_id = 10  # Counter-Strike
+        
+        print(f"\n1. Testing PCGamingWiki scraper...")
+        pcg_options = fetch_pcgamingwiki_launch_options(
+            game_name, 
+            rate_limit=1.0, 
+            debug=debug,
+            test_mode=True
+        )
+        print(f"   Result: {len(pcg_options)} options found")
+        for i, opt in enumerate(pcg_options[:3]):
+            print(f"     {i+1}. {opt['command']}: {opt['description'][:50]}...")
+        
+        print(f"\n2. Testing Steam Community scraper...")
+        sc_options = fetch_steam_community_launch_options(
+            test_app_id,
+            game_title=game_name,
+            rate_limit=1.0,
+            debug=debug,
+            test_mode=True
+        )
+        print(f"   Result: {len(sc_options)} options found")
+        for i, opt in enumerate(sc_options[:3]):
+            print(f"     {i+1}. {opt['command']}: {opt['description'][:50]}...")
+        
+        print(f"\n3. Testing ProtonDB scraper...")
+        pdb_options = fetch_protondb_launch_options(
+            test_app_id,
+            game_title=game_name,
+            rate_limit=1.0,
+            debug=debug,
+            test_mode=True
+        )
+        print(f"   Result: {len(pdb_options)} options found")
+        for i, opt in enumerate(pdb_options[:3]):
+            print(f"     {i+1}. {opt['command']}: {opt['description'][:50]}...")
+        
+        print(f"\n4. Testing Game-Specific scraper...")
+        cache = {}  # Empty cache for testing
+        gs_options = fetch_game_specific_options(
+            test_app_id,
+            game_name,
+            cache,
+            test_mode=True
+        )
+        print(f"   Result: {len(gs_options)} options found")
+        for i, opt in enumerate(gs_options[:3]):
+            print(f"     {i+1}. {opt['command']}: {opt['description'][:50]}...")
+        
+        # Summary
+        total_options = len(pcg_options) + len(sc_options) + len(pdb_options) + len(gs_options)
+        print(f"\n📊 Summary for '{game_name}':")
+        print(f"   PCGamingWiki: {len(pcg_options)} options")
+        print(f"   Steam Community: {len(sc_options)} options") 
+        print(f"   ProtonDB: {len(pdb_options)} options")
+        print(f"   Game-Specific: {len(gs_options)} options")
+        print(f"   Total: {total_options} options")
+        
+        if total_options == 0:
+            print("\n⚠️ NO OPTIONS FOUND! This indicates the scrapers need debugging.")
+            print("   Possible issues:")
+            print("   - Sites are blocking requests")
+            print("   - HTML structure has changed")
+            print("   - Network connectivity issues")
+            print("   - Security validation is too strict")
+        else:
+            print(f"\n✅ Found {total_options} total options - scrapers appear to be working!")
+            
+    except Exception as e:
+        print(f"❌ Error testing scrapers: {e}")
+        import traceback
+        traceback.print_exc()
 
 def main():
     """Main entry point for the application"""
@@ -116,6 +219,11 @@ def main():
     parser = setup_argument_parser()
     args = parser.parse_args()
     
+    # Handle single game testing
+    if args.test_single_game:
+        test_single_game_scrapers(args.test_single_game, debug=True)
+        sys.exit(0)
+    
     # Handle database statistics request
     if args.db_stats:
         success = show_database_statistics()
@@ -127,14 +235,28 @@ def main():
     args.limit = SecurityConfig.validate_games_limit(args.limit)
     args.output = SecurityConfig.validate_output_path(args.output, args.absolute_path)
     
+    slops_debug = args.debug or args.debug_scrapers
+    
     # Display security-validated parameters
     print(f"🔒 Validated parameters:")
     print(f"   Rate limit: {args.rate}s")
     print(f"   Games limit: {args.limit}")
     print(f"   Output directory: {args.output}")
-    print(f"   Skip existing games: {'✅' if args.skip_existing else '❌'}")  # Show skip setting
+    print(f"   Skip existing games: {'✅' if args.skip_existing else '❌'}")
     print(f"   Force refresh: {'✅' if args.force_refresh else '❌'}")
-    print(f"   Debug mode: {'✅' if args.debug else '❌'}")  # Show debug setting
+    print(f"   Debug mode: {'✅' if slops_debug else '❌'}")
+    
+    # Better guidance on flag combinations
+    if args.force_refresh and args.skip_existing:
+        print("ℹ️  Configuration: Force refresh cache but skip games already in database")
+        print("   This will refresh Steam API data but won't re-process existing games")
+    elif args.force_refresh and not args.skip_existing:
+        print("⚠️  Configuration: Force refresh cache AND re-process all games")
+        print("   This may result in duplicate processing and longer run times")
+    elif not args.force_refresh and args.skip_existing:
+        print("ℹ️  Configuration: Use cached data and skip existing games (efficient)")
+    else:
+        print("⚠️  Configuration: Use cached data but process all games")
     
     # Provide guidance on skip_existing behavior
     if not args.test and not args.skip_existing:
@@ -153,7 +275,7 @@ def main():
         test_mode=args.test,
         output_dir=args.output,
         force_refresh=args.force_refresh,
-        debug=args.debug,  # Pass debug flag
+        debug=slops_debug,  # Pass debug flag
         skip_existing=args.skip_existing  # Pass skip_existing flag
     )
     
@@ -171,6 +293,9 @@ def main():
         sys.exit(1)
     except Exception as e:
         print(f"\n🚨 Security or execution error: {e}")
+        if slops_debug:
+            import traceback
+            traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-# Simple imports that work both ways
 import os
 import sys
 
