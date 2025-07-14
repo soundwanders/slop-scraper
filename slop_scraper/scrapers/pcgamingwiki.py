@@ -33,7 +33,7 @@ def format_game_title_for_wiki(title):
 
 def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, test_results=None, 
                                     test_mode=False, rate_limiter=None, session_monitor=None):
-    """Fetch launch options from PCGamingWiki with security controls"""
+    """Fetch launch options from PCGamingWiki with debugging and error handling"""
     
     # Security validation
     if not game_title or len(game_title) > 200:
@@ -54,9 +54,18 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
     url = f"https://www.pcgamingwiki.com/wiki/{formatted_title}"
     
     if debug:
-        print(f"🔒 Fetching PCGamingWiki data securely from: {url}")
+        print(f"🔍 PCGamingWiki: Fetching {url}")
     
     try:
+        # Better User-Agent that's less likely to be blocked
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+        }
+        
         # Use secure request handler
         response = SecureRequestHandler.make_secure_request(url, timeout=15, max_size_mb=5)
         
@@ -64,10 +73,16 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
         if session_monitor:
             session_monitor.record_request()
         
+        if debug:
+            print(f"🔍 PCGamingWiki: Response status {response.status_code}")
+        
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Try to find more section headers that could contain launch options
+            if debug:
+                print(f"🔍 PCGamingWiki: Parsed HTML, length: {len(response.text)}")
+            
+            # More comprehensive section headers
             potential_section_ids = [
                 "Command_line_arguments", 
                 "Launch_options", 
@@ -76,17 +91,22 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
                 "Launch_parameters",
                 "Command-line_arguments",
                 "Command_line_parameters",
-                "Steam_launch_options"
+                "Steam_launch_options",
+                "Command_line_options",
+                "Startup_parameters",
+                "Execution_parameters"
             ]
             
             options = []
+            sections_found = []
             
             # Method 1: Find tables in relevant sections
             for section_id in potential_section_ids:
                 section = soup.find(id=section_id)
                 if section:
+                    sections_found.append(section_id)
                     if debug:
-                        print(f"🔒 Found section: {section_id}")
+                        print(f"🔍 PCGamingWiki: Found section: {section_id}")
                     
                     # Navigate up to the heading element
                     if section.parent and section.parent.name.startswith('h'):
@@ -96,14 +116,17 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
                         table = heading.find_next('table')
                         if table and 'wikitable' in table.get('class', []):
                             if debug:
-                                print(f"🔒 Found table in section {section_id}")
+                                print(f"🔍 PCGamingWiki: Found table in section {section_id}")
                             
                             rows = table.find_all('tr')[1:]  # Skip header row
-                            for row in rows:
+                            for row_idx, row in enumerate(rows):
                                 cells = row.find_all('td')
                                 if len(cells) >= 2:
                                     command = cells[0].get_text(strip=True)
                                     description = cells[1].get_text(strip=True)
+                                    
+                                    if debug and row_idx < 3:  # Show first few for debugging
+                                        print(f"🔍 PCGamingWiki: Row {row_idx}: {command} -> {description[:50]}...")
                                     
                                     # Security: Validate and limit field lengths
                                     if command and len(command) <= 100 and len(description) <= 500:
@@ -115,64 +138,87 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
                                                 'source': 'PCGamingWiki'
                                             })
             
-            # Method 2: Look for lists in relevant sections
+            if debug:
+                print(f"🔍 PCGamingWiki: Found {len(sections_found)} sections: {sections_found}")
+            
+            # Method 2: list search with better context awareness
             if not options:
+                if debug:
+                    print("🔍 PCGamingWiki: No table results, trying list method...")
+                
                 for section_id in potential_section_ids:
                     section = soup.find(id=section_id)
                     if section and section.parent:
                         heading = section.parent
                         
-                        # Find lists (ul/ol) after the heading
-                        list_element = heading.find_next(['ul', 'ol'])
-                        if list_element:
-                            list_items = list_element.find_all('li')
-                            for item in list_items:
-                                text = item.get_text(strip=True)
+                        # Look for lists within a reasonable distance from the heading
+                        next_elements = heading.find_next_siblings(limit=5)
+                        for element in next_elements:
+                            list_element = element.find(['ul', 'ol']) if hasattr(element, 'find') else None
+                            if not list_element and element.name in ['ul', 'ol']:
+                                list_element = element
+                            
+                            if list_element:
+                                if debug:
+                                    print(f"🔍 PCGamingWiki: Found list in section {section_id}")
                                 
-                                # Security: Limit text processing length
-                                if len(text) > 1000:
-                                    continue
-                                
-                                # Try to separate command from description
-                                cmd, desc = None, None
-                                if ':' in text:
-                                    parts = text.split(':', 1)
-                                    cmd = parts[0].strip()
-                                    desc = parts[1].strip()
-                                elif ' - ' in text:
-                                    parts = text.split(' - ', 1)
-                                    cmd = parts[0].strip()
-                                    desc = parts[1].strip()
-                                elif ' – ' in text:
-                                    parts = text.split(' – ', 1)
-                                    cmd = parts[0].strip()
-                                    desc = parts[1].strip()
-                                else:
-                                    # If we can't split, look for patterns like -command or --command
-                                    match = re.search(r'(-{1,2}\w+)', text)
-                                    if match:
-                                        cmd = match.group(1)
-                                        desc = text.replace(cmd, '').strip()
-                                    else:
-                                        cmd = text
-                                        desc = "No description available"
-                                
-                                # Security: Validate command and description
-                                if (cmd and cmd.strip() and len(cmd) <= 100 and 
-                                    desc and len(desc) <= 500):
-                                    # Basic security check for command format
-                                    if re.match(r'^[-+/]\w+', cmd.strip()):
-                                        options.append({
-                                            'command': cmd[:100],
-                                            'description': desc[:500],
-                                            'source': 'PCGamingWiki'
-                                        })
+                                list_items = list_element.find_all('li')
+                                for item_idx, item in enumerate(list_items):
+                                    text = item.get_text(strip=True)
+                                    
+                                    if debug and item_idx < 3:
+                                        print(f"🔍 PCGamingWiki: List item {item_idx}: {text[:50]}...")
+                                    
+                                    # Security: Limit text processing length
+                                    if len(text) > 1000:
+                                        continue
+                                    
+                                    # Multiple separator patterns
+                                    cmd, desc = None, None
+                                    separators = [':', ' - ', ' – ', ' — ', ' | ']
+                                    
+                                    for sep in separators:
+                                        if sep in text:
+                                            parts = text.split(sep, 1)
+                                            cmd = parts[0].strip()
+                                            desc = parts[1].strip()
+                                            break
+                                    
+                                    if not cmd:
+                                        # Look for patterns like -command or --command at start
+                                        match = re.search(r'^(-{1,2}\w+)', text)
+                                        if match:
+                                            cmd = match.group(1)
+                                            desc = text.replace(cmd, '').strip()
+                                        else:
+                                            # Look for patterns anywhere in text
+                                            match = re.search(r'(-{1,2}\w+)', text)
+                                            if match:
+                                                cmd = match.group(1)
+                                                desc = text.replace(cmd, '').strip()
+                                    
+                                    # Security: Validate command and description
+                                    if (cmd and cmd.strip() and len(cmd) <= 100 and 
+                                        desc and len(desc) <= 500):
+                                        # Basic security check for command format
+                                        if re.match(r'^[-+/]\w+', cmd.strip()):
+                                            options.append({
+                                                'command': cmd[:100],
+                                                'description': desc[:500],
+                                                'source': 'PCGamingWiki'
+                                            })
             
-            # Method 3: Look for code blocks or pre elements (limited for security)
+            # Method 3: code block search with better context
             if not options:
-                code_blocks = soup.find_all(['code', 'pre'])[:10]  # Limit processing
-                for block in code_blocks:
+                if debug:
+                    print("🔍 PCGamingWiki: No list results, trying code block method...")
+                
+                code_blocks = soup.find_all(['code', 'pre', 'kbd', 'samp'])[:15]  # Include more code-like elements
+                for block_idx, block in enumerate(code_blocks):
                     text = block.get_text(strip=True)
+                    
+                    if debug and block_idx < 5:
+                        print(f"🔍 PCGamingWiki: Code block {block_idx}: {text[:30]}...")
                     
                     # Security: Limit block text length
                     if len(text) > 200:
@@ -182,11 +228,23 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
                     if text.startswith('-') or text.startswith('/') or text.startswith('+'):
                         # Basic validation
                         if re.match(r'^[-+/]\w+', text):
-                            parent_text = block.parent.get_text(strip=True) if block.parent else ""
-                            if len(parent_text) > len(text) and len(parent_text) <= 500:
-                                desc = parent_text.replace(text, '', 1).strip()
-                            else:
-                                desc = "No description available"
+                            # Look for description in surrounding context
+                            desc = "No description available"
+                            
+                            # Check parent elements for description
+                            parent = block.parent
+                            if parent:
+                                parent_text = parent.get_text(strip=True)
+                                if len(parent_text) > len(text) and len(parent_text) <= 500:
+                                    desc = parent_text.replace(text, '', 1).strip()
+                                
+                                # Also check siblings
+                                if desc == "No description available" or len(desc) < 10:
+                                    next_sibling = parent.find_next_sibling()
+                                    if next_sibling:
+                                        sibling_text = next_sibling.get_text(strip=True)
+                                        if len(sibling_text) <= 300:
+                                            desc = sibling_text
                             
                             options.append({
                                 'command': text[:100],
@@ -194,35 +252,50 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
                                 'source': 'PCGamingWiki'
                             })
             
-            # Method 4: Look for text with typical command patterns (limited)
+            # Method 4: text pattern search with better validation
             if not options:
-                potential_commands = []
-                tags = soup.find_all(['p', 'li'])[:20]  # Limit processing for security
+                if debug:
+                    print("🔍 PCGamingWiki: No code block results, trying text pattern method...")
                 
-                for tag in tags:
-                    text = tag.get_text()
+                # Look for paragraphs that might contain launch options
+                paragraphs = soup.find_all(['p', 'div'])[:30]  # Increased search scope
+                
+                for para_idx, para in enumerate(paragraphs):
+                    text = para.get_text()
                     
                     # Security: Limit text processing
                     if len(text) > 1000:
                         continue
+                    
+                    # Look for launch option keywords in the paragraph
+                    if any(keyword in text.lower() for keyword in ['launch', 'command', 'argument', 'parameter', 'option']):
+                        if debug and para_idx < 5:
+                            print(f"🔍 PCGamingWiki: Relevant paragraph {para_idx}: {text[:50]}...")
                         
-                    # Look for patterns like -command, --long-option, +option, /option
-                    matches = re.finditer(r'(?:^|\s)(-{1,2}\w[\w\-]*|\+\w[\w\-]*|\/\w[\w\-]*)(?:\s|$)', text)
-                    for match in matches:
-                        cmd = match.group(1)
-                        if len(cmd) <= 50:  # Security: reasonable command length
-                            potential_commands.append({
-                                'command': cmd,
-                                'description': text[:500],  # Limit description
-                                'source': 'PCGamingWiki'
-                            })
+                        # Look for patterns like -command, --long-option, +option, /option
+                        matches = re.finditer(r'(?:^|\s)(-{1,2}\w[\w\-]*|\+\w[\w\-]*|\/\w[\w\-]*)(?:\s|$|[,.!?])', text)
+                        for match in matches:
+                            cmd = match.group(1)
+                            if len(cmd) <= 50:  # Security: reasonable command length
+                                # Extract surrounding context for description
+                                start_pos = max(0, match.start() - 50)
+                                end_pos = min(len(text), match.end() + 100)
+                                context = text[start_pos:end_pos].strip()
+                                
+                                options.append({
+                                    'command': cmd,
+                                    'description': context[:500],  # Limit description
+                                    'source': 'PCGamingWiki'
+                                })
                 
                 # De-duplicate by command (limit total for security)
                 seen_commands = set()
-                for cmd in potential_commands[:20]:  # Limit results
+                unique_options = []
+                for cmd in options[:20]:  # Limit results
                     if cmd['command'] not in seen_commands:
                         seen_commands.add(cmd['command'])
-                        options.append(cmd)
+                        unique_options.append(cmd)
+                options = unique_options
             
             # Security: Limit total options returned
             options = options[:50]
@@ -235,31 +308,55 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
                 test_results['options_by_source'][source] += len(options)
             
             if debug:
-                print(f"🔒 Found {len(options)} validated options from PCGamingWiki")
+                print(f"🔍 PCGamingWiki: Final result: {len(options)} validated options")
+                if options:
+                    print(f"🔍 PCGamingWiki: Sample options: {[opt['command'] for opt in options[:3]]}")
             
             return options
             
         elif response.status_code == 404:
             if debug:
-                print(f"🔒 PCGamingWiki page not found for '{game_title}'")
-            # Try alternative title formats (security: limit recursion)
-            alt_title = game_title.split(':')[0] if ':' in game_title else None
-            if alt_title and alt_title != game_title and len(alt_title) > 3:
-                if debug:
-                    print(f"🔒 Trying alternate title: {alt_title}")
-                # Prevent infinite recursion by not passing rate_limiter/session_monitor
-                return fetch_pcgamingwiki_launch_options(
-                    alt_title, rate_limit=rate_limit, debug=debug, 
-                    test_results=test_results, test_mode=test_mode
-                )
+                print(f"🔍 PCGamingWiki: Page not found for '{game_title}'")
+            
+            # Try alternative title formats with better logic
+            alt_titles = []
+            
+            # Remove subtitle after colon
+            if ':' in game_title:
+                alt_titles.append(game_title.split(':')[0].strip())
+            
+            # Remove edition/version info
+            edition_patterns = [r'\s+(Edition|Version|HD|Remastered|Director\'s Cut|Enhanced|Definitive).*$']
+            for pattern in edition_patterns:
+                alt_title = re.sub(pattern, '', game_title, flags=re.IGNORECASE).strip()
+                if alt_title != game_title and alt_title not in alt_titles:
+                    alt_titles.append(alt_title)
+            
+            # Try alternative titles (prevent infinite recursion)
+            for alt_title in alt_titles[:2]:  # Limit to 2 alternatives
+                if len(alt_title) > 3:
+                    if debug:
+                        print(f"🔍 PCGamingWiki: Trying alternate title: {alt_title}")
+                    # Prevent infinite recursion by not passing rate_limiter/session_monitor
+                    result = fetch_pcgamingwiki_launch_options(
+                        alt_title, rate_limit=rate_limit, debug=debug, 
+                        test_results=test_results, test_mode=test_mode
+                    )
+                    if result:
+                        return result
+            
             return []
+            
         else:
             if debug:
-                print(f"🔒 PCGamingWiki returned status code {response.status_code}")
+                print(f"🔍 PCGamingWiki: HTTP {response.status_code} for '{game_title}'")
             return []
             
     except Exception as e:
         if session_monitor:
             session_monitor.record_error()
-        print(f"🔒 Error fetching from PCGamingWiki: {e}")
+        print(f"🔍 PCGamingWiki: Error for '{game_title}': {e}")
+        if debug:
+            import traceback
+            print(f"🔍 PCGamingWiki: Full traceback: {traceback.format_exc()}")
         return []

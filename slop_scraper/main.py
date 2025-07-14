@@ -52,7 +52,7 @@ def setup_argument_parser():
     parser.add_argument('--debug', action='store_true',
                        help='Enable debug output including database stats')
     
-    # IMPROVED: Add scraper-specific debug options
+    # Add scraper-specific debug options
     parser.add_argument('--debug-scrapers', action='store_true',
                        help='Enable detailed debug output for all scrapers')
     parser.add_argument('--test-single-game', type=str, 
@@ -75,7 +75,7 @@ def show_database_statistics():
         for source, count in stats.get('options_by_source', {}).items():
             print(f"     {source}: {count}")
         
-        # IMPROVED: Show problematic options analysis
+        # Show problematic options analysis
         problematic_stats = stats.get('problematic_options', {})
         if problematic_stats:
             print("\n🚨 Problematic Options Analysis:")
@@ -219,7 +219,7 @@ def main():
     parser = setup_argument_parser()
     args = parser.parse_args()
     
-    # IMPROVED: Handle single game testing
+    # Handle single game testing
     if args.test_single_game:
         test_single_game_scrapers(args.test_single_game, debug=True)
         sys.exit(0)
@@ -246,7 +246,7 @@ def main():
     print(f"   Force refresh: {'✅' if args.force_refresh else '❌'}")
     print(f"   Debug mode: {'✅' if slops_debug else '❌'}")
     
-    # IMPROVED: Better guidance on flag combinations
+    # Better guidance on flag combinations
     if args.force_refresh and args.skip_existing:
         print("ℹ️  Configuration: Force refresh cache but skip games already in database")
         print("   This will refresh Steam API data but won't re-process existing games")
@@ -275,7 +275,7 @@ def main():
         test_mode=args.test,
         output_dir=args.output,
         force_refresh=args.force_refresh,
-        debug=slops_debug,  # Pass enhanced debug flag
+        debug=slops_debug,  # Pass debug flag
         skip_existing=args.skip_existing  # Pass skip_existing flag
     )
     
