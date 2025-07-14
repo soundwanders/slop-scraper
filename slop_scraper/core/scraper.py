@@ -190,411 +190,407 @@ class SlopScraper:
         except Exception as e:
             print(f"⚠️ Error getting database stats: {e}")
 
-    # REPLACE the existing run() method in slop_scraper/core/scraper.py 
-# Find this line (around line 160): def run(self):
-# Replace everything from that line until the end of the run method with this:
-
-def run(self):
-    """Run method with diagnostics and error handling for generic options issue"""
-    print(f"Running in {'TEST' if self.test_mode else 'PRODUCTION'} mode")
-    print(f"🔒 Security: Rate limit={self.rate_limit}s, Max games={self.max_games}")
-    print(f"🔍 Skip existing games: {'✅' if self.skip_existing else '❌'}")
-    
-    # Diagnostic counters for the generic options issue
-    scraper_stats = {
-        'total_games_processed': 0,
-        'games_with_any_options': 0,
-        'games_with_only_generic_options': 0,
-        'games_skipped_existing': 0,
-        'scraper_success_rates': {
-            'Game-Specific': {'success': 0, 'attempts': 0},
-            'PCGamingWiki': {'success': 0, 'attempts': 0},
-            'Steam Community': {'success': 0, 'attempts': 0},
-            'ProtonDB': {'success': 0, 'attempts': 0}
+    def run(self):
+        """Run method with diagnostics and error handling for generic options issue"""
+        print(f"Running in {'TEST' if self.test_mode else 'PRODUCTION'} mode")
+        print(f"🔒 Security: Rate limit={self.rate_limit}s, Max games={self.max_games}")
+        print(f"🔍 Skip existing games: {'✅' if self.skip_existing else '❌'}")
+        
+        # Diagnostic counters for the generic options issue
+        scraper_stats = {
+            'total_games_processed': 0,
+            'games_with_any_options': 0,
+            'games_with_only_generic_options': 0,
+            'games_skipped_existing': 0,
+            'scraper_success_rates': {
+                'Game-Specific': {'success': 0, 'attempts': 0},
+                'PCGamingWiki': {'success': 0, 'attempts': 0},
+                'Steam Community': {'success': 0, 'attempts': 0},
+                'ProtonDB': {'success': 0, 'attempts': 0}
+            }
         }
-    }
-    
-    try:
-        # Initial runtime check
-        if hasattr(self, 'session_monitor'):
-            self.session_monitor.check_runtime_limit()
         
-        # Get list of games (limited by max_games) with database checking
-        games = get_steam_game_list(
-            limit=self.max_games,
-            force_refresh=self.force_refresh,
-            cache=self.cache,
-            test_mode=self.test_mode,
-            debug=self.debug,
-            cache_file=self.cache_file,
-            rate_limiter=getattr(self, 'rate_limiter', None),
-            session_monitor=getattr(self, 'session_monitor', None),
-            db_client=self.supabase,  # Pass database client for skip-existing logic
-            skip_existing=self.skip_existing,  # Pass skip_existing setting
-            db_client_wrapper=self.db_client  # Pass the database wrapper
-        )
-        
-        if not games:
-            print("⚠️ No new games found to process")
-            return
-        
-        print(f"📋 Found {len(games)} games to process")
-        
-        # Process each game with diagnostics
-        with tqdm(games, desc="Processing games", unit="game") as game_pbar:
-            for game in game_pbar:
-                app_id = game['appid']
-                title = game['name']
-                
-                game_pbar.set_description(f"Processing {title[:25]}...")
-                scraper_stats['total_games_processed'] += 1
-                
-                # Check if this game was skipped due to existing data
-                if hasattr(game, '_skipped_existing') and game._skipped_existing:
-                    scraper_stats['games_skipped_existing'] += 1
-                    continue
-                
-                # Collect options from different sources with detailed tracking
-                all_options = []
-                source_options = {}
-                
-                game_pbar.write(f"\n📋 Processing {title} (App ID: {app_id})")
-                
-                # 1. Game-specific options
-                try:
-                    game_pbar.write(f"  🔍 Checking game-specific options...")
-                    scraper_stats['scraper_success_rates']['Game-Specific']['attempts'] += 1
-                    
-                    if self.session_monitor:
-                        self.session_monitor.start_scraper_timing("Game-specific")
-                    
-                    game_specific_options = fetch_game_specific_options(
-                        app_id=app_id, 
-                        title=title, 
-                        cache=self.cache,
-                        test_results=getattr(self, 'test_results', None),
-                        test_mode=self.test_mode
-                    )
-                    
-                    if self.session_monitor:
-                        elapsed = self.session_monitor.end_scraper_timing("Game-specific")
-                        timing_info = f" ({elapsed:.1f}s)"
-                    else:
-                        timing_info = ""
-                    
-                    if game_specific_options:
-                        scraper_stats['scraper_success_rates']['Game-Specific']['success'] += 1
-                        source_options['Game-Specific'] = game_specific_options
-                        all_options.extend(game_specific_options)
-                        
-                        # Check if only generic/universal options (this was the bug)
-                        generic_commands = {'-windowed', '-fullscreen'}
-                        problematic_commands = {'-fps_max', '-nojoy', '-nosplash'}
-                        
-                        commands = {opt['command'] for opt in game_specific_options}
-                        only_generic = commands.issubset(generic_commands)
-                        has_problematic = bool(commands & problematic_commands)
-                        
-                        if only_generic:
-                            game_pbar.write(f"  ⚠️ Only universal options found (this is normal for unrecognized engines)")
-                        elif has_problematic:
-                            game_pbar.write(f"  🚨 WARNING: Found old problematic generic options!")
-                    
-                    game_pbar.write(f"  ✅ Game-specific: {len(game_specific_options)} options found{timing_info}")
-                    
-                except Exception as e:
-                    game_pbar.write(f"  ❌ Game-specific: Error - {e}")
-
-                # 2. PCGamingWiki
-                try:
-                    game_pbar.write(f"  🔍 Searching PCGamingWiki...")
-                    scraper_stats['scraper_success_rates']['PCGamingWiki']['attempts'] += 1
-                    
-                    if self.session_monitor:
-                        self.session_monitor.start_scraper_timing("PCGamingWiki")
-                    
-                    pcgaming_options = fetch_pcgamingwiki_launch_options(
-                        title, 
-                        rate_limit=self.rate_limit,
-                        debug=self.debug,
-                        test_results=getattr(self, 'test_results', None),
-                        test_mode=self.test_mode,
-                        rate_limiter=self.rate_limiter,
-                        session_monitor=self.session_monitor
-                    )
-                    
-                    if self.session_monitor:
-                        elapsed = self.session_monitor.end_scraper_timing("PCGamingWiki")
-                        timing_info = f" ({elapsed:.1f}s)"
-                    else:
-                        timing_info = ""
-                    
-                    if pcgaming_options:
-                        scraper_stats['scraper_success_rates']['PCGamingWiki']['success'] += 1
-                        source_options['PCGamingWiki'] = pcgaming_options
-                        all_options.extend(pcgaming_options)
-                    
-                    game_pbar.write(f"  ✅ PCGamingWiki: {len(pcgaming_options)} options found{timing_info}")
-                    
-                except Exception as e:
-                    game_pbar.write(f"  ❌ PCGamingWiki: Error - {e}")
-
-                # 3. Steam Community
-                try:
-                    game_pbar.write(f"  🔍 Searching Steam Community guides...")
-                    scraper_stats['scraper_success_rates']['Steam Community']['attempts'] += 1
-                    
-                    if self.session_monitor:
-                        self.session_monitor.start_scraper_timing("Steam Community")
-                    
-                    steam_community_options = fetch_steam_community_launch_options(
-                        app_id, 
-                        game_title=title,
-                        rate_limit=self.rate_limit,
-                        debug=self.debug,
-                        test_results=getattr(self, 'test_results', None),
-                        test_mode=self.test_mode,
-                        rate_limiter=self.rate_limiter,
-                        session_monitor=self.session_monitor
-                    )
-                    
-                    if self.session_monitor:
-                        elapsed = self.session_monitor.end_scraper_timing("Steam Community")
-                        timing_info = f" ({elapsed:.1f}s)"
-                    else:
-                        timing_info = ""
-                    
-                    if steam_community_options:
-                        scraper_stats['scraper_success_rates']['Steam Community']['success'] += 1
-                        source_options['Steam Community'] = steam_community_options
-                        all_options.extend(steam_community_options)
-                    
-                    game_pbar.write(f"  ✅ Steam Community: {len(steam_community_options)} options found{timing_info}")
-                    
-                except Exception as e:
-                    game_pbar.write(f"  ❌ Steam Community: Error - {e}")
-
-                # 4. ProtonDB
-                try:
-                    game_pbar.write(f"  🔍 Checking ProtonDB...")
-                    scraper_stats['scraper_success_rates']['ProtonDB']['attempts'] += 1
-                    
-                    if self.session_monitor:
-                        self.session_monitor.start_scraper_timing("ProtonDB")
-                    
-                    protondb_options = fetch_protondb_launch_options(
-                        app_id,
-                        game_title=title,
-                        rate_limit=self.rate_limit,
-                        debug=self.debug,
-                        test_results=getattr(self, 'test_results', None),
-                        test_mode=self.test_mode,
-                        rate_limiter=self.rate_limiter,
-                        session_monitor=self.session_monitor
-                    )
-                    
-                    if self.session_monitor:
-                        elapsed = self.session_monitor.end_scraper_timing("ProtonDB")
-                        timing_info = f" ({elapsed:.1f}s)"
-                    else:
-                        timing_info = ""
-                    
-                    if protondb_options:
-                        scraper_stats['scraper_success_rates']['ProtonDB']['success'] += 1
-                        source_options['ProtonDB'] = protondb_options
-                        all_options.extend(protondb_options)
-                    
-                    game_pbar.write(f"  ✅ ProtonDB: {len(protondb_options)} options found{timing_info}")
-                    
-                except Exception as e:
-                    game_pbar.write(f"  ❌ ProtonDB: Error - {e}")
-
-                # Deduplication with source priority
-                unique_options = self.deduplicate_with_priority(all_options)
-                
-                # Analyze option quality (detect generic options issue)
-                if unique_options:
-                    scraper_stats['games_with_any_options'] += 1
-                    
-                    # Check for the old problematic generic options
-                    problematic_commands = {'-fps_max', '-nojoy', '-nosplash'}
-                    generic_commands = {'-windowed', '-fullscreen'}
-                    
-                    commands = {opt['command'] for opt in unique_options}
-                    has_problematic = bool(commands & problematic_commands)
-                    only_basic_generic = len(commands) <= 2 and commands.issubset(generic_commands | problematic_commands)
-                    
-                    if has_problematic:
-                        game_pbar.write(f"  🚨 WARNING: Found old problematic options: {commands & problematic_commands}")
-                    elif only_basic_generic:
-                        scraper_stats['games_with_only_generic_options'] += 1
-                        game_pbar.write(f"  ⚠️ Only basic generic options found")
-
-                # Update test statistics or save to database
-                if self.test_mode:
-                    if hasattr(self, 'test_results'):
-                        self.test_results['games_processed'] += 1
-                        if unique_options:
-                            self.test_results['games_with_options'] += 1
-                        self.test_results['total_options_found'] += len(unique_options)
-                        
-                        # Add game data to test results
-                        self.test_results['games'].append({
-                            'app_id': app_id,
-                            'title': title,
-                            'options_count': len(unique_options),
-                            'options': unique_options
-                        })
-                    
-                    # Save individual game results
-                    try:
-                        save_game_results(app_id, title, unique_options, self.output_dir)
-                    except Exception as e:
-                        game_pbar.write(f"  Error saving game results: {e}")
-                else:
-                    # Save to database in production mode
-                    if self.supabase:
-                        try:
-                            save_to_database(game, unique_options, self.supabase)
-                        except Exception as e:
-                            game_pbar.write(f"⚠️ Error saving to database: {e}")
-                    else:
-                        game_pbar.write(f"⚠️ Database connection not available")
-                
-                game_pbar.write(f"\n✅ Completed {title}: {len(unique_options)} unique options found")
-                if source_options:
-                    sources_str = ", ".join(f"{k}({len(v)})" for k, v in source_options.items())
-                    game_pbar.write(f"   Sources: {sources_str}\n")
-                
-                # Periodically save cache during execution
-                if app_id % 3 == 0:
-                    try:
-                        save_cache(self.cache, self.cache_file)
-                    except Exception as e:
-                        game_pbar.write(f"⚠️ Error saving cache: {e}")
-
-        # Print comprehensive diagnostics for generic options issue
-        self.print_scraper_diagnostics(scraper_stats)
-
-        # Save test results summary
-        if self.test_mode:
-            try:
-                save_test_results(self.test_results, self.output_dir)
-            except Exception as e:
-                print(f"⚠️ Error saving test results: {e}")
-                
-    except Exception as e:
-        print(f"\n🚨 Error during execution: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Save what we have so far
         try:
-            save_cache(self.cache, self.cache_file)
-        except Exception as cache_error:
-            print(f"⚠️ Error saving cache during cleanup: {cache_error}")
+            # Initial runtime check
+            if hasattr(self, 'session_monitor'):
+                self.session_monitor.check_runtime_limit()
             
-        if self.test_mode:
+            # Get list of games (limited by max_games) with database checking
+            games = get_steam_game_list(
+                limit=self.max_games,
+                force_refresh=self.force_refresh,
+                cache=self.cache,
+                test_mode=self.test_mode,
+                debug=self.debug,
+                cache_file=self.cache_file,
+                rate_limiter=getattr(self, 'rate_limiter', None),
+                session_monitor=getattr(self, 'session_monitor', None),
+                db_client=self.supabase,  # Pass database client for skip-existing logic
+                skip_existing=self.skip_existing,  # Pass skip_existing setting
+                db_client_wrapper=self.db_client  # Pass the database wrapper
+            )
+            
+            if not games:
+                print("⚠️ No new games found to process")
+                return
+            
+            print(f"📋 Found {len(games)} games to process")
+            
+            # Process each game with diagnostics
+            with tqdm(games, desc="Processing games", unit="game") as game_pbar:
+                for game in game_pbar:
+                    app_id = game['appid']
+                    title = game['name']
+                    
+                    game_pbar.set_description(f"Processing {title[:25]}...")
+                    scraper_stats['total_games_processed'] += 1
+                    
+                    # Check if this game was skipped due to existing data
+                    if hasattr(game, '_skipped_existing') and game._skipped_existing:
+                        scraper_stats['games_skipped_existing'] += 1
+                        continue
+                    
+                    # Collect options from different sources with detailed tracking
+                    all_options = []
+                    source_options = {}
+                    
+                    game_pbar.write(f"\n📋 Processing {title} (App ID: {app_id})")
+                    
+                    # 1. Game-specific options
+                    try:
+                        game_pbar.write(f"  🔍 Checking game-specific options...")
+                        scraper_stats['scraper_success_rates']['Game-Specific']['attempts'] += 1
+                        
+                        if self.session_monitor:
+                            self.session_monitor.start_scraper_timing("Game-specific")
+                        
+                        game_specific_options = fetch_game_specific_options(
+                            app_id=app_id, 
+                            title=title, 
+                            cache=self.cache,
+                            test_results=getattr(self, 'test_results', None),
+                            test_mode=self.test_mode
+                        )
+                        
+                        if self.session_monitor:
+                            elapsed = self.session_monitor.end_scraper_timing("Game-specific")
+                            timing_info = f" ({elapsed:.1f}s)"
+                        else:
+                            timing_info = ""
+                        
+                        if game_specific_options:
+                            scraper_stats['scraper_success_rates']['Game-Specific']['success'] += 1
+                            source_options['Game-Specific'] = game_specific_options
+                            all_options.extend(game_specific_options)
+                            
+                            # Check if only generic/universal options (this was the bug)
+                            generic_commands = {'-windowed', '-fullscreen'}
+                            problematic_commands = {'-fps_max', '-nojoy', '-nosplash'}
+                            
+                            commands = {opt['command'] for opt in game_specific_options}
+                            only_generic = commands.issubset(generic_commands)
+                            has_problematic = bool(commands & problematic_commands)
+                            
+                            if only_generic:
+                                game_pbar.write(f"  ⚠️ Only universal options found (this is normal for unrecognized engines)")
+                            elif has_problematic:
+                                game_pbar.write(f"  🚨 WARNING: Found old problematic generic options!")
+                        
+                        game_pbar.write(f"  ✅ Game-specific: {len(game_specific_options)} options found{timing_info}")
+                        
+                    except Exception as e:
+                        game_pbar.write(f"  ❌ Game-specific: Error - {e}")
+
+                    # 2. PCGamingWiki
+                    try:
+                        game_pbar.write(f"  🔍 Searching PCGamingWiki...")
+                        scraper_stats['scraper_success_rates']['PCGamingWiki']['attempts'] += 1
+                        
+                        if self.session_monitor:
+                            self.session_monitor.start_scraper_timing("PCGamingWiki")
+                        
+                        pcgaming_options = fetch_pcgamingwiki_launch_options(
+                            title, 
+                            rate_limit=self.rate_limit,
+                            debug=self.debug,
+                            test_results=getattr(self, 'test_results', None),
+                            test_mode=self.test_mode,
+                            rate_limiter=self.rate_limiter,
+                            session_monitor=self.session_monitor
+                        )
+                        
+                        if self.session_monitor:
+                            elapsed = self.session_monitor.end_scraper_timing("PCGamingWiki")
+                            timing_info = f" ({elapsed:.1f}s)"
+                        else:
+                            timing_info = ""
+                        
+                        if pcgaming_options:
+                            scraper_stats['scraper_success_rates']['PCGamingWiki']['success'] += 1
+                            source_options['PCGamingWiki'] = pcgaming_options
+                            all_options.extend(pcgaming_options)
+                        
+                        game_pbar.write(f"  ✅ PCGamingWiki: {len(pcgaming_options)} options found{timing_info}")
+                        
+                    except Exception as e:
+                        game_pbar.write(f"  ❌ PCGamingWiki: Error - {e}")
+
+                    # 3. Steam Community
+                    try:
+                        game_pbar.write(f"  🔍 Searching Steam Community guides...")
+                        scraper_stats['scraper_success_rates']['Steam Community']['attempts'] += 1
+                        
+                        if self.session_monitor:
+                            self.session_monitor.start_scraper_timing("Steam Community")
+                        
+                        steam_community_options = fetch_steam_community_launch_options(
+                            app_id, 
+                            game_title=title,
+                            rate_limit=self.rate_limit,
+                            debug=self.debug,
+                            test_results=getattr(self, 'test_results', None),
+                            test_mode=self.test_mode,
+                            rate_limiter=self.rate_limiter,
+                            session_monitor=self.session_monitor
+                        )
+                        
+                        if self.session_monitor:
+                            elapsed = self.session_monitor.end_scraper_timing("Steam Community")
+                            timing_info = f" ({elapsed:.1f}s)"
+                        else:
+                            timing_info = ""
+                        
+                        if steam_community_options:
+                            scraper_stats['scraper_success_rates']['Steam Community']['success'] += 1
+                            source_options['Steam Community'] = steam_community_options
+                            all_options.extend(steam_community_options)
+                        
+                        game_pbar.write(f"  ✅ Steam Community: {len(steam_community_options)} options found{timing_info}")
+                        
+                    except Exception as e:
+                        game_pbar.write(f"  ❌ Steam Community: Error - {e}")
+
+                    # 4. ProtonDB
+                    try:
+                        game_pbar.write(f"  🔍 Checking ProtonDB...")
+                        scraper_stats['scraper_success_rates']['ProtonDB']['attempts'] += 1
+                        
+                        if self.session_monitor:
+                            self.session_monitor.start_scraper_timing("ProtonDB")
+                        
+                        protondb_options = fetch_protondb_launch_options(
+                            app_id,
+                            game_title=title,
+                            rate_limit=self.rate_limit,
+                            debug=self.debug,
+                            test_results=getattr(self, 'test_results', None),
+                            test_mode=self.test_mode,
+                            rate_limiter=self.rate_limiter,
+                            session_monitor=self.session_monitor
+                        )
+                        
+                        if self.session_monitor:
+                            elapsed = self.session_monitor.end_scraper_timing("ProtonDB")
+                            timing_info = f" ({elapsed:.1f}s)"
+                        else:
+                            timing_info = ""
+                        
+                        if protondb_options:
+                            scraper_stats['scraper_success_rates']['ProtonDB']['success'] += 1
+                            source_options['ProtonDB'] = protondb_options
+                            all_options.extend(protondb_options)
+                        
+                        game_pbar.write(f"  ✅ ProtonDB: {len(protondb_options)} options found{timing_info}")
+                        
+                    except Exception as e:
+                        game_pbar.write(f"  ❌ ProtonDB: Error - {e}")
+
+                    # Deduplication with source priority
+                    unique_options = self.deduplicate_with_priority(all_options)
+                    
+                    # Analyze option quality (detect generic options issue)
+                    if unique_options:
+                        scraper_stats['games_with_any_options'] += 1
+                        
+                        # Check for the old problematic generic options
+                        problematic_commands = {'-fps_max', '-nojoy', '-nosplash'}
+                        generic_commands = {'-windowed', '-fullscreen'}
+                        
+                        commands = {opt['command'] for opt in unique_options}
+                        has_problematic = bool(commands & problematic_commands)
+                        only_basic_generic = len(commands) <= 2 and commands.issubset(generic_commands | problematic_commands)
+                        
+                        if has_problematic:
+                            game_pbar.write(f"  🚨 WARNING: Found old problematic options: {commands & problematic_commands}")
+                        elif only_basic_generic:
+                            scraper_stats['games_with_only_generic_options'] += 1
+                            game_pbar.write(f"  ⚠️ Only basic generic options found")
+
+                    # Update test statistics or save to database
+                    if self.test_mode:
+                        if hasattr(self, 'test_results'):
+                            self.test_results['games_processed'] += 1
+                            if unique_options:
+                                self.test_results['games_with_options'] += 1
+                            self.test_results['total_options_found'] += len(unique_options)
+                            
+                            # Add game data to test results
+                            self.test_results['games'].append({
+                                'app_id': app_id,
+                                'title': title,
+                                'options_count': len(unique_options),
+                                'options': unique_options
+                            })
+                        
+                        # Save individual game results
+                        try:
+                            save_game_results(app_id, title, unique_options, self.output_dir)
+                        except Exception as e:
+                            game_pbar.write(f"  Error saving game results: {e}")
+                    else:
+                        # Save to database in production mode
+                        if self.supabase:
+                            try:
+                                save_to_database(game, unique_options, self.supabase)
+                            except Exception as e:
+                                game_pbar.write(f"⚠️ Error saving to database: {e}")
+                        else:
+                            game_pbar.write(f"⚠️ Database connection not available")
+                    
+                    game_pbar.write(f"\n✅ Completed {title}: {len(unique_options)} unique options found")
+                    if source_options:
+                        sources_str = ", ".join(f"{k}({len(v)})" for k, v in source_options.items())
+                        game_pbar.write(f"   Sources: {sources_str}\n")
+                    
+                    # Periodically save cache during execution
+                    if app_id % 3 == 0:
+                        try:
+                            save_cache(self.cache, self.cache_file)
+                        except Exception as e:
+                            game_pbar.write(f"⚠️ Error saving cache: {e}")
+
+            # Print comprehensive diagnostics for generic options issue
+            self.print_scraper_diagnostics(scraper_stats)
+
+            # Save test results summary
+            if self.test_mode:
+                try:
+                    save_test_results(self.test_results, self.output_dir)
+                except Exception as e:
+                    print(f"⚠️ Error saving test results: {e}")
+                    
+        except Exception as e:
+            print(f"\n🚨 Error during execution: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Save what we have so far
             try:
-                save_test_results(self.test_results, self.output_dir)
-            except Exception as results_error:
-                print(f"⚠️ Error saving test results during cleanup: {results_error}")
-        raise
+                save_cache(self.cache, self.cache_file)
+            except Exception as cache_error:
+                print(f"⚠️ Error saving cache during cleanup: {cache_error}")
+                
+            if self.test_mode:
+                try:
+                    save_test_results(self.test_results, self.output_dir)
+                except Exception as results_error:
+                    print(f"⚠️ Error saving test results during cleanup: {results_error}")
+            raise
 
-def deduplicate_with_priority(self, all_options):
-    """Deduplication with source priority to fix conflicts"""
-    unique_options = []
-    seen_commands = {}  # Track command -> best_option mapping
-    
-    # Source priority for resolving conflicts (higher = better)
-    source_priority = {
-        'PCGamingWiki': 9,      # Highest - most reliable
-        'Steam Community': 8,   # High - community verified
-        'Source Engine': 7,     # High for Source games
-        'Unity Engine': 7,      # High for Unity games
-        'Unreal Engine': 7,     # High for Unreal games
-        'id Tech': 7,           # High for id Tech games
-        'Minecraft Java': 8,    # High for Minecraft
-        'Creation Engine': 7,   # High for Bethesda games
-        'Frostbite Engine': 7,  # High for EA games
-        'ProtonDB': 6,          # Medium-high - Linux specific
-        'Universal': 3,         # Low - basic universal options
-        'Generic': 1,           # Lowest - old generic system
-        'Launch Option': 1      # Lowest - old problematic system
-    }
-    
-    for option in all_options:
-        cmd = option['command'].strip().lower()
+    def deduplicate_with_priority(self, all_options):
+        """Deduplication with source priority to fix conflicts"""
+        unique_options = []
+        seen_commands = {}  # Track command -> best_option mapping
         
-        if cmd not in seen_commands:
-            seen_commands[cmd] = option
-        else:
-            # Resolve conflicts by source priority
-            existing_option = seen_commands[cmd]
-            existing_priority = source_priority.get(existing_option['source'], 0)
-            new_priority = source_priority.get(option['source'], 0)
+        # Source priority for resolving conflicts (higher = better)
+        source_priority = {
+            'PCGamingWiki': 9,      # Highest - most reliable
+            'Steam Community': 8,   # High - community verified
+            'Source Engine': 7,     # High for Source games
+            'Unity Engine': 7,      # High for Unity games
+            'Unreal Engine': 7,     # High for Unreal games
+            'id Tech': 7,           # High for id Tech games
+            'Minecraft Java': 8,    # High for Minecraft
+            'Creation Engine': 7,   # High for Bethesda games
+            'Frostbite Engine': 7,  # High for EA games
+            'ProtonDB': 6,          # Medium-high - Linux specific
+            'Universal': 3,         # Low - basic universal options
+            'Generic': 1,           # Lowest - old generic system
+            'Launch Option': 1      # Lowest - old problematic system
+        }
+        
+        for option in all_options:
+            cmd = option['command'].strip().lower()
             
-            if new_priority > existing_priority:
+            if cmd not in seen_commands:
                 seen_commands[cmd] = option
-    
-    unique_options = list(seen_commands.values())
-    
-    if self.debug:
-        print(f"  🔍 Deduplication: {len(all_options)} → {len(unique_options)} options")
-    
-    return unique_options
-
-def print_scraper_diagnostics(self, stats):
-    """Print comprehensive diagnostics specifically for the generic options issue"""
-    print("\n" + "="*70)
-    print("📊 SCRAPER DIAGNOSTICS - GENERIC OPTIONS ISSUE ANALYSIS")
-    print("="*70)
-    
-    print(f"Total games processed: {stats['total_games_processed']}")
-    print(f"Games with any options: {stats['games_with_any_options']}")
-    print(f"Games with only generic options: {stats['games_with_only_generic_options']}")
-    print(f"Games skipped (existing): {stats['games_skipped_existing']}")
-    
-    if stats['total_games_processed'] > 0:
-        success_rate = (stats['games_with_any_options'] / stats['total_games_processed']) * 100
-        print(f"Overall success rate: {success_rate:.1f}%")
-        
-        if stats['games_with_any_options'] > 0:
-            generic_rate = (stats['games_with_only_generic_options'] / stats['games_with_any_options']) * 100
-            print(f"Generic-only rate: {generic_rate:.1f}%", end="")
-            if generic_rate > 50:
-                print(" 🚨 HIGH - Bug likely still present!")
-            elif generic_rate > 25:
-                print(" ⚠️ MODERATE - Some issues remain")
-            elif generic_rate > 10:
-                print(" ⚠️ LOW - Minor issues")
             else:
-                print(" ✅ GOOD - Bug appears fixed!")
-    
-    print("\nScraper Success Rates:")
-    for scraper, data in stats['scraper_success_rates'].items():
-        if data['attempts'] > 0:
-            rate = (data['success'] / data['attempts']) * 100
-            status = "✅" if rate > 50 else "⚠️" if rate > 20 else "❌"
-            print(f"  {scraper:<15}: {rate:5.1f}% ({data['success']}/{data['attempts']}) {status}")
+                # Resolve conflicts by source priority
+                existing_option = seen_commands[cmd]
+                existing_priority = source_priority.get(existing_option['source'], 0)
+                new_priority = source_priority.get(option['source'], 0)
+                
+                if new_priority > existing_priority:
+                    seen_commands[cmd] = option
+        
+        unique_options = list(seen_commands.values())
+        
+        if self.debug:
+            print(f"  🔍 Deduplication: {len(all_options)} → {len(unique_options)} options")
+        
+        return unique_options
+
+    def print_scraper_diagnostics(self, stats):
+        """Print comprehensive diagnostics specifically for the generic options issue"""
+        print("\n" + "="*70)
+        print("📊 SCRAPER DIAGNOSTICS - GENERIC OPTIONS ISSUE ANALYSIS")
+        print("="*70)
+        
+        print(f"Total games processed: {stats['total_games_processed']}")
+        print(f"Games with any options: {stats['games_with_any_options']}")
+        print(f"Games with only generic options: {stats['games_with_only_generic_options']}")
+        print(f"Games skipped (existing): {stats['games_skipped_existing']}")
+        
+        if stats['total_games_processed'] > 0:
+            success_rate = (stats['games_with_any_options'] / stats['total_games_processed']) * 100
+            print(f"Overall success rate: {success_rate:.1f}%")
+            
+            if stats['games_with_any_options'] > 0:
+                generic_rate = (stats['games_with_only_generic_options'] / stats['games_with_any_options']) * 100
+                print(f"Generic-only rate: {generic_rate:.1f}%", end="")
+                if generic_rate > 50:
+                    print(" 🚨 HIGH - Bug likely still present!")
+                elif generic_rate > 25:
+                    print(" ⚠️ MODERATE - Some issues remain")
+                elif generic_rate > 10:
+                    print(" ⚠️ LOW - Minor issues")
+                else:
+                    print(" ✅ GOOD - Bug appears fixed!")
+        
+        print("\nScraper Success Rates:")
+        for scraper, data in stats['scraper_success_rates'].items():
+            if data['attempts'] > 0:
+                rate = (data['success'] / data['attempts']) * 100
+                status = "✅" if rate > 50 else "⚠️" if rate > 20 else "❌"
+                print(f"  {scraper:<15}: {rate:5.1f}% ({data['success']}/{data['attempts']}) {status}")
+            else:
+                print(f"  {scraper:<15}: No attempts")
+        
+        print("\n💡 Recommendations:")
+        if stats['games_with_only_generic_options'] > stats['games_with_any_options'] * 0.5:
+            print("  🚨 HIGH generic-only rate suggests the bug persists")
+            print("  → Check if game_specific.py was properly replaced")
+            print("  → Verify engine detection is working")
+        elif stats['games_with_only_generic_options'] > 0:
+            print("  ⚠️ Some games still have only generic options")
+            print("  → This is normal for games with unrecognized engines")
         else:
-            print(f"  {scraper:<15}: No attempts")
-    
-    print("\n💡 Recommendations:")
-    if stats['games_with_only_generic_options'] > stats['games_with_any_options'] * 0.5:
-        print("  🚨 HIGH generic-only rate suggests the bug persists")
-        print("  → Check if game_specific.py was properly replaced")
-        print("  → Verify engine detection is working")
-    elif stats['games_with_only_generic_options'] > 0:
-        print("  ⚠️ Some games still have only generic options")
-        print("  → This is normal for games with unrecognized engines")
-    else:
-        print("  ✅ No generic-only games found - bug appears fixed!")
-    
-    for scraper, data in stats['scraper_success_rates'].items():
-        if data['attempts'] > 0:
-            rate = (data['success'] / data['attempts']) * 100
-            if rate < 20:
-                print(f"  ⚠️ {scraper} has low success rate ({rate:.1f}%) - investigate")
-    
-    print("="*70)
+            print("  ✅ No generic-only games found - bug appears fixed!")
+        
+        for scraper, data in stats['scraper_success_rates'].items():
+            if data['attempts'] > 0:
+                rate = (data['success'] / data['attempts']) * 100
+                if rate < 20:
+                    print(f"  ⚠️ {scraper} has low success rate ({rate:.1f}%) - investigate")
+        
+        print("="*70)

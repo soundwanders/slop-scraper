@@ -584,7 +584,7 @@ class SupabaseClient:
             recommendations.append("🚨 Run: slop-scraper --force-refresh --no-skip-existing --limit 100")
         elif severity == "HIGH":
             recommendations.append("⚠️ URGENT: Many games affected by generic options bug")
-            recommendations.append("⚠️ Run selective reprocessing with improved scraper")
+            recommendations.append("⚠️ Run selective reprocessing with scraper")
         elif severity == "MEDIUM":
             recommendations.append("ℹ️ Some games affected - selective reprocessing recommended")
         elif severity == "LOW":
