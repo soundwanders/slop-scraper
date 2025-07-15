@@ -127,7 +127,7 @@ def detect_game_engine(store_data, game_name):
 
 def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_file='appdetails_cache.json', 
                        rate_limiter=None, session_monitor=None, db_client=None, **kwargs):
-    """Fetch Steam game list with FIXED skip-existing logic"""
+    """Fetch Steam game list with skip existing games logic included"""
     print(f"🔒 Fetching game list securely (force_refresh={force_refresh})...")
     print(f"Debug: Attempting to fetch up to {limit} games")
 
@@ -224,7 +224,7 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
                     pbar.write(f"⚠️ Skipping app with suspicious name/ID length: {name[:50]}")
                     continue
 
-                # FIXED: Check if game already exists in database INDEPENDENTLY of force_refresh
+                # Check if game already exists in database INDEPENDENTLY of force_refresh
                 if skip_existing and int(app_id) in existing_games:
                     skipped_existing += 1
                     api_calls_saved += 1
@@ -234,7 +234,7 @@ def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_fil
 
                 store_data = None
                 
-                # FIXED: Cache logic separated from database skip logic
+                # Cache logic separated from database skip logic
                 # Check cache first (unless force_refresh is True)
                 if not force_refresh and app_id in cache:
                     store_data = cache[app_id]
