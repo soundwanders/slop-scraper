@@ -323,11 +323,6 @@ def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mo
             }
         ])
     
-    # IMPORTANT: NO UNIVERSAL GENERIC OPTIONS
-    # The old code added these to EVERY game, which was the bug:
-    # - Don't add '-fps_max', '-nojoy', '-nosplash' to every game
-    # - Only add truly universal options in very specific cases
-    
     # Only add minimal universal options if:
     # 1. No engine-specific options were found, AND
     # 2. The game appears to be a PC game that might support windowing
