@@ -284,11 +284,58 @@ class RateLimiter:
         }
 
 class SecureRequestHandler:
-    """Secure HTTP request handler with size limits and validation"""
+    """Secure HTTP request handler with headers and error handling"""
     
     @staticmethod
-    def make_secure_request(url: str, timeout: int = None, max_size_mb: float = None):
-        """Make a secure HTTP request with size and safety checks"""
+    def get_realistic_headers(domain: str = None) -> dict:
+        """Get realistic browser headers that are less likely to be blocked"""
+        
+        # Different headers for different sites
+        if domain == "pcgamingwiki.com":
+            return {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0'
+            }
+        elif domain == "steamcommunity.com":
+            return {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+        elif domain == "protondb.com":
+            return {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive'
+            }
+        else:
+            # Generic headers
+            return {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive'
+            }
+    
+    @staticmethod
+    def make_secure_request(url: str, timeout: int = None, max_size_mb: float = None, debug: bool = False):
+        """Make a secure HTTP request with headers and error handling"""
         import requests
         from urllib.parse import urlparse
         
@@ -307,15 +354,16 @@ class SecureRequestHandler:
         max_size_mb = max_size_mb or SecurityConfig.MAX_REQUEST_SIZE_MB
         max_size_bytes = max_size_mb * 1024 * 1024
         
+        # Get domain-specific headers
+        domain = parsed.netloc.lower()
+        headers = SecureRequestHandler.get_realistic_headers(domain)
+        
+        if debug:
+            print(f"🔍 Making request to {domain} with headers: {list(headers.keys())}")
+        
         # Configure session with security settings
         session = requests.Session()
         session.max_redirects = SecurityConfig.MAX_REDIRECTS
-        
-        # Add User-Agent to avoid being blocked
-        headers = {
-            'User-Agent': 'SlopScraper/1.0 (Educational/Research Tool)',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        }
         
         try:
             response = session.get(
@@ -325,6 +373,10 @@ class SecureRequestHandler:
                 stream=True,  # Stream to check size
                 allow_redirects=True
             )
+            
+            if debug:
+                print(f"🔍 Response status: {response.status_code}")
+                print(f"🔍 Response headers: {dict(response.headers)}")
             
             # Check response size before downloading
             content_length = response.headers.get('content-length')
@@ -342,13 +394,27 @@ class SecureRequestHandler:
             
             # Set content for compatibility
             response._content = content
+            
+            if debug:
+                print(f"🔍 Downloaded {len(content)} bytes")
+            
             return response
             
         except requests.exceptions.Timeout:
+            if debug:
+                print(f"🔍 Request to {domain} timed out")
             raise TimeoutError("Request timed out")
         except requests.exceptions.TooManyRedirects:
+            if debug:
+                print(f"🔍 Too many redirects for {domain}")
             raise ValueError("Too many redirects")
+        except requests.exceptions.ConnectionError as e:
+            if debug:
+                print(f"🔍 Connection error for {domain}: {e}")
+            raise Exception(f"Connection failed: {e}")
         except Exception as e:
+            if debug:
+                print(f"🔍 Request failed for {domain}: {e}")
             raise Exception(f"Request failed: {e}")
 
 class CredentialManager:

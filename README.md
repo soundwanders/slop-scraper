@@ -12,10 +12,8 @@ Use your power wisely. 😊
 
 ## 📦 Features
 
-- **Multi-source scraping**: Fetches launch options from PCGamingWiki, Steam Community guides, and built-in game knowledge
+- **Multi-source scraping**: Fetches launch options from PCGamingWiki, Steam Community guides, and game engine documentation
 - **Steam API integration**: Retrieves comprehensive game data from Steam's public API
-- **Flexible storage**: Save to Supabase database (production) or JSON files (test mode)
-- **Smart caching**: Avoids redundant API calls with persistent cache
 - **Rate limiting**: Respectful scraping with configurable delays
 - **Progress tracking**: Real-time progress bars with [tqdm](https://tqdm.github.io/)
 - **Graceful shutdown**: Clean exit handling with data preservation
