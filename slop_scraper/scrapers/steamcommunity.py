@@ -16,7 +16,7 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                                        test_results=None, test_mode=False, rate_limiter=None, 
                                        session_monitor=None):
     """
-    Steam Community scraper with updated HTML parsing for current Steam structure
+    Steam Community scraper 
     """
     
     # Security validation
@@ -65,10 +65,7 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
             if debug:
                 print(f"🔍 Steam Community: Parsed HTML, length: {len(response.text)} characters")
             
-            # UPDATED: Look for modern Steam Community guide structure
-            # Steam has changed their HTML structure, need to find new selectors
-            
-            # Method 1: Look for various possible guide containers
+            # Look for modern Steam Community guide structure
             possible_guide_selectors = [
                 'div.guide_item',           # Old selector
                 'div[class*="guide"]',      # Any div with "guide" in class
@@ -77,8 +74,14 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                 'div[class*="item"]',       # Generic items
                 'a[href*="/sharedfiles/filedetails/"]',  # Direct links to guides
                 'div[class*="shared_file"]', # Shared files
+                'div[class*="guide_item"]',
+                'div[class*="Guide"]', 
+                'div[class*="workshopItem"]',
+                'a[href*="/guides/"]',
+                'div[class*="recommendation"]',
+                'div[class*="review"]'
             ]
-            
+  
             guides_found = []
             for selector in possible_guide_selectors:
                 elements = soup.select(selector)
@@ -149,11 +152,34 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                                     if debug:
                                         print(f"🔍 Steam Community: Found text option: {cmd}")
             
-            # Process found guides
+            # Much more comprehensive keyword filtering
             relevant_guides = []
-            launch_keywords = ['launch', 'command', 'option', 'parameter', 'argument', 'fps', 'performance', 'tweak', 'fix']
             
-            for guide in guides[:20]:  # Limit to first 20 guides for performance
+            # Launch Options Keywords list
+            launch_keywords = [
+                # Direct launch option terms
+                'launch', 'command', 'option', 'parameter', 'argument', 'startup',
+                # Performance & technical terms  
+                'fps', 'performance', 'optimize', 'optimization', 'boost', 'speed',
+                'lag', 'stutter', 'smooth', 'framerate', 'frame rate',
+                # Configuration terms
+                'config', 'configuration', 'setting', 'settings', 'setup', 'install',
+                'fix', 'fixing', 'solution', 'resolve', 'problem', 'issue', 'crash',
+                'tweak', 'tweaking', 'mod', 'modify', 'adjust',
+                # Graphics & display terms
+                'graphics', 'visual', 'display', 'resolution', 'fullscreen', 'windowed',
+                'vsync', 'anti-aliasing', 'quality', 'low', 'high', 'ultra',
+                # Audio terms  
+                'audio', 'sound', 'music', 'volume',
+                # Platform specific
+                'linux', 'proton', 'wine', 'compatibility', 'steam deck',
+                # Generic improvement terms
+                'improve', 'better', 'enhancement', 'guide', 'tutorial', 'how to',
+                'tips', 'tricks', 'help', 'support'
+            ]
+            
+            # Lenient filtering to scrape more guides and prevent missing options
+            for guide in guides[:30]: 
                 # Extract title from various possible locations
                 title = None
                 
@@ -183,10 +209,23 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                 if title and len(title) <= 200:
                     title_lower = title.lower()
                     
-                    if debug and len(relevant_guides) < 5:
+                    if debug and len(relevant_guides) < 10:  # Show more debug info
                         print(f"🔍 Steam Community: Checking guide: {title[:50]}...")
                     
-                    if any(keyword in title_lower for keyword in launch_keywords):
+                    # If ANY keyword matches, include the guide
+                    guide_relevant = any(keyword in title_lower for keyword in launch_keywords)
+                    
+                    # Also include guides that have certain patterns even without keywords
+                    pattern_matches = [
+                        # Version numbers (like "7.39c") often indicate config guides
+                        re.search(r'\d+\.\d+', title_lower),
+                        # Brackets often indicate important guides [2025], [FIX], etc.
+                        '[' in title and ']' in title,
+                        # Keywords that often appear in technical guides
+                        any(term in title_lower for term in ['meta', 'build', 'setup', 'config', 'install'])
+                    ]
+                    
+                    if guide_relevant or any(pattern_matches):
                         # Get the guide URL
                         guide_url = None
                         
@@ -211,13 +250,14 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                                 })
                                 
                                 if debug:
-                                    print(f"🔍 Steam Community: Relevant guide found: {title[:30]}...")
+                                    match_reason = "keyword" if guide_relevant else "pattern"
+                                    print(f"🔍 Steam Community: Relevant guide found ({match_reason}): {title[:30]}...")
             
             if debug:
                 print(f"🔍 Steam Community: Found {len(relevant_guides)} relevant guides")
             
-            # Process relevant guides (limit to avoid overloading)
-            for guide in relevant_guides[:3]:
+            # Process relevant guides (increased limit)
+            for guide in relevant_guides[:5]:  # Increased from 3 to 5
                 try:
                     if debug:
                         print(f"🔍 Steam Community: Processing guide: {guide['title'][:30]}...")
@@ -325,7 +365,7 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
         return []
 
 def extract_launch_options_from_content(content, guide_title, debug=False):
-    """Extract launch options from guide content"""
+    """Extract launch options from guide content with detection"""
     options = []
     
     # Look for code blocks, pre elements, and quoted text
@@ -338,10 +378,11 @@ def extract_launch_options_from_content(content, guide_title, debug=False):
         
         # Look for launch option patterns
         if any(char in text for char in ['-', '+', '/']):
-            commands = re.findall(r'(-{1,2}\w[\w\-]*|\+\w[\w\-]*|/\w[\w\-]*)', text)
+            # Regex to catch more launch option patterns
+            commands = re.findall(r'(-{1,2}[\w\-]+(?:=[\w\-]+)?|\+[\w\-]+(?:=[\w\-]+)?|/[\w\-]+)', text)
             
             for cmd in commands:
-                if len(cmd) <= 50:
+                if 2 <= len(cmd) <= 50:  # Reasonable length limits
                     # Get context from surrounding text
                     parent_text = element.parent.get_text(strip=True) if element.parent else ""
                     desc = parent_text[:300] if len(parent_text) > len(text) else f"From guide: {guide_title}"
@@ -365,13 +406,17 @@ def extract_launch_options_from_content(content, guide_title, debug=False):
             if len(text) > 1000:
                 continue
             
-            if ('launch' in text.lower() and 
-                any(char in text for char in ['-', '+', '/'])):
-                
-                commands = re.findall(r'(-{1,2}\w[\w\-]*|\+\w[\w\-]*|/\w[\w\-]*)', text)
+            # Detection - look for more patterns
+            launch_indicators = ['launch', 'command', 'option', 'parameter', 'startup']
+            has_launch_term = any(term in text.lower() for term in launch_indicators)
+            has_command_chars = any(char in text for char in ['-', '+', '/'])
+            
+            if has_launch_term and has_command_chars:
+                # Regex to catch more launch option patterns
+                commands = re.findall(r'(-{1,2}[\w\-]+(?:=[\w\-]+)?|\+[\w\-]+(?:=[\w\-]+)?|/[\w\-]+)', text)
                 
                 for cmd in commands:
-                    if len(cmd) <= 50:
+                    if 2 <= len(cmd) <= 50:  # Reasonable length limits
                         desc = text[:250] if len(text) <= 250 else text[:250] + "..."
                         
                         options.append({

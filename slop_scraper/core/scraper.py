@@ -565,7 +565,7 @@ class SlopScraper:
                 elif generic_rate > 10:
                     print(" ⚠️ LOW - Minor issues")
                 else:
-                    print(" ✅ GOOD - Bug appears fixed!")
+                    print(" ✅ GOOD - Diagnostic success")
         
         print("\nScraper Success Rates:")
         for scraper, data in stats['scraper_success_rates'].items():
