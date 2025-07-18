@@ -16,8 +16,28 @@ except ImportError:
 def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, test_results=None, 
                                     test_mode=False, rate_limiter=None, session_monitor=None):
     """
-    ETHICAL PCGamingWiki scraper using the official MediaWiki API + Cargo
-    No Cloudflare bypass needed - uses official, documented endpoints
+    Fetches launch options for a game from PCGamingWiki using the official API.
+    It formats the game title according to MediaWiki standards, searches for the game page,
+    and extracts launch options from the page content.
+    Parameters:
+        game_title (str): The title of the game to search for.
+        rate_limit (float): Optional rate limit in seconds between requests.
+        debug (bool): If True, prints debug information.
+        test_results (dict): Optional dictionary to store test results.
+        test_mode (bool): If True, runs in test mode without making actual requests.
+        rate_limiter (SecureRequestHandler): Optional rate limiter instance.
+        session_monitor: Optional session monitor for tracking requests and errors.
+    Returns:
+        list: A list of launch options found for the game, each option is a dict with
+              'command', 'description', and 'source' keys.
+    This function uses the official PCGamingWiki API to search for the game page,
+    retrieves the page content, and extracts launch options from the wikitext.
+    It handles rate limiting and session monitoring if provided.
+    If the game is not found, it tries alternative search methods to find similar games.
+    If debug mode is enabled, it prints detailed information about the process.
+    If test mode is enabled, it updates the test results with the number of options found.
+    Note: This is designed to be ethical and respects the PCGamingWiki API usage guidelines
+    by using the official API endpoints and adhering to rate limits
     """
     
     # Security validation

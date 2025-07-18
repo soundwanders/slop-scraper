@@ -5,6 +5,16 @@ Game-Specific Launch Options Scraper
 def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mode=False):
     """
     Fetch game-specific launch options based on engine detection and game patterns
+    launch options for various game engines and specific games.
+    :param app_id: The Steam application ID of the game
+    :param title: The title of the game
+    :param cache: Cache object to retrieve game metadata
+    :param test_results: Optional dictionary to store test results for validation
+    :param test_mode: Boolean indicating if the function is in test mode
+    :return: List of launch options with descriptions and sources
+    :raises ValueError: If app_id is not a valid integer or title is empty
+    :raises TypeError: If cache is not a valid cache object
+    :raises Exception: If an unexpected error occurs during processing
     """
     options = []
     
