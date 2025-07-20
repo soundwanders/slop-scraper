@@ -312,7 +312,7 @@ def get_games_needing_reprocessing(supabase, max_options: int = 3) -> List[Dict]
 def get_smart_existing_games(supabase, skip_existing: bool = True, force_reprocess_generic: bool = True) -> Set[int]:
     """
     Smart logic for determining which games to skip
-    This fixes the skip-existing logic to handle generic options properly
+    This handle generic options properly with skip-existing logic
     """
     try:
         if not skip_existing:

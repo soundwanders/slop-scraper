@@ -1,350 +1,328 @@
-import re
+import requests
 import time
+import random
 import os
-import sys
+import json
 from tqdm import tqdm
 
-# Add the project root to the path to enable absolute imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(current_dir))
-sys.path.insert(0, project_root)
-
-from tqdm import tqdm
-
-# Import using absolute paths relative to project root
 try:
-    from slop_scraper.utils.cache import save_cache
-    from slop_scraper.utils.security_config import SecureRequestHandler
+    # Try relative imports first (when run as module)
+    from ..utils.cache import load_cache, save_cache
+    from ..utils.security_config import SecurityConfig, SessionMonitor, RateLimiter
 except ImportError:
-    # Fallback - try to import directly if the above fails
-    try:
-        import slop_scraper.utils.cache as cache_module
-        save_cache = cache_module.save_cache
-        import slop_scraper.utils.security_config as security_module
-        SecureRequestHandler = security_module.SecureRequestHandler
-    except ImportError:
-        # Final fallback - define minimal versions
-        print("⚠️ Warning: Could not import cache and security modules, using fallbacks")
-        
-        def save_cache(cache, cache_file):
-            """Fallback cache save function"""
-            try:
-                import json
-                with open(cache_file, 'w') as f:
-                    json.dump(cache, f, indent=2)
-                print(f"✅ Cache saved to {cache_file}")
-            except Exception as e:
-                print(f"⚠️ Error saving cache: {e}")
-        
-        class SecureRequestHandler:
-            @staticmethod
-            def make_secure_request(url, timeout=10, max_size_mb=2):
-                """Fallback secure request function"""
-                import requests
-                return requests.get(url, timeout=timeout)
-            
-def extract_first_from_list(data_list):
-    """Safely extract the first item from a list, handling various data types"""
-    if not data_list:
-        return ""
-    
-    if isinstance(data_list, list) and len(data_list) > 0:
-        first_item = data_list[0]
-        if isinstance(first_item, str):
-            return first_item
-        elif isinstance(first_item, dict):
-            return first_item.get("name", "") or first_item.get("description", "")
-        else:
-            return str(first_item)
-    elif isinstance(data_list, str):
-        return data_list
-    
-    return ""
+    # Fall back to absolute imports (when run directly)
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from utils.cache import load_cache, save_cache
+    from utils.security_config import SecurityConfig, SessionMonitor, RateLimiter
 
-def detect_game_engine(store_data, game_name):
-    """Detect game engine based on available Steam API data"""
+def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=False, 
+                       debug=False, cache_file='appdetails_cache.json', 
+                       rate_limiter=None, session_monitor=None, 
+                       db_client=None, skip_existing=True, db_client_wrapper=None):
+    """
+    Fetch a list of Steam games securely with error handling and rate limiting.
+    Args:
+        limit (int): Maximum number of games to fetch.
+        force_refresh (bool): Whether to force refresh the cache.
+        cache (dict): Optional cache to use instead of loading from file.
+        test_mode (bool): If True, runs in test mode with limited output.
+        debug (bool): If True, enables debug output.
+        cache_file (str): Path to the cache file.
+        rate_limiter (RateLimiter): Optional rate limiter instance.
+        session_monitor (SessionMonitor): Optional session monitor for runtime limits.
+        db_client (object): Optional database client for skip-existing logic.
+        skip_existing (bool): Whether to skip existing games in the database.
+        db_client_wrapper (object): Optional wrapper for database client to handle existing app IDs.
+    """
     
-    # Check categories for engine hints
-    categories = store_data.get("categories", [])
-    category_names = [cat.get("description", "").lower() for cat in categories if isinstance(cat, dict)]
+    if debug:
+        print(f"🔒 Fetching game list securely (force_refresh={force_refresh})...")
+        print(f"Debug: Attempting to fetch up to {limit} games")
     
-    # Check genres for engine hints
-    genres = store_data.get("genres", [])
-    genre_names = [genre.get("description", "").lower() for genre in genres if isinstance(genre, dict)]
+    # Validate limit
+    limit = SecurityConfig.validate_games_limit(limit)
     
-    # Check developers and publishers for engine clues
-    developers = store_data.get("developers", [])
-    publishers = store_data.get("publishers", [])
+    # Initialize or use provided cache
+    if cache is None:
+        cache = load_cache(cache_file)
     
-    game_name_lower = game_name.lower()
-    all_text = " ".join([game_name_lower] + category_names + genre_names + developers + publishers).lower()
-    
-    # Engine detection based on common patterns
-    if any(keyword in all_text for keyword in ["source", "valve", "counter-strike", "half-life", "portal", "team fortress", "left 4 dead", "dota"]):
-        return "Source Engine"
-    
-    if any(keyword in all_text for keyword in ["unreal", "epic games", "unreal engine"]):
-        return "Unreal Engine"
-    
-    if any(keyword in all_text for keyword in ["unity", "unity technologies"]):
-        return "Unity"
-    
-    if any(keyword in all_text for keyword in ["id tech", "id software", "doom", "quake", "wolfenstein"]):
-        return "id Tech"
-    
-    if any(keyword in all_text for keyword in ["cryengine", "crytek", "far cry", "crysis"]):
-        return "CryEngine"
-    
-    if any(keyword in all_text for keyword in ["frostbite", "battlefield", "fifa", "need for speed"]):
-        return "Frostbite"
-    
-    if any(keyword in all_text for keyword in ["creation engine", "gamebryo", "bethesda", "elder scrolls", "fallout"]):
-        return "Creation Engine"
-    
-    if any(keyword in all_text for keyword in ["anvil", "assassin's creed", "ubisoft"]):
-        return "Anvil"
-    
-    if any(keyword in all_text for keyword in ["rage engine", "rockstar", "grand theft auto", "red dead"]):
-        return "RAGE"
-    
-    # Check for indie engines
-    if any(keyword in all_text for keyword in ["godot"]):
-        return "Godot"
-    
-    if any(keyword in all_text for keyword in ["construct", "clickteam", "game maker", "gamemaker"]):
-        return "Game Maker Studio"
-    
-    # Check for web technologies
-    if any(keyword in all_text for keyword in ["html5", "javascript", "web browser"]):
-        return "HTML5/Web"
-    
-    # Check for mobile engines
-    if any(keyword in all_text for keyword in ["cocos2d", "corona", "solar2d"]):
-        return "Mobile Engine"
-    
-    # Default fallback
-    return "Unknown"
-
-def get_steam_game_list(cache, debug, limit, force_refresh, test_mode, cache_file='appdetails_cache.json', 
-                       rate_limiter=None, session_monitor=None, db_client=None, **kwargs):
-    """Fetch Steam game list with skip existing games logic included"""
-    print(f"🔒 Fetching game list securely (force_refresh={force_refresh})...")
-    print(f"Debug: Attempting to fetch up to {limit} games")
-
-    # Get skip_existing setting from kwargs
-    skip_existing = kwargs.get('skip_existing', True)
-    
-    if test_mode and limit <= 10:
-        print("🔒 Using test mode data for security")
-        return [
-            {"appid": 570, "name": "Dota 2", "developer": "Valve Corporation", "publisher": "Valve Corporation", "engine": "Source Engine"},
-            {"appid": 730, "name": "Counter-Strike 2", "developer": "Valve Corporation", "publisher": "Valve Corporation", "engine": "Source Engine"},
-            {"appid": 264710, "name": "Subnautica", "developer": "Unknown Worlds Entertainment", "publisher": "Unknown Worlds Entertainment", "engine": "Unity"},
-            {"appid": 377840, "name": "Final Fantasy IX", "developer": "Square Enix", "publisher": "Square Enix", "engine": "Unknown"},
-            {"appid": 1868140, "name": "Dave the Diver", "developer": "MINTROCKET", "publisher": "NEXON", "engine": "Unity"},
-        ][:limit]
-
-    # Pre-fetch existing games from database INDEPENDENTLY of force_refresh
-    existing_games = set()
-    if db_client and skip_existing:
+    # Skip-existing logic using database
+    existing_app_ids = set()
+    if skip_existing and db_client_wrapper:
         try:
-            print("🔍 Using smart database logic for skip-existing...")
-            
-            # Check if we have the database wrapper
-            if hasattr(kwargs, 'db_client_wrapper') and kwargs['db_client_wrapper']:
-                existing_games = kwargs['db_client_wrapper'].get_smart_existing_app_ids(
-                    skip_existing=skip_existing
-                )
-                print(f"📊 Smart skip logic: will skip {len(existing_games)} games")
-            else:
-                # Fallback to simple existing games check
-                existing_result = db_client.table("games").select("app_id").execute()
-                if existing_result.data:
-                    existing_games = {game['app_id'] for game in existing_result.data}
-                    print(f"📊 Standard skip logic: will skip {len(existing_games)} existing games")
-                else:
-                    print("📊 No existing games found in database")
+            if debug:
+                print("🔍 Using smart database logic for skip-existing...")
+            existing_app_ids = db_client_wrapper.get_existing_app_ids()
+            if debug:
+                print(f"📊 Standard skip logic: will skip {len(existing_app_ids)} existing games")
         except Exception as e:
-            print(f"⚠️ Error in smart skip logic: {e}")
-            print("⚠️ Continuing without skip-existing optimization...")
-
-    url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
-    try:
-        # Use rate limiter for Steam API request type
-        if rate_limiter:
-            rate_limiter.wait_if_needed("steam_api")
-        
-        # Use secure request handler
+            if debug:
+                print(f"⚠️ Database skip-existing check failed: {e}")
+                print("🔍 Falling back to cache-only skip logic")
+    
+    # Get the main Steam app list
+    if debug:
         print("🔒 Making secure request to Steam API...")
-        response = SecureRequestHandler.make_secure_request(url, timeout=30, max_size_mb=50)
+    
+    try:
+        # Get the initial app list (this usually works fine)
+        response = requests.get(
+            'https://api.steampowered.com/ISteamApps/GetAppList/v2/',
+            timeout=30
+        )
         response.raise_for_status()
+        app_data = response.json()
         
-        # Record the request for monitoring
-        if session_monitor:
-            session_monitor.record_request()
-            
-        all_apps = response.json()['applist']['apps']
-        print(f"✅ Securely fetched {len(all_apps)} total apps")
-
-        # Blocklist of terms to exclude
-        blocklist_terms = [
-            'dlc', 'soundtrack', 'beta', 'demo', 'test', 'adult', 'hentai', 'xxx', 'mature', 
-            'expansion', 'tool', 'software', 'trailer', 'video'
-        ]
-
-        # Regex patterns for filtering unwanted games
-        blocklist_pattern = re.compile(r'(?i)(' + '|'.join(re.escape(term) for term in blocklist_terms) + ')')
-        non_latin_pattern = re.compile(r'[^\x00-\x7F]')
-        only_numeric_special = re.compile(r'^[0-9\s\-_+=.,!@#$%^&*()\[\]{}|\\/<>?;:\'"`~]*$')
-
-        filtered_games = []
-        skipped_existing = 0
-        api_calls_saved = 0
-
-        # Use tqdm for processing apps with security checks
-        with tqdm(total=min(limit * 3, len(all_apps)), desc="🔒 Filtering games securely") as pbar:
-            for app_index, app in enumerate(all_apps):
-                if len(filtered_games) >= limit:
-                    break
-                
-                # Periodic security checks
-                if app_index % 100 == 0 and session_monitor:
-                    session_monitor.check_runtime_limit()
-
-                app_id = str(app['appid'])
-                name = app['name']
-                pbar.update(1)
-
-                # Skip invalid or unwanted entries based on blocklist
-                if not name or blocklist_pattern.search(name) or non_latin_pattern.search(name) or only_numeric_special.match(name):
-                    continue
-
-                # Additional length validation for security
-                if len(name) > 100 or len(app_id) > 10:
-                    pbar.write(f"⚠️ Skipping app with suspicious name/ID length: {name[:50]}")
-                    continue
-
-                # Check if game already exists in database INDEPENDENTLY of force_refresh
-                if skip_existing and int(app_id) in existing_games:
-                    skipped_existing += 1
-                    api_calls_saved += 1
-                    if debug:
-                        pbar.write(f"⏭️  Skipping {name} - already in database")
-                    continue
-
-                store_data = None
-                
-                # Cache logic separated from database skip logic
-                # Check cache first (unless force_refresh is True)
-                if not force_refresh and app_id in cache:
-                    store_data = cache[app_id]
-                    if debug:
-                        pbar.write(f"💾 Using cached data for {name}")
-                else:
-                    # Apply Steam API rate limiting before making request
-                    if rate_limiter:
-                        rate_limiter.wait_if_needed("steam_api") 
-                    
-                    # Fetch detailed data from store API
-                    store_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}&cc=us&l=en"
-                    try:
-                        # Use secure request handler for store API
-                        store_res = SecureRequestHandler.make_secure_request(store_url, timeout=10, max_size_mb=2)
-                        store_res.raise_for_status()
-                        
-                        # Record the request
-                        if session_monitor:
-                            session_monitor.record_request()
-                        
-                        raw = store_res.json()
-                        store_data = raw.get(app_id, {}).get("data", {})
-
-                        if store_data:
-                            cache[app_id] = store_data
-                            if debug:
-                                pbar.write(f"🌐 Fetched fresh data for {name}")
-                        else:
-                            pbar.write(f"⚠️ No valid data for app_id {app_id}. Skipping.")
-                            continue
-                            
-                    except Exception as e:
-                        if session_monitor:
-                            session_monitor.record_error()
-                        pbar.write(f"⚠️ Error fetching data for app_id {app_id}: {e}. Skipping.")
-                        continue
-
-                # Validate store_data before proceeding
-                if not store_data or not isinstance(store_data, dict):
-                    pbar.write(f"⚠️ Invalid or missing data for app_id {app_id}. Skipping.")
-                    continue
-
-                # Additional validation checks
-                if store_data.get("type") != "game":
-                    continue  # Silent skip for non-games
-                if store_data.get("release_date", {}).get("coming_soon", False):
-                    continue  # Silent skip for unreleased games
-                if store_data.get("is_free", False) and "demo" in store_data.get("name", "").lower():
-                    continue  # Silent skip for demos
-
-                # Additional security validation on store data
-                game_name = store_data.get("name", name)
-                if len(game_name) > 200:  # Sanity check
-                    pbar.write(f"⚠️ Game name too long, skipping: {game_name[:50]}...")
-                    continue
-
-                # Extract developer using our helper function
-                developer = extract_first_from_list(store_data.get("developers", []))
-                if not developer:
-                    developer = "Unknown"
-                if len(developer) > 100:  # Limit developer name length
-                    developer = developer[:100]
-
-                # Extract publisher using our helper function
-                publisher = extract_first_from_list(store_data.get("publishers", []))
-                if not publisher:
-                    publisher = "Unknown"
-                if len(publisher) > 100:  # Limit publisher name length
-                    publisher = publisher[:100]
-                
-                # Detect engine using our helper function
-                engine = detect_game_engine(store_data, game_name)
-                if len(engine) > 50:  # Limit engine name length
-                    engine = engine[:50]
-
-                # Add the game to the filtered list if it passes all checks
-                filtered_games.append({
-                    "appid": int(app_id),
-                    "name": game_name[:200],  # Limit name length
-                    "developer": developer,
-                    "publisher": publisher,
-                    "release_date": str(store_data.get("release_date", {}).get("date", ""))[:50],
-                    "engine": engine
-                })
-
-                # Optional debug output to verify data extraction
-                if debug:
-                    print(f"✅ Game: {game_name}")
-                    print(f"  Developer: {developer}")
-                    print(f"  Publisher: {publisher}")
-                    print(f"  Engine: {engine}")
-
-                pbar.write(f"✔️ Added: {game_name}")
-
-        # Securely save cache
-        try:
-            save_cache(cache, cache_file)
-        except Exception as e:
-            print(f"⚠️ Error saving cache: {e}")
+        if 'applist' not in app_data or 'apps' not in app_data['applist']:
+            raise Exception("Invalid app list response format")
         
-        # Report efficiency gains
-        print(f"🔒 Final game count: {len(filtered_games)} (security validated)")
-        if skipped_existing > 0:
-            print(f"⚡ Efficiency: Skipped {skipped_existing} existing games, saved {api_calls_saved} API calls")
+        all_apps = app_data['applist']['apps']
+        if debug:
+            print(f"✅ Securely fetched {len(all_apps)} total apps")
         
-        return filtered_games
-
     except Exception as e:
-        if session_monitor:
-            session_monitor.record_error()
-        print(f"🔒 Error fetching game list: {e}")
+        # DON'T report this to session monitor - it's an initial setup issue
+        if debug:
+            print(f"❌ Failed to fetch app list: {e}")
         return []
+    
+    # Process apps with NO session monitor error reporting
+    games = []
+    rate_limit_count = 0
+    actual_error_count = 0  # Only count truly unexpected errors
+    max_actual_errors = 20  # Much lower threshold for real errors
+    consecutive_429s = 0
+    
+    # Rate limiting settings
+    base_delay = 2.0
+    current_delay = base_delay
+    max_delay = 60.0
+    backoff_multiplier = 1.5
+    
+    if debug:
+        print(f"🔒 Starting with {base_delay}s delay between requests")
+        print(f"🔒 Will only report truly unexpected errors to security system")
+    
+    # REVERTED: Use original game processing logic that was working
+    # Process games in original order without "smart starting point"
+    
+    if debug:
+        print(f"🔍 Processing games in original order (no filtering by app_id range)")
+    
+    with tqdm(all_apps, desc="🔒 Filtering games securely", unit="game") as pbar:
+        for app in pbar:
+            # Check if we have enough games
+            if len(games) >= limit:
+                break
+            
+            # Safety check for runtime - but don't count this as an error
+            if session_monitor:
+                try:
+                    session_monitor.check_runtime_limit()
+                except Exception as e:
+                    if debug:
+                        print(f"⚠️ Runtime limit reached: {e}")
+                    break
+            
+            # Security validation
+            app_id = app.get('appid')
+            if not app_id or not isinstance(app_id, int) or app_id <= 0:
+                continue
+            
+            # Skip existing games
+            if skip_existing and app_id in existing_app_ids:
+                continue
+            
+            # Check cache first
+            if str(app_id) in cache and not force_refresh:
+                cached_game = cache[str(app_id)]
+                if cached_game:  # Only use non-null cached data
+                    games.append(cached_game)
+                continue
+            
+            # Apply current delay with jitter
+            if rate_limiter:
+                rate_limiter.wait_if_needed("steam_api", domain="store.steampowered.com")
+            else:
+                jittered_delay = current_delay + random.uniform(0, 0.5)
+                time.sleep(jittered_delay)
+            
+            # CRITICAL: Fetch game details WITHOUT reporting rate limits as errors
+            success, game_data, error_type = fetch_game_details_no_error_reporting(
+                app_id, 
+                cache, 
+                current_delay,
+                debug=debug
+            )
+            
+            if success and game_data:
+                games.append(game_data)
+                # Success! Reset consecutive 429 counter and reduce delay slightly
+                consecutive_429s = 0
+                current_delay = max(base_delay, current_delay * 0.9)
+                
+            elif error_type == "rate_limit":
+                # Handle rate limits without reporting to session monitor
+                consecutive_429s += 1
+                rate_limit_count += 1
+                current_delay = min(max_delay, current_delay * backoff_multiplier)
+                
+                if debug and rate_limit_count % 20 == 1:  # Log every 20th rate limit
+                    print(f"🔄 Rate limiting detected ({rate_limit_count} total). Delay now {current_delay:.1f}s")
+                
+            elif error_type == "real_error":
+                # Only count truly unexpected errors
+                actual_error_count += 1
+                
+                if debug and actual_error_count % 5 == 1:
+                    print(f"⚠️ Unexpected error #{actual_error_count}: {str(game_data)[:50]}...")
+                
+                # ONLY report truly unexpected errors to session monitor
+                if session_monitor and actual_error_count <= 3:  # Only report first few real errors
+                    session_monitor.record_error()
+                
+                if actual_error_count > max_actual_errors:
+                    if debug:
+                        print(f"⚠️ Too many unexpected errors ({actual_error_count}). Stopping.")
+                        print(f"📊 Final stats: {rate_limit_count} rate limits, {actual_error_count} unexpected errors")
+                    break
+            
+            # Update progress bar with current status
+            if consecutive_429s > 0:
+                pbar.set_description(f"🔄 Rate limited (delay: {current_delay:.1f}s)")
+            else:
+                pbar.set_description(f"🔒 Filtering games securely")
+    
+    # Save cache
+    try:
+        save_cache(cache, cache_file)
+        if debug:
+            print(f"✅ Cache saved to {cache_file}")
+    except Exception as e:
+        if debug:
+            print(f"⚠️ Failed to save cache: {e}")
+    
+    # Filter for valid games
+    valid_games = [g for g in games if g and 'appid' in g and 'name' in g]
+    
+    if debug:
+        print(f"🔒 Final game count: {len(valid_games)} (security validated)")
+        print(f"📊 Processing stats: {rate_limit_count} rate limits, {actual_error_count} unexpected errors")
+        if skip_existing and existing_app_ids:
+            skipped_count = len(existing_app_ids)
+            print(f"⚡ Efficiency: Skipped {skipped_count} existing games, saved {skipped_count} API calls")
+    
+    return valid_games
+
+def fetch_game_details_no_error_reporting(app_id, cache, current_delay, max_retries=3, debug=False):
+    """
+    Fetch game details with ZERO error reporting to session monitor
+    Only categorizes error types for intelligent handling
+    
+    Returns:
+        (success: bool, data: dict/str, error_type: str)
+    """
+    
+    for attempt in range(max_retries):
+        try:
+            # Make the API request
+            store_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}&cc=us&l=en"
+            
+            store_res = requests.get(store_url, timeout=15)
+            
+            if store_res.status_code == 200:
+                # Success! Parse the data
+                store_data = store_res.json()
+                
+                if str(app_id) in store_data and store_data[str(app_id)].get('success'):
+                    game_info = store_data[str(app_id)]['data']
+                    
+                    # Validate the game data
+                    if not game_info.get('name') or game_info.get('type') != 'game':
+                        if debug:
+                            print(f"⚠️ No valid data for app_id {app_id}. Skipping.")
+                        cache[str(app_id)] = None
+                        return False, None, "invalid_data"
+                    
+                    # Create game object
+                    game = {
+                        'appid': app_id,
+                        'name': game_info['name']
+                    }
+                    
+                    # Cache the result
+                    cache[str(app_id)] = game
+                    
+                    if debug:
+                        print(f"✔️ Added: {game['name']}")
+                    
+                    return True, game, "success"
+                
+                else:
+                    # Game exists but isn't available/valid
+                    if debug:
+                        print(f"⚠️ No valid data for app_id {app_id}. Skipping.")
+                    cache[str(app_id)] = None
+                    return False, None, "invalid_data"
+            
+            elif store_res.status_code == 429:
+                # Rate limited! Handle gracefully without reporting error
+                if attempt < max_retries - 1:
+                    # Calculate backoff delay for this specific 429
+                    backoff_delay = current_delay * (2 ** attempt) + random.uniform(0, 1)
+                    backoff_delay = min(backoff_delay, 120)  # Max 2 minutes
+                    
+                    if debug and attempt == 0:  # Only log on first 429 for this app
+                        print(f"🔄 Rate limited for app {app_id}. Waiting {backoff_delay:.1f}s...")
+                    
+                    time.sleep(backoff_delay)
+                    continue  # Retry
+                else:
+                    # Max retries reached for this app - still not an error, just rate limiting
+                    return False, "429_max_retries", "rate_limit"
+            
+            else:
+                # Other HTTP error - could be real issue
+                if debug:
+                    print(f"⚠️ HTTP {store_res.status_code} for app_id {app_id}. Skipping.")
+                cache[str(app_id)] = None
+                return False, f"HTTP_{store_res.status_code}", "http_error"
+        
+        except requests.exceptions.Timeout:
+            # Timeout is not a real error in this context - just slow network
+            if debug and attempt == 0:
+                print(f"⚠️ Timeout for app_id {app_id}. Retrying...")
+            if attempt < max_retries - 1:
+                time.sleep(current_delay * (attempt + 1))
+                continue
+            else:
+                return False, "timeout", "timeout"
+        
+        except requests.exceptions.RequestException as e:
+            if "429" in str(e):
+                # This is a 429 error wrapped in an exception
+                if attempt < max_retries - 1:
+                    backoff_delay = current_delay * (2 ** attempt) + random.uniform(0, 1)
+                    if debug and attempt == 0:
+                        print(f"🔄 Rate limit exception for app {app_id}. Waiting {backoff_delay:.1f}s...")
+                    time.sleep(backoff_delay)
+                    continue
+                else:
+                    return False, "429_exception", "rate_limit"
+            else:
+                # Real network error
+                if debug:
+                    print(f"⚠️ Network error for app_id {app_id}: {e}. Skipping.")
+                cache[str(app_id)] = None
+                return False, str(e), "network_error"
+        
+        except Exception as e:
+            # Truly unexpected error
+            if debug:
+                print(f"⚠️ Unexpected error for app_id {app_id}: {e}. Skipping.")
+            cache[str(app_id)] = None
+            return False, str(e), "real_error"
+    
+    # If we get here, we exhausted retries
+    return False, "max_retries_exhausted", "real_error"

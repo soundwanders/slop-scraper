@@ -11,7 +11,7 @@ class SecurityConfig:
     MAX_RATE_LIMIT = 60.0  # Maximum 60 seconds (sanity check)
     
     # Resource limits
-    MAX_GAMES_LIMIT = 1000  # Maximum games per session
+    MAX_GAMES_LIMIT = 10000  # Maximum games per session
     MAX_CACHE_SIZE_MB = 100  # Maximum cache file size in MB
     MAX_EXECUTION_TIME_HOURS = 6  # Maximum runtime
     

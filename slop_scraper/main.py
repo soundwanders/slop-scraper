@@ -109,9 +109,40 @@ def show_database_statistics():
         print("Make sure you have valid Supabase credentials and database access.")
         return False
 
-def test_single_game_scrapers(game_name, debug=True):
+def test_single_game_scrapers(game_input, debug=True):
     """Test all scrapers on a single game for debugging purposes"""
-    print(f"\n🧪 Testing all scrapers on '{game_name}'...")
+    
+    # Parse input - could be app_id or game name
+    app_id = None
+    game_name = None
+    
+    # Try to parse as app_id first
+    try:
+        app_id = int(game_input)
+        
+        # Look up game name from Steam API
+        try:
+            import requests
+            response = requests.get(f"https://store.steampowered.com/api/appdetails?appids={app_id}", timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if str(app_id) in data and data[str(app_id)].get('success'):
+                    game_name = data[str(app_id)]['data'].get('name', f'App ID {app_id}')
+                else:
+                    game_name = f'App ID {app_id} (not found)'
+            else:
+                game_name = f'App ID {app_id} (API error)'
+        except Exception as e:
+            game_name = f'App ID {app_id} (lookup failed: {e})'
+            
+    except ValueError:
+        # Input is a game name, not app_id
+        game_name = game_input
+        # Use a reasonable default app_id for testing when only name is provided
+        app_id = 730  # Counter-Strike 2 as default
+        print(f"ℹ️ Using game name '{game_name}' with default test app_id {app_id}")
+    
+    print(f"\n🧪 Testing all scrapers on '{game_name}' (App ID: {app_id})...")
     
     try:
         # Import scrapers
@@ -120,12 +151,10 @@ def test_single_game_scrapers(game_name, debug=True):
         from scrapers.protondb import fetch_protondb_launch_options
         from scrapers.game_specific import fetch_game_specific_options
         
-        # Mock app_id for testing (use Counter-Strike as default)
-        test_app_id = 10  # Counter-Strike
-        
         print(f"\n1. Testing PCGamingWiki scraper...")
+        print(f"   → Searching for: '{game_name}'")
         pcg_options = fetch_pcgamingwiki_launch_options(
-            game_name, 
+            game_name,  # PCGamingWiki uses game name
             rate_limit=1.0, 
             debug=debug,
             test_mode=True
@@ -135,8 +164,9 @@ def test_single_game_scrapers(game_name, debug=True):
             print(f"     {i+1}. {opt['command']}: {opt['description'][:50]}...")
         
         print(f"\n2. Testing Steam Community scraper...")
+        print(f"   → Using app_id: {app_id}")
         sc_options = fetch_steam_community_launch_options(
-            test_app_id,
+            app_id,  # Steam Community uses app_id
             game_title=game_name,
             rate_limit=1.0,
             debug=debug,
@@ -147,8 +177,9 @@ def test_single_game_scrapers(game_name, debug=True):
             print(f"     {i+1}. {opt['command']}: {opt['description'][:50]}...")
         
         print(f"\n3. Testing ProtonDB scraper...")
+        print(f"   → Using app_id: {app_id}")
         pdb_options = fetch_protondb_launch_options(
-            test_app_id,
+            app_id,  # ProtonDB uses app_id
             game_title=game_name,
             rate_limit=1.0,
             debug=debug,
@@ -159,9 +190,10 @@ def test_single_game_scrapers(game_name, debug=True):
             print(f"     {i+1}. {opt['command']}: {opt['description'][:50]}...")
         
         print(f"\n4. Testing Game-Specific scraper...")
+        print(f"   → Using app_id: {app_id}, game_name: '{game_name}'")
         cache = {}  # Empty cache for testing
         gs_options = fetch_game_specific_options(
-            test_app_id,
+            app_id,
             game_name,
             cache,
             test_mode=True
@@ -172,7 +204,7 @@ def test_single_game_scrapers(game_name, debug=True):
         
         # Summary
         total_options = len(pcg_options) + len(sc_options) + len(pdb_options) + len(gs_options)
-        print(f"\n📊 Summary for '{game_name}':")
+        print(f"\n📊 Summary for '{game_name}' (App ID: {app_id}):")
         print(f"   PCGamingWiki: {len(pcg_options)} options")
         print(f"   Steam Community: {len(sc_options)} options") 
         print(f"   ProtonDB: {len(pdb_options)} options")
@@ -183,11 +215,20 @@ def test_single_game_scrapers(game_name, debug=True):
             print("\n⚠️ NO OPTIONS FOUND! This indicates the scrapers need debugging.")
             print("   Possible issues:")
             print("   - Sites are blocking requests")
-            print("   - HTML structure has changed")
+            print("   - HTML structure has changed") 
             print("   - Network connectivity issues")
+            print("   - App ID mapping issues")
             print("   - Security validation is too strict")
         else:
             print(f"\n✅ Found {total_options} total options - scrapers appear to be working!")
+            
+        # Specific debugging info
+        print(f"\n🔧 Debug Info:")
+        print(f"   App ID used: {app_id}")
+        print(f"   Game name used: '{game_name}'")
+        print(f"   PCGamingWiki searched for: '{game_name}'")
+        print(f"   Steam Community checked: /app/{app_id}/guides/")
+        print(f"   ProtonDB checked app_id: {app_id}")
             
     except Exception as e:
         print(f"❌ Error testing scrapers: {e}")

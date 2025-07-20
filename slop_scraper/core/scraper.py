@@ -35,8 +35,8 @@ except ImportError:
         test_database_connection,
         fetch_steam_launch_options_from_db,
         save_to_database,
-        SupabaseClient,  # Import the wrapper class
-        get_database_stats  # Import stats function
+        SupabaseClient, 
+        get_database_stats 
     )
     from scrapers.steampowered import get_steam_game_list
     from scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options
@@ -48,7 +48,7 @@ except ImportError:
 class SlopScraper:
     def __init__(self, test_mode=False, cache_file='appdetails_cache.json', 
                  rate_limit=None, force_refresh=False, max_games=100, 
-                 output_dir="./test-output", debug=False, skip_existing=True):  # skip_existing parameter
+                 output_dir="./test-output", debug=False, skip_existing=True):
         """Initialize with configuration options and security validation"""
         
         # Security validation first
@@ -565,7 +565,7 @@ class SlopScraper:
                 elif generic_rate > 10:
                     print(" ⚠️ LOW - Minor issues")
                 else:
-                    print(" ✅ GOOD - Bug appears fixed!")
+                    print(" ✅ GOOD - Diagnostic success")
         
         print("\nScraper Success Rates:")
         for scraper, data in stats['scraper_success_rates'].items():

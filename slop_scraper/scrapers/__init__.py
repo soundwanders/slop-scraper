@@ -13,7 +13,7 @@ try:
     from .game_specific import fetch_game_specific_options
     from .steampowered import get_steam_game_list
     from .steamcommunity import fetch_steam_community_launch_options
-    from .pcgamingwiki import fetch_pcgamingwiki_launch_options, format_game_title_for_wiki
+    from .pcgamingwiki import fetch_pcgamingwiki_launch_options, format_game_title_for_api
     from .protondb import fetch_protondb_launch_options
 except ImportError:
     # Fall back to absolute imports (when run directly)
@@ -22,7 +22,7 @@ except ImportError:
     from game_specific import fetch_game_specific_options
     from steampowered import get_steam_game_list
     from steamcommunity import fetch_steam_community_launch_options
-    from pcgamingwiki import fetch_pcgamingwiki_launch_options, format_game_title_for_wiki
+    from pcgamingwiki import fetch_pcgamingwiki_launch_options, format_game_title_for_api
     from protondb import fetch_protondb_launch_options
 
 __all__ = [
@@ -30,6 +30,6 @@ __all__ = [
     'get_steam_game_list',
     'fetch_steam_community_launch_options',
     'fetch_pcgamingwiki_launch_options',
-    'format_game_title_for_wiki',
+    'format_game_title_for_api', 
     'fetch_protondb_launch_options'
 ]
