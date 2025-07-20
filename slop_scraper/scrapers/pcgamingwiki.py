@@ -136,7 +136,6 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
             print(f"🔍 PCGamingWiki API: Error for '{game_title}': {e}")
         else:
             print(f"🔍 PCGamingWiki API: Error for '{game_title}': {e}")
-        
         return []
 
 def format_game_title_for_api(title):
