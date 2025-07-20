@@ -21,7 +21,7 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
                        rate_limiter=None, session_monitor=None, 
                        db_client=None, skip_existing=True, db_client_wrapper=None):
     """
-    Fetch a list of Steam games securely with enhanced error handling and rate limiting.
+    Fetch a list of Steam games securely with error handling and rate limiting.
     Args:
         limit (int): Maximum number of games to fetch.
         force_refresh (bool): Whether to force refresh the cache.
@@ -87,14 +87,14 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
             print(f"❌ Failed to fetch app list: {e}")
         return []
     
-    # COMPREHENSIVE FIX: Process apps with NO session monitor error reporting
+    # Process apps with NO session monitor error reporting
     games = []
     rate_limit_count = 0
     actual_error_count = 0  # Only count truly unexpected errors
     max_actual_errors = 20  # Much lower threshold for real errors
     consecutive_429s = 0
     
-    # Enhanced rate limiting settings
+    # Rate limiting settings
     base_delay = 2.0
     current_delay = base_delay
     max_delay = 60.0

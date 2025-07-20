@@ -302,122 +302,256 @@ def extract_launch_options_from_guide_content(guide_soup, guide_title, debug=Fal
 
 def extract_steam_launch_options_from_text(text, debug=False):
     """
-    Extract valid Steam launch options from text using STRICT validation
-    Based on actual Steam launch option patterns
+    Extract valid Steam launch options from text using validation
+    More lenient to handle different languages and formats while preventing false positives
     """
     options = []
     
-    # STRICT patterns for valid Steam launch options only
-    # Pattern 1: -command (dash commands without parameters)
-    dash_commands = re.findall(r'-([a-zA-Z][a-zA-Z0-9_]*)', text)
+    # Patterns for valid Steam launch options
+    # Pattern 1: -command (more flexible matching)
+    dash_pattern = r'-([a-zA-Z][a-zA-Z0-9_\-]{1,25})'
+    dash_commands = re.findall(dash_pattern, text, re.IGNORECASE)
     
-    # Pattern 2: -command parameter (dash commands with parameters)  
-    dash_with_params = re.findall(r'-([a-zA-Z][a-zA-Z0-9_]*)\s+([a-zA-Z0-9_]+)', text)
+    # Pattern 2: -command parameter (with flexible parameter matching)
+    dash_with_params_pattern = r'-([a-zA-Z][a-zA-Z0-9_\-]{1,25})\s+([a-zA-Z0-9_\-\.]{1,15})'
+    dash_with_params = re.findall(dash_with_params_pattern, text, re.IGNORECASE)
     
-    # Pattern 3: +command parameter (plus commands with parameters)
-    plus_with_params = re.findall(r'\+([a-zA-Z][a-zA-Z0-9_]*)\s+([a-zA-Z0-9_]+)', text)
+    # Pattern 3: +command parameter (Source engine style)
+    plus_with_params_pattern = r'\+([a-zA-Z][a-zA-Z0-9_\-]{1,25})\s+([a-zA-Z0-9_\-\.]{1,15})'
+    plus_with_params = re.findall(plus_with_params_pattern, text, re.IGNORECASE)
+    
+    # Pattern 4: Common launch option patterns without spaces (like -fps_max_60)
+    compound_pattern = r'-([a-zA-Z][a-zA-Z0-9_\-]{2,30})'
+    compound_commands = re.findall(compound_pattern, text, re.IGNORECASE)
+    
+    if debug:
+        print(f"🔍 Steam Community: Text analysis:")
+        print(f"   Dash commands found: {dash_commands}")
+        print(f"   Dash with params: {dash_with_params}")
+        print(f"   Plus with params: {plus_with_params}")
+        print(f"   Compound commands: {compound_commands}")
     
     # Process dash commands (no parameters)
     for cmd in dash_commands:
-        if is_valid_steam_launch_option(cmd):
-            options.append(f"-{cmd}")
+        if is_valid_steam_launch_option(cmd, debug):
+            option = f"-{cmd}"
+            if option not in [opt for opt in options]:  # Avoid duplicates
+                options.append(option)
+                if debug:
+                    print(f"🔍 Steam Community: Added dash command: {option}")
     
     # Process dash commands with parameters
     for cmd, param in dash_with_params:
-        if is_valid_steam_launch_option(cmd) and is_valid_parameter(param):
-            options.append(f"-{cmd} {param}")
+        if is_valid_steam_launch_option(cmd, debug) and is_valid_parameter(param):
+            option = f"-{cmd} {param}"
+            if option not in options:
+                options.append(option)
+                if debug:
+                    print(f"🔍 Steam Community: Added dash+param: {option}")
     
-    # Process plus commands with parameters
+    # Process plus commands with parameters (Source engine)
     for cmd, param in plus_with_params:
-        if is_valid_steam_launch_option(cmd) and is_valid_parameter(param):
-            options.append(f"+{cmd} {param}")
+        if is_valid_steam_launch_option(cmd, debug) and is_valid_parameter(param):
+            option = f"+{cmd} {param}"
+            if option not in options:
+                options.append(option)
+                if debug:
+                    print(f"🔍 Steam Community: Added plus+param: {option}")
     
-    # Remove duplicates while preserving order
-    seen = set()
+    # Process compound commands (like -fps_max_144)
+    for cmd in compound_commands:
+        if is_valid_steam_launch_option(cmd, debug):
+            option = f"-{cmd}"
+            if option not in options and option not in [f"-{c}" for c in dash_commands]:  # Avoid duplicates
+                options.append(option)
+                if debug:
+                    print(f"🔍 Steam Community: Added compound: {option}")
+    
+    # Remove exact duplicates while preserving order
     unique_options = []
+    seen = set()
     for option in options:
-        if option not in seen:
-            seen.add(option)
+        if option.lower() not in seen:
+            seen.add(option.lower())
             unique_options.append(option)
-            
-            if debug:
-                print(f"🔍 Steam Community: Validated option: {option}")
     
-    return unique_options
+    if debug:
+        print(f"🔍 Steam Community: Final validated options: {unique_options}")
+    
+    return unique_options[:20]  # Limit to prevent spam
 
-def is_valid_steam_launch_option(cmd):
+
+def is_valid_steam_launch_option(cmd, debug=False):
     """
-    Validate that a command name is a valid Steam launch option
-    Based on real Steam launch option patterns
+    Validation that's more lenient but still prevents false positives
     """
+    if not cmd or not isinstance(cmd, str):
+        return False
+    
     cmd_lower = cmd.lower().strip()
     
-    # Must be reasonable length (not too short or too long)
-    if len(cmd_lower) < 2 or len(cmd_lower) > 30:
+    # Basic length check (more lenient)
+    if len(cmd_lower) < 2 or len(cmd_lower) > 35:
+        if debug:
+            print(f"🔍 Steam Community: Rejected '{cmd}' - invalid length")
         return False
     
-    # Must start with a letter (not number or symbol)
+    # Must start with a letter
     if not cmd_lower[0].isalpha():
+        if debug:
+            print(f"🔍 Steam Community: Rejected '{cmd}' - doesn't start with letter")
         return False
     
-    # Must contain only letters, numbers, and underscores
-    if not re.match(r'^[a-zA-Z][a-zA-Z0-9_]*$', cmd_lower):
+    # Allow letters, numbers, underscores, and hyphens
+    if not re.match(r'^[a-zA-Z][a-zA-Z0-9_\-]*$', cmd_lower):
+        if debug:
+            print(f"🔍 Steam Community: Rejected '{cmd}' - invalid characters")
         return False
     
-    # Filter out obvious false positives
-    false_positives = [
-        'ref', 'img', 'div', 'span', 'href', 'src', 'alt', 'title',  # HTML-related
-        'http', 'https', 'www', 'com', 'net', 'org',  # URL-related
-        'and', 'the', 'for', 'with', 'this', 'that',  # Common words
-        'dash', 'slash', 'backslash',  # Meta references
-    ]
+    # EXPANDED blacklist for obvious false positives
+    false_positives = {
+        # HTML/XML related
+        'ref', 'img', 'div', 'span', 'href', 'src', 'alt', 'title', 'class', 'style', 'script',
+        'html', 'body', 'head', 'meta', 'link', 'strong', 'bold', 'italic', 'table', 'tbody',
+        # URL related
+        'http', 'https', 'www', 'com', 'net', 'org', 'html', 'php', 'asp', 'jsp',
+        # Common words that might appear
+        'and', 'the', 'for', 'with', 'this', 'that', 'from', 'will', 'can', 'all',
+        'are', 'not', 'you', 'any', 'may', 'use', 'set', 'get', 'new', 'old',
+        # Meta references
+        'dash', 'slash', 'backslash', 'command', 'option', 'parameter', 'setting',
+        # Steam interface terms that aren't launch options
+        'steam', 'steamcmd', 'steamapps', 'library', 'install', 'download',
+        # File extensions
+        'exe', 'dll', 'cfg', 'ini', 'txt', 'log', 'bat', 'sh'
+    }
     
     if cmd_lower in false_positives:
+        if debug:
+            print(f"🔍 Steam Community: Rejected '{cmd}' - blacklisted word")
         return False
     
-    # Known valid Steam launch options (whitelist approach for high confidence)
-    known_valid_options = [
-        # Common performance options
-        'fps_max', 'novid', 'nod3d9ex', 'high', 'nojoy', 'console', 'threads', 'fullscreen',
-        'windowed', 'refresh', 'refreshrate', 'freq', 'lv', 'autoconfig', 'heapsize',
-        # Source engine options
+    # EXPANDED whitelist of known valid options (more comprehensive)
+    known_valid_options = {
+        # Performance & Graphics
+        'fps_max', 'fps-max', 'fps_max_60', 'fps_max_144', 'fps_max_120', 'maxfps',
+        'novid', 'nod3d9ex', 'high', 'nojoy', 'nosound', 'noipx', 'console',
+        'threads', 'thread', 'fullscreen', 'windowed', 'borderless',
+        'refresh', 'refreshrate', 'freq', 'frequency', 'hz',
+        'lv', 'autoconfig', 'heapsize', 'mem', 'memory',
+        
+        # Video/Display options
+        'w', 'h', 'width', 'height', 'res', 'resolution',
+        'x', 'y', 'posx', 'posy', 'xpos', 'ypos',
+        'dxlevel', 'gl', 'opengl', 'directx', 'dx11', 'dx12', 'vulkan',
+        
+        # Source Engine specific
         'mat_queue_mode', 'cl_showfps', 'r_dynamic', 'cl_interp', 'cl_interp_ratio',
         'cl_updaterate', 'cl_forcepreload', 'cl_cmdrate', 'rate', 'cl_lagcompensation',
-        # Graphics options
-        'gl_clear', 'gl_texturemode', 'gl_ansio', 'r_speeds', 'r_drawviewmodel',
-        # Audio options
-        'nosound', 'primarysound', 'snoforceformat', 'wavonly',
-        # Other common options
-        'safe', 'autoexec', 'userconfig', 'game', 'steam', 'applaunch', 'dev', 'condebug'
-    ]
+        
+        # Audio
+        'nosound', 'primarysound', 'snoforceformat', 'wavonly', 'dsound',
+        
+        # Networking
+        'port', 'ip', 'connect', 'server', 'dedicated',
+        'maxplayers', 'tickrate', 'tick',
+        
+        # Debug/Development
+        'safe', 'autoexec', 'userconfig', 'condebug', 'dev', 'developer',
+        'log', 'logaddress', 'debug',
+        
+        # Game-specific options that might appear
+        'game', 'mod', 'applaunch', 'language', 'lang',
+        'skipintro', 'nointro', 'intro',
+        
+        # Common performance tweaks
+        'low', 'medium', 'high', 'ultra', 'max', 'min',
+        'enable', 'disable', 'on', 'off', 'force',
+        
+        # Configuration
+        'config', 'cfg', 'exec', 'override'
+    }
     
-    # If it's in the known valid list, it's definitely good
+    # If it's in the known valid list, definitely accept it
     if cmd_lower in known_valid_options:
+        if debug:
+            print(f"🔍 Steam Community: Accepted '{cmd}' - known valid option")
         return True
     
-    # For unknown options, apply stricter validation
-    # Must be at least 3 characters and look like a real command
-    if len(cmd_lower) >= 3 and not cmd_lower.isdigit():
-        return True
+    # For unknown options, apply reasonable heuristics
+    # Accept if it looks like a realistic command:
+    # 1. At least 3 characters
+    # 2. Contains letters (not just numbers)
+    # 3. Doesn't look like random text
     
+    if len(cmd_lower) >= 3:
+        # Check if it has a reasonable structure
+        has_letters = any(c.isalpha() for c in cmd_lower)
+        has_reasonable_structure = True
+        
+        # Reject if it's all numbers
+        if cmd_lower.isdigit():
+            has_reasonable_structure = False
+        
+        # Reject if it has too many consecutive consonants/vowels (likely gibberish)
+        consonants = 'bcdfghjklmnpqrstvwxyz'
+        vowels = 'aeiou'
+        max_consecutive = 4
+        
+        consecutive_consonants = 0
+        consecutive_vowels = 0
+        
+        for char in cmd_lower:
+            if char in consonants:
+                consecutive_consonants += 1
+                consecutive_vowels = 0
+                if consecutive_consonants > max_consecutive:
+                    has_reasonable_structure = False
+                    break
+            elif char in vowels:
+                consecutive_vowels += 1
+                consecutive_consonants = 0
+                if consecutive_vowels > max_consecutive:
+                    has_reasonable_structure = False
+                    break
+            else:
+                consecutive_consonants = 0
+                consecutive_vowels = 0
+        
+        if has_letters and has_reasonable_structure:
+            if debug:
+                print(f"🔍 Steam Community: Accepted '{cmd}' - heuristic validation passed")
+            return True
+    
+    if debug:
+        print(f"🔍 Steam Community: Rejected '{cmd}' - failed heuristic validation")
     return False
+
 
 def is_valid_parameter(param):
     """
-    Validate that a parameter value is reasonable for a Steam launch option
+    Parameter validation for Steam launch options
+    Lenient to handle different formats while preventing false positives
     """
-    param_lower = param.lower().strip()
-    
-    # Must be reasonable length
-    if len(param_lower) < 1 or len(param_lower) > 20:
+    if not param or not isinstance(param, str):
         return False
     
-    # Must contain only letters, numbers, and basic symbols
-    if not re.match(r'^[a-zA-Z0-9_\.]+$', param_lower):
+    param_clean = param.strip()
+    
+    # Length check (more lenient)
+    if len(param_clean) < 1 or len(param_clean) > 25:
         return False
     
-    # Filter out HTML-like parameters
-    if param_lower.startswith('<') or param_lower.endswith('>'):
+    # Allow alphanumeric, dots, underscores, hyphens
+    if not re.match(r'^[a-zA-Z0-9_\.\-]+$', param_clean):
+        return False
+    
+    # Reject obvious HTML artifacts
+    if param_clean.startswith('<') or param_clean.endswith('>'):
+        return False
+    
+    # Reject if it's just dots or hyphens
+    if set(param_clean) <= {'.', '-', '_'}:
         return False
     
     return True
