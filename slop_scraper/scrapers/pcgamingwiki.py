@@ -17,27 +17,7 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
                                     test_mode=False, rate_limiter=None, session_monitor=None):
     """
     Fetches launch options for a game from PCGamingWiki using the official API.
-    It formats the game title according to MediaWiki standards, searches for the game page,
-    and extracts launch options from the page content.
-    Parameters:
-        game_title (str): The title of the game to search for.
-        rate_limit (float): Optional rate limit in seconds between requests.
-        debug (bool): If True, prints debug information.
-        test_results (dict): Optional dictionary to store test results.
-        test_mode (bool): If True, runs in test mode without making actual requests.
-        rate_limiter (SecureRequestHandler): Optional rate limiter instance.
-        session_monitor: Optional session monitor for tracking requests and errors.
-    Returns:
-        list: A list of launch options found for the game, each option is a dict with
-              'command', 'description', and 'source' keys.
-    This function uses the official PCGamingWiki API to search for the game page,
-    retrieves the page content, and extracts launch options from the wikitext.
-    It handles rate limiting and session monitoring if provided.
-    If the game is not found, it tries alternative search methods to find similar games.
-    If debug mode is enabled, it prints detailed information about the process.
-    If test mode is enabled, it updates the test results with the number of options found.
-    Note: This is designed to be ethical and respects the PCGamingWiki API usage guidelines
-    by using the official API endpoints and adhering to rate limits
+    Now with enhanced validation to prevent HTML artifacts and false positives.
     """
     
     # Security validation
@@ -97,10 +77,12 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
                 # Method 2: Get the page content using official API
                 if page_id:
                     content_options = get_launch_options_from_page_api(page_id, debug=debug)
-                    options.extend(content_options)
+                    # Apply strict validation to prevent false positives
+                    validated_options = validate_pcgaming_options(content_options, debug=debug)
+                    options.extend(validated_options)
                     
                     if debug:
-                        print(f"🔍 PCGamingWiki API: Extracted {len(content_options)} options from page content")
+                        print(f"🔍 PCGamingWiki API: Extracted {len(content_options)} raw, {len(validated_options)} validated options")
             
             else:
                 if debug:
@@ -108,7 +90,8 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
                 
                 # Try alternative search methods
                 alt_options = try_alternative_search(game_title, debug=debug)
-                options.extend(alt_options)
+                validated_alt_options = validate_pcgaming_options(alt_options, debug=debug)
+                options.extend(validated_alt_options)
         
         else:
             if debug:
@@ -122,7 +105,7 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
             test_results['options_by_source'][source] += len(options)
         
         if debug:
-            print(f"🔍 PCGamingWiki API: Final result: {len(options)} options found")
+            print(f"🔍 PCGamingWiki API: Final result: {len(options)} validated options found")
             for opt in options[:3]:
                 print(f"🔍 PCGamingWiki API:   {opt['command']}: {opt['description'][:40]}...")
         
@@ -136,7 +119,208 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
             print(f"🔍 PCGamingWiki API: Error for '{game_title}': {e}")
         else:
             print(f"🔍 PCGamingWiki API: Error for '{game_title}': {e}")
+        
         return []
+
+def validate_pcgaming_options(options, debug=False):
+    """
+    Strict validation for PCGamingWiki options to prevent HTML artifacts and false positives
+    """
+    validated_options = []
+    
+    for option in options:
+        command = option.get('command', '').strip()
+        description = option.get('description', '').strip()
+        
+        # STRICT validation for command
+        if not is_valid_launch_command_strict(command, debug=debug):
+            if debug:
+                print(f"🔍 PCGamingWiki: REJECTED command '{command}' - failed strict validation")
+            continue
+        
+        # Clean and validate description 
+        clean_description = clean_wiki_description(description, debug=debug)
+        if not clean_description:
+            clean_description = f"Launch option from PCGamingWiki"
+        
+        validated_options.append({
+            'command': command,
+            'description': clean_description,
+            'source': 'PCGamingWiki'
+        })
+        
+        if debug:
+            print(f"🔍 PCGamingWiki: ACCEPTED '{command}' with clean description")
+    
+    return validated_options
+
+def is_valid_launch_command_strict(command, debug=False):
+    """
+    EXTREMELY strict validation for launch commands to prevent false positives
+    """
+    if not command or not isinstance(command, str):
+        return False
+    
+    command = command.strip()
+    
+    # Length check - reasonable launch options are typically 2-30 characters
+    if len(command) < 2 or len(command) > 35:
+        if debug:
+            print(f"🔍 Length check failed for '{command}' (len={len(command)})")
+        return False
+    
+    # Must start with - or + (launch options always do)
+    if not (command.startswith('-') or command.startswith('+')):
+        if debug:
+            print(f"🔍 Prefix check failed for '{command}' (no -/+ prefix)")
+        return False
+    
+    # Remove prefix for further validation
+    cmd_body = command[1:]
+    
+    # Body must start with a letter
+    if not cmd_body or not cmd_body[0].isalpha():
+        if debug:
+            print(f"🔍 Letter check failed for '{command}' (body doesn't start with letter)")
+        return False
+    
+    # Only allow alphanumeric, underscore, dash in body
+    if not re.match(r'^[a-zA-Z][a-zA-Z0-9_\-]*$', cmd_body):
+        if debug:
+            print(f"🔍 Character check failed for '{command}' (invalid chars in body)")
+        return False
+    
+    # BLACKLIST: Obvious false positives and HTML artifacts
+    false_positives = {
+        # HTML/XML tags
+        '-ref', '-/ref', '+ref', '+/ref', '-br', '+br', '-div', '+div', '-span', '+span',
+        '-html', '+html', '-xml', '+xml', '-tag', '+tag', '-href', '+href', '-src', '+src',
+        
+        # Wiki markup artifacts  
+        '-pagename', '+pagename', '-pageid', '+pageid', '-infobox', '+infobox',
+        '-template', '+template', '-category', '+category', '-namespace', '+namespace',
+        
+        # Numbers/IDs that got picked up
+        '-2011012614', '+2011012614', '-3833', '+3833',
+        
+        # Random words that aren't launch options
+        '-and', '+and', '-the', '+the', '-for', '+for', '-with', '+with', '-are', '+are',
+        '-this', '+this', '-that', '+that', '-will', '+will', '-can', '+can', '-may', '+may',
+        '-present', '+present', '-unavailable', '+unavailable', '-windows', '+windows',
+        
+        # File paths/extensions that got picked up
+        '-exe', '+exe', '-dll', '+dll', '-cfg', '+cfg', '-ini', '+ini', '-txt', '+txt',
+        '-com', '+com', '-net', '+net', '-org', '+org', '-www', '+www',
+        
+        # Meta references
+        '-command', '+command', '-option', '+option', '-parameter', '+parameter',
+        '-launch', '+launch', '-startup', '+startup'
+    }
+    
+    if command.lower() in false_positives:
+        if debug:
+            print(f"🔍 Blacklist check failed for '{command}' (known false positive)")
+        return False
+    
+    # WHITELIST: Known valid launch options (more conservative)
+    known_valid = {
+        # Performance
+        '-fps_max', '-novid', '-high', '-low', '-threads', '-nojoy', '-nosound',
+        '+fps_max', '+mat_queue_mode', '+cl_showfps',
+        
+        # Display  
+        '-windowed', '-fullscreen', '-borderless', '-w', '-h', '-width', '-height',
+        '-freq', '-refresh', '-dxlevel', '-gl', '-dx11', '-dx12', '-vulkan',
+        
+        # Engine specific
+        '-console', '-condebug', '-autoconfig', '-heapsize', '-safe', '-dev',
+        '+developer', '+con_enable', '+exec',
+        
+        # Game specific
+        '-skipintro', '-nointro', '-language', '-applaunch'
+    }
+    
+    if command.lower() in known_valid:
+        if debug:
+            print(f"🔍 Whitelist check passed for '{command}' (known valid)")
+        return True
+    
+    # For unknown commands, apply heuristic validation
+    # More conservative - reject unless it really looks like a launch option
+    cmd_lower = command.lower()
+    
+    # Reject if it contains suspicious patterns
+    suspicious_patterns = [
+        r'\d{8,}',  # Long numbers (like page IDs)
+        r'[<>{}|]', # HTML/markup characters
+        r'ref.*ref', # Reference patterns
+        r'window.*unavailable', # Wiki text patterns
+        r'activation.*prompt', # Descriptive text patterns
+    ]
+    
+    for pattern in suspicious_patterns:
+        if re.search(pattern, cmd_lower):
+            if debug:
+                print(f"🔍 Suspicious pattern check failed for '{command}' (pattern: {pattern})")
+            return False
+    
+    # Final heuristic: if it's not in whitelist and longer than 15 chars, be very suspicious
+    if len(command) > 15:
+        # Must have typical launch option structure
+        if not any(keyword in cmd_lower for keyword in ['fps', 'res', 'window', 'screen', 'force', 'disable', 'enable', 'max', 'min']):
+            if debug:
+                print(f"🔍 Heuristic check failed for '{command}' (too long without keywords)")
+            return False
+    
+    if debug:
+        print(f"🔍 Validation passed for '{command}' (heuristic approval)")
+    return True
+
+def clean_wiki_description(description, debug=False):
+    """
+    Clean wiki description text to remove markup and artifacts
+    """
+    if not description:
+        return ""
+    
+    # Remove HTML/XML tags
+    description = re.sub(r'<[^>]+>', '', description)
+    
+    # Remove wiki markup
+    description = re.sub(r'\{\{[^}]*\}\}', '', description)  # Templates
+    description = re.sub(r'\[\[[^]]*\]\]', '', description)  # Links
+    description = re.sub(r"'''?([^']*?)'''?", r'\1', description)  # Bold/italic
+    description = re.sub(r'<ref[^>]*>.*?</ref>', '', description, flags=re.DOTALL)  # References
+    description = re.sub(r'<ref[^>]*/?>', '', description)  # Self-closing refs
+    
+    # Remove wiki reference artifacts
+    description = re.sub(r'\}\}.*?\{\{', ' ', description)
+    description = re.sub(r'\|.*?\|', ' ', description)
+    
+    # Clean up whitespace
+    description = re.sub(r'\s+', ' ', description).strip()
+    
+    # If description is too long or contains artifacts, truncate/clean
+    if len(description) > 200:
+        description = description[:200] + "..."
+    
+    # Remove descriptions that are just artifacts
+    artifact_patterns = [
+        r'^and the .* are present',
+        r'.*unavailable.*',
+        r'^\d+$',  # Just numbers
+        r'^[<>{}|]+$',  # Just markup characters
+    ]
+    
+    for pattern in artifact_patterns:
+        if re.match(pattern, description.lower()):
+            return ""
+    
+    # If description is very short and not meaningful, provide default
+    if len(description) < 10:
+        return "Launch option from PCGamingWiki"
+    
+    return description
 
 def format_game_title_for_api(title):
     """Format game title for PCGamingWiki API search"""
@@ -183,8 +367,8 @@ def get_launch_options_from_page_api(page_id, debug=False):
                 if debug:
                     print(f"🔍 PCGamingWiki API: Retrieved {len(wikitext)} characters of wikitext")
                 
-                # Parse wikitext for launch options
-                parsed_options = parse_wikitext_for_launch_options(wikitext, debug=debug)
+                # Parse wikitext for launch options with strict validation
+                parsed_options = parse_wikitext_for_launch_options_strict(wikitext, debug=debug)
                 options.extend(parsed_options)
     
     except Exception as e:
@@ -193,77 +377,112 @@ def get_launch_options_from_page_api(page_id, debug=False):
     
     return options
 
-def parse_wikitext_for_launch_options(wikitext, debug=False):
-    """Parse MediaWiki wikitext for launch options"""
+def parse_wikitext_for_launch_options_strict(wikitext, debug=False):
+    """
+    Parse MediaWiki wikitext for launch options with STRICT validation
+    """
     options = []
     
-    # Look for common launch option patterns in wikitext
+    # Clean the wikitext first to remove obvious markup
+    cleaned_text = clean_wikitext(wikitext)
+    
+    # Look for launch option patterns in cleaned text
     launch_option_patterns = [
-        r'-\w+[\w\-]*',  # Standard command line options
-        r'\+\w+[\w\-]*', # Plus-style options  
-        r'/\w+[\w\-]*'   # Slash-style options
+        r'(?<!\w)(-[a-zA-Z][a-zA-Z0-9_\-]{1,25})(?!\w)',  # -command
+        r'(?<!\w)(\+[a-zA-Z][a-zA-Z0-9_\-]{1,25})(?!\w)',  # +command
     ]
     
-    # Split wikitext into lines for processing
-    lines = wikitext.split('\n')
+    # Split text into lines for context-aware processing
+    lines = cleaned_text.split('\n')
     
     for i, line in enumerate(lines):
-        # Look for sections that might contain launch options
+        # Only process lines that might contain launch options
         if any(keyword in line.lower() for keyword in 
-               ['command', 'launch', 'option', 'parameter', 'argument']):
+               ['command', 'launch', 'option', 'parameter', 'argument', 'flag']):
             
-            # Check this line and surrounding lines for launch options
-            context_start = max(0, i - 2)
-            context_end = min(len(lines), i + 5)
+            # Get context around this line
+            context_start = max(0, i - 1)
+            context_end = min(len(lines), i + 2)
             context_lines = lines[context_start:context_end]
-            context_text = '\n'.join(context_lines)
+            context_text = ' '.join(context_lines)
             
-            # Extract launch options from context
+            # Extract launch options from this context
             for pattern in launch_option_patterns:
-                matches = re.findall(pattern, context_text)
+                matches = re.findall(pattern, line)  # Only search the current line, not context
                 
                 for match in matches:
-                    if len(match) <= 50:  # Reasonable length check
-                        # Get description from surrounding context
-                        desc = extract_description_from_context(match, context_text)
+                    # Apply strict validation before adding
+                    if is_valid_launch_command_strict(match, debug=debug):
+                        # Get description from context
+                        desc = extract_description_from_context_safe(match, context_text)
                         
                         options.append({
                             'command': match,
-                            'description': desc[:300],  # Limit description length
+                            'description': desc,
                             'source': 'PCGamingWiki'
                         })
                         
-                        if debug and len(options) <= 5:
-                            print(f"🔍 PCGamingWiki API: Found option: {match}")
+                        if debug and len(options) <= 10:
+                            print(f"🔍 PCGamingWiki API: Found validated option: {match}")
     
-    # Remove duplicates
+    # Remove duplicates and limit results
     seen_commands = set()
     unique_options = []
     for option in options:
-        if option['command'] not in seen_commands:
-            seen_commands.add(option['command'])
+        cmd = option['command'].lower()
+        if cmd not in seen_commands:
+            seen_commands.add(cmd)
             unique_options.append(option)
     
-    return unique_options[:15]  # Limit total options
+    return unique_options[:10]  # Strict limit
 
-def extract_description_from_context(command, context):
-    """Extract description for a command from its context"""
+def clean_wikitext(wikitext):
+    """
+    Clean wikitext to remove markup that could cause false positives
+    """
+    # Remove reference tags completely
+    cleaned = re.sub(r'<ref[^>]*>.*?</ref>', '', wikitext, flags=re.DOTALL)
+    cleaned = re.sub(r'<ref[^>]*/?>', '', cleaned)
+    
+    # Remove other HTML tags
+    cleaned = re.sub(r'<[^>]+>', '', cleaned)
+    
+    # Remove templates
+    cleaned = re.sub(r'\{\{[^}]*\}\}', '', cleaned)
+    
+    # Remove links but keep link text
+    cleaned = re.sub(r'\[\[([^]|]*\|)?([^]]*)\]\]', r'\2', cleaned)
+    
+    # Remove wiki markup
+    cleaned = re.sub(r"'''([^']*?)'''", r'\1', cleaned)  # Bold
+    cleaned = re.sub(r"''([^']*?)''", r'\1', cleaned)   # Italic
+    
+    # Clean up whitespace
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    
+    return cleaned
+
+def extract_description_from_context_safe(command, context):
+    """
+    Safely extract description for a command from its context
+    """
     lines = context.split('\n')
     
     for line in lines:
         if command in line:
-            # Clean up the line and use as description
+            # Clean up the line
             desc = line.strip()
-            # Remove wiki markup
-            desc = re.sub(r'\{\{[^}]*\}\}', '', desc)  # Remove templates
-            desc = re.sub(r'\[\[[^]]*\]\]', '', desc)  # Remove links
-            desc = re.sub(r"'''?([^']*?)'''?", r'\1', desc)  # Remove bold/italic
-            desc = desc.strip()
             
-            if desc and len(desc) > len(command):
+            # Remove the command itself from description
+            desc = desc.replace(command, '').strip()
+            
+            # Clean up wiki markup from description
+            desc = clean_wiki_description(desc)
+            
+            if desc and len(desc) > 5 and len(desc) < 150:
                 return desc
     
-    return f"Launch option found in PCGamingWiki"
+    return f"Launch option from PCGamingWiki"
 
 def try_alternative_search(game_title, debug=False):
     """Try alternative search methods when exact match fails"""
