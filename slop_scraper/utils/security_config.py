@@ -64,6 +64,7 @@ class SecurityConfig:
                 try:
                     resolved_path.relative_to(cwd)
                 except ValueError:
+                    print(f"⚠️ Output path outside working directory. Using default.")
                     return "./test-output"
                 
                 # Check against allowed directory patterns
@@ -78,7 +79,7 @@ class SecurityConfig:
             path_str = str(resolved_path)
             dangerous_patterns = ['/etc', '/var', '/usr', '/bin', '/sbin', '/sys', '/proc', 'C:\\Windows', 'C:\\Program Files']
             if any(pattern in path_str for pattern in dangerous_patterns):
-                print(f"⚠️ Output path targets system directory. Using default to avoid dangerous patterns.")
+                print(f"⚠️ Output path targets system directory. Using default.")
                 return "./test-output"
                 
             return str(resolved_path)
@@ -101,106 +102,57 @@ class SecurityConfig:
             return True  # If we can't check, assume it's okay
 
 
-# Updated RateLimiter class with fixed Steam API handling
-# Replace the existing RateLimiter class in security_config.py with this version
-
-import time
-
 class RateLimiter:
     """Rate limiter with different limits for different request types and domains"""
     
-    def __init__(self, rate_limit: float, burst_limit: int = 30):
+    def __init__(self, rate_limit: float, burst_limit: int = 50):
         self.rate_limit = SecurityConfig.validate_rate_limit(rate_limit)
-        self.burst_limit = burst_limit
+        self.burst_limit = burst_limit  # General burst limit
         self.last_requests = []
         self.last_request_time = 0
         
         # Separate tracking for different request types
-        self.steam_api_requests = []
-        self.scraping_requests = []
+        self.steam_api_requests = []  # For Steam API calls (more lenient)
+        self.scraping_requests = []   # For web scraping (more restrictive)
         
-        # Set limits for Steam API
-        self.steam_api_burst_limit = 50 
-        self.scraping_burst_limit = 30 
-        self.steam_api_window = 60 
-        self.scraping_window = 60 
+        # Domain-specific tracking for better rate limiting
+        self.domain_requests = {}  # Track requests per domain
         
-        # Per-domain limits
-        self.domain_requests = {}
+        # Different limits for different request types
+        self.steam_api_burst_limit = 100  # Higher limit for Steam API
+        self.scraping_burst_limit = 60    # Increased from 20 to accommodate multiple scrapers
+        self.steam_api_window = 60        # 60 seconds for Steam API
+        self.scraping_window = 60         # 60 seconds for scraping
+        
+        # Per-domain limits to prevent hammering individual sites
         self.domain_burst_limits = {
-            'pcgamingwiki.com': 10,        # Reduced from 15
-            'steamcommunity.com': 15,      # Reduced from 20
-            'protondb.com': 10,            # Reduced from 15
-            'store.steampowered.com': 30,  # Special limit for Steam store
-            'default': 8
+            'pcgamingwiki.com': 15,
+            'steamcommunity.com': 20,
+            'protondb.com': 15,
+            'default': 10
         }
-        self.domain_window = 60
-        
-        # Cooldown mechanism
-        self.last_429_time = 0
-        self.consecutive_429_count = 0
-        self.max_consecutive_429s = 5
+        self.domain_window = 60  # 60 second window for domain tracking
         
     def wait_if_needed(self, request_type: str = "general", domain: str = None):
         """
-        Rate limiting with cooling-off mechanism to prevent endless loops
+        Enforce rate limiting with burst protection based on request type and domain
+        
+        Args:
+            request_type: "steam_api", "scraping", or "general"
+            domain: Optional domain for domain-specific rate limiting
         """
         current_time = time.time()
         
-        # Check for cooldown period after consecutive 429s
-        if self.consecutive_429_count >= self.max_consecutive_429s:
-            time_since_last_429 = current_time - self.last_429_time
-            if time_since_last_429 < 120:
-                remaining_cooldown = 120 - time_since_last_429
-                print(f"🔄 Cooldown period: waiting {remaining_cooldown:.1f}s after consecutive rate limits")
-                time.sleep(remaining_cooldown)
-                self.consecutive_429_count = 0  # Reset after cooldown
-        
-        # Apply domain-specific rate limiting first
+        # Apply domain-specific rate limiting if domain is provided
         if domain and request_type == "scraping":
             self._handle_domain_rate_limit(current_time, domain)
         
         if request_type == "steam_api":
-            self._handle_steam_api_rate_limit_fixed(current_time)
+            self._handle_steam_api_rate_limit(current_time)
         elif request_type == "scraping":
             self._handle_scraping_rate_limit(current_time)
         else:
             self._handle_general_rate_limit(current_time)
-    
-    def _handle_steam_api_rate_limit_fixed(self, current_time: float):
-        """
-        Steam API rate limiting with better burst handling
-        """
-        # Clean old requests
-        self.steam_api_requests = [t for t in self.steam_api_requests 
-                                   if current_time - t < self.steam_api_window]
-        
-        # Burst limit handling
-        if len(self.steam_api_requests) >= self.steam_api_burst_limit:
-            oldest_request = self.steam_api_requests[0]
-            sleep_time = self.steam_api_window - (current_time - oldest_request)
-            
-            if sleep_time > 0:
-                # Cap the sleep time to prevent excessive delays
-                sleep_time = min(sleep_time, 30)  # Max 30 seconds
-                print(f"🔄 Steam API burst limit reached ({len(self.steam_api_requests)}/{self.steam_api_burst_limit}). Waiting {sleep_time:.1f}s...")
-                time.sleep(sleep_time)
-                
-                # Clean requests again after waiting
-                current_time = time.time()
-                self.steam_api_requests = [t for t in self.steam_api_requests 
-                                          if current_time - t < self.steam_api_window]
-        
-        time_since_last = current_time - self.last_request_time
-        min_delay = max(1.0, self.rate_limit * 0.8)  # At least 1 second
-        
-        if time_since_last < min_delay:
-            sleep_time = min_delay - time_since_last
-            time.sleep(sleep_time)
-        
-        # Record this request
-        self.last_request_time = time.time()
-        self.steam_api_requests.append(self.last_request_time)
     
     def _handle_domain_rate_limit(self, current_time: float, domain: str):
         """Handle rate limiting for specific domains"""
@@ -217,15 +169,10 @@ class RateLimiter:
         
         # Check domain-specific burst limit
         if len(self.domain_requests[domain]) >= burst_limit:
-            oldest_request = self.domain_requests[domain][0]
-            sleep_time = self.domain_window - (current_time - oldest_request)
-            
+            sleep_time = self.domain_window - (current_time - self.domain_requests[domain][0])
             if sleep_time > 0:
-                # Cap domain sleep time too
-                sleep_time = min(sleep_time, 60)  # Max 1 minute for domain limits
-                print(f"🔄 Rate limit for {domain} reached ({len(self.domain_requests[domain])}/{burst_limit}). Waiting {sleep_time:.1f}s...")
+                print(f"🔄 Rate limit for {domain} reached ({burst_limit} requests/minute). Waiting {sleep_time:.1f}s...")
                 time.sleep(sleep_time)
-                
                 # Clean requests again after waiting
                 current_time = time.time()
                 self.domain_requests[domain] = [t for t in self.domain_requests[domain] 
@@ -234,22 +181,46 @@ class RateLimiter:
         # Record this domain request
         self.domain_requests[domain].append(current_time)
     
+    def _handle_steam_api_rate_limit(self, current_time: float):
+        """Handle rate limiting for Steam API requests (more lenient)"""
+        # Clean old requests
+        self.steam_api_requests = [t for t in self.steam_api_requests 
+                                   if current_time - t < self.steam_api_window]
+        
+        # Check burst limit for Steam API (higher limit)
+        if len(self.steam_api_requests) >= self.steam_api_burst_limit:
+            sleep_time = self.steam_api_window - (current_time - self.steam_api_requests[0])
+            if sleep_time > 0:
+                print(f"🔄 Steam API burst limit reached. Waiting {sleep_time:.1f}s...")
+                time.sleep(sleep_time)
+                # Clean requests again after waiting
+                current_time = time.time()
+                self.steam_api_requests = [t for t in self.steam_api_requests 
+                                          if current_time - t < self.steam_api_window]
+        
+        # Apply minimal rate limiting for Steam API (faster)
+        time_since_last = current_time - self.last_request_time
+        min_delay = max(0.1, self.rate_limit * 0.3)  # Much faster for Steam API
+        if time_since_last < min_delay:
+            sleep_time = min_delay - time_since_last
+            time.sleep(sleep_time)
+        
+        # Record this request
+        self.last_request_time = time.time()
+        self.steam_api_requests.append(self.last_request_time)
+    
     def _handle_scraping_rate_limit(self, current_time: float):
-        """Handle rate limiting for web scraping"""
+        """Handle rate limiting for web scraping (more restrictive but reasonable)"""
         # Clean old requests
         self.scraping_requests = [t for t in self.scraping_requests 
                                   if current_time - t < self.scraping_window]
         
-        # Check burst limit for scraping
+        # Check burst limit for scraping (increased limit)
         if len(self.scraping_requests) >= self.scraping_burst_limit:
-            oldest_request = self.scraping_requests[0]
-            sleep_time = self.scraping_window - (current_time - oldest_request)
-            
+            sleep_time = self.scraping_window - (current_time - self.scraping_requests[0])
             if sleep_time > 0:
-                sleep_time = min(sleep_time, 45)  # Max 45 seconds for scraping
                 print(f"⚠️ Web scraping burst limit reached ({len(self.scraping_requests)}/{self.scraping_burst_limit}). Waiting {sleep_time:.1f}s...")
                 time.sleep(sleep_time)
-                
                 # Clean requests again after waiting
                 current_time = time.time()
                 self.scraping_requests = [t for t in self.scraping_requests 
@@ -266,17 +237,14 @@ class RateLimiter:
         self.scraping_requests.append(self.last_request_time)
     
     def _handle_general_rate_limit(self, current_time: float):
-        """Handle general rate limiting"""
-        # Remove requests older than burst window
+        """Handle general rate limiting (original behavior, but more lenient)"""
+        # Remove requests older than burst window (60 seconds)
         self.last_requests = [t for t in self.last_requests if current_time - t < 60]
         
-        # Check burst limit
+        # Check burst limit (now higher)
         if len(self.last_requests) >= self.burst_limit:
-            oldest_request = self.last_requests[0]
-            sleep_time = 60 - (current_time - oldest_request)
-            
+            sleep_time = 60 - (current_time - self.last_requests[0])
             if sleep_time > 0:
-                sleep_time = min(sleep_time, 30)  # Cap general burst sleep time
                 print(f"⚠️ General burst limit reached. Waiting {sleep_time:.1f}s...")
                 time.sleep(sleep_time)
         
@@ -289,25 +257,6 @@ class RateLimiter:
         # Record this request
         self.last_request_time = time.time()
         self.last_requests.append(self.last_request_time)
-    
-    def record_429_error(self):
-        """
-        FIXED: Track 429 errors to implement cooling-off mechanism
-        """
-        current_time = time.time()
-        
-        # If it's been more than 5 minutes since last 429, reset counter
-        if current_time - self.last_429_time > 300:
-            self.consecutive_429_count = 0
-        
-        self.last_429_time = current_time
-        self.consecutive_429_count += 1
-        
-        print(f"🔄 Rate limit detected (#{self.consecutive_429_count})")
-        
-        # If we've hit too many consecutive 429s, force a longer delay
-        if self.consecutive_429_count >= self.max_consecutive_429s:
-            print(f"⚠️ Too many consecutive rate limits. Implementing cooling-off period...")
     
     def get_stats(self) -> dict:
         """Get current rate limiting statistics"""
@@ -331,8 +280,6 @@ class RateLimiter:
             "steam_api_limit": self.steam_api_burst_limit,
             "scraping_limit": self.scraping_burst_limit,
             "general_limit": self.burst_limit,
-            "consecutive_429s": self.consecutive_429_count,
-            "last_429_time": self.last_429_time,
             "domain_requests": domain_stats
         }
 
