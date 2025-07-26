@@ -17,7 +17,6 @@ def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, 
                                     test_mode=False, rate_limiter=None, session_monitor=None):
     """
     Fetches launch options for a game from PCGamingWiki using the official API.
-    Now with enhanced validation to prevent HTML artifacts and false positives.
     """
     
     # Security validation

@@ -66,7 +66,7 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
         print("🔒 Making secure request to Steam API...")
     
     try:
-        # Get the initial app list (this usually works fine)
+        # Get the initial app list
         response = requests.get(
             'https://api.steampowered.com/ISteamApps/GetAppList/v2/',
             timeout=30
@@ -82,33 +82,24 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
             print(f"✅ Securely fetched {len(all_apps)} total apps")
         
     except Exception as e:
-        # DON'T report this to session monitor - it's an initial setup issue
         if debug:
             print(f"❌ Failed to fetch app list: {e}")
         return []
     
-    # Process apps with NO session monitor error reporting
+    # Process apps with proper rate limiting
     games = []
     rate_limit_count = 0
-    actual_error_count = 0  # Only count truly unexpected errors
-    max_actual_errors = 20  # Much lower threshold for real errors
     consecutive_429s = 0
+    max_consecutive_429s = 10  # Stop after 10 consecutive 429s
     
-    # Rate limiting settings
-    base_delay = 2.0
+    base_delay = 3.0  # Start with 3 seconds instead of 2
     current_delay = base_delay
-    max_delay = 60.0
-    backoff_multiplier = 1.5
+    max_delay = 60.0 
+    success_count = 0
+    error_count = 0
     
     if debug:
         print(f"🔒 Starting with {base_delay}s delay between requests")
-        print(f"🔒 Will only report truly unexpected errors to security system")
-    
-    # REVERTED: Use original game processing logic that was working
-    # Process games in original order without "smart starting point"
-    
-    if debug:
-        print(f"🔍 Processing games in original order (no filtering by app_id range)")
     
     with tqdm(all_apps, desc="🔒 Filtering games securely", unit="game") as pbar:
         for app in pbar:
@@ -116,7 +107,7 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
             if len(games) >= limit:
                 break
             
-            # Safety check for runtime - but don't count this as an error
+            # Safety check for runtime
             if session_monitor:
                 try:
                     session_monitor.check_runtime_limit()
@@ -137,19 +128,21 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
             # Check cache first
             if str(app_id) in cache and not force_refresh:
                 cached_game = cache[str(app_id)]
-                if cached_game:  # Only use non-null cached data
+                if cached_game:
                     games.append(cached_game)
                 continue
             
-            # Apply current delay with jitter
+            # Apply rate limiting BEFORE making request
             if rate_limiter:
+                # Use the more conservative Steam API rate limiting
                 rate_limiter.wait_if_needed("steam_api", domain="store.steampowered.com")
             else:
-                jittered_delay = current_delay + random.uniform(0, 0.5)
+                # Manual rate limiting with jitter
+                jittered_delay = current_delay + random.uniform(0, 1.0)
                 time.sleep(jittered_delay)
             
-            # Fetch game details WITHOUT reporting rate limits as errors
-            success, game_data, error_type = fetch_game_details_no_error_reporting(
+            # Fetch game details
+            success, game_data, error_type = fetch_game_details(
                 app_id, 
                 cache, 
                 current_delay,
@@ -158,38 +151,46 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
             
             if success and game_data:
                 games.append(game_data)
-                # Success! Reset consecutive 429 counter and reduce delay slightly
-                consecutive_429s = 0
-                current_delay = max(base_delay, current_delay * 0.9)
+                success_count += 1
+                consecutive_429s = 0  # Reset consecutive 429 counter
+                
+                # Gradually reduce delay (but not too aggressively)
+                current_delay = max(base_delay, current_delay * 0.95)
                 
             elif error_type == "rate_limit":
-                # Handle rate limits without reporting to session monitor
                 consecutive_429s += 1
                 rate_limit_count += 1
-                current_delay = min(max_delay, current_delay * backoff_multiplier)
                 
+                # More aggressive backoff for 429s
+                current_delay = min(max_delay, current_delay * 1.5)
+
                 if debug and rate_limit_count % 20 == 1:  # Log every 20th rate limit
                     print(f"🔄 Rate limiting detected ({rate_limit_count} total). Delay now {current_delay:.1f}s")
+
+                if debug and consecutive_429s % 5 == 1:
+                    print(f"🔄 Rate limited {consecutive_429s} times. Delay now {current_delay:.1f}s")
+                
+                # If we get too many consecutive 429s, take a longer break
+                if consecutive_429s >= max_consecutive_429s:
+                    if debug:
+                        print(f"⚠️ Too many consecutive rate limits ({consecutive_429s}). Taking extended break...")
+                    time.sleep(60)  # 1 minute break
+                    consecutive_429s = 0
+                    current_delay = base_delay  # Reset delay
                 
             elif error_type == "real_error":
-                # Only count truly unexpected errors
-                actual_error_count += 1
+                error_count += 1
                 
-                if debug and actual_error_count % 5 == 1:
-                    print(f"⚠️ Unexpected error #{actual_error_count}: {str(game_data)[:50]}...")
-                
-                # ONLY report truly unexpected errors to session monitor
-                if session_monitor and actual_error_count <= 3:  # Only report first few real errors
+                if session_monitor and error_count <= 3:
                     session_monitor.record_error()
                 
-                if actual_error_count > max_actual_errors:
+                if error_count > 20:
                     if debug:
-                        print(f"⚠️ Too many unexpected errors ({actual_error_count}). Stopping.")
-                        print(f"📊 Final stats: {rate_limit_count} rate limits, {actual_error_count} unexpected errors")
+                        print(f"⚠️ Too many real errors ({error_count}). Stopping.")
                     break
             
-            # Update progress bar with current status
-            if consecutive_429s > 0:
+            # Update progress bar
+            if consecutive_429s > 5:
                 pbar.set_description(f"🔄 Rate limited (delay: {current_delay:.1f}s)")
             else:
                 pbar.set_description(f"🔒 Filtering games securely")
@@ -208,17 +209,17 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
     
     if debug:
         print(f"🔒 Final game count: {len(valid_games)} (security validated)")
-        print(f"📊 Processing stats: {rate_limit_count} rate limits, {actual_error_count} unexpected errors")
+        print(f"📊 Processing stats: {rate_limit_count} rate limits, {error_count} unexpected errors")
+        print(f"📊 Success rate: {success_count} successes, {error_count} errors")
         if skip_existing and existing_app_ids:
             skipped_count = len(existing_app_ids)
-            print(f"⚡ Efficiency: Skipped {skipped_count} existing games, saved {skipped_count} API calls")
+            print(f"⚡ Efficiency: Skipped {skipped_count} existing games")
     
     return valid_games
 
-def fetch_game_details_no_error_reporting(app_id, cache, current_delay, max_retries=3, debug=False):
+def fetch_game_details(app_id, cache, current_delay, max_retries=2, debug=False):
     """
-    Fetch game details with ZERO error reporting to session monitor
-    FIXED: Now extracts full game metadata like the original scraper
+    Fetch game details - extracts full game metadata
     
     Returns:
         (success: bool, data: dict/str, error_type: str)
@@ -229,75 +230,61 @@ def fetch_game_details_no_error_reporting(app_id, cache, current_delay, max_retr
             # Make the API request
             store_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}&cc=us&l=en"
             
-            store_res = requests.get(store_url, timeout=15)
+            # TIMEOUT IS CHANGEABLE -- DEFAULT VALUE CURRENTLY SET TO 10
+            store_res = requests.get(store_url, timeout=10)
             
             if store_res.status_code == 200:
-                # Success! Parse the data
-                store_data = store_res.json()
+                try:
+                    store_data = store_res.json()
+                except ValueError as json_error:
+                    if debug:
+                        print(f"⚠️ JSON decode error for app_id {app_id}: {json_error}")
+                    cache[str(app_id)] = None
+                    return False, None, "invalid_data"
                 
                 if str(app_id) in store_data and store_data[str(app_id)].get('success'):
                     game_info = store_data[str(app_id)]['data']
                     
                     # Validate the game data
                     if not game_info.get('name') or game_info.get('type') != 'game':
-                        if debug:
-                            print(f"⚠️ No valid data for app_id {app_id}. Skipping.")
                         cache[str(app_id)] = None
                         return False, None, "invalid_data"
                     
-                    # FIXED: Extract FULL game metadata like the original scraper
+                    # Create game object
                     game = {
                         'appid': app_id,
-                        'name': game_info['name'],
-                        # Extract developer information
-                        'developer': extract_developer_safely(game_info),
-                        'publisher': extract_publisher_safely(game_info),
-                        'release_date': extract_release_date_safely(game_info),
-                        'engine': extract_engine_safely(game_info)
+                        'name': game_info['name']
                     }
                     
-                    # Cache the result with full metadata
+                    # Cache the result
                     cache[str(app_id)] = game
-                    
-                    if debug:
-                        print(f"✔️ Added: {game['name']} (Dev: {game['developer']}, Engine: {game['engine']})")
-                    
                     return True, game, "success"
                 
                 else:
                     # Game exists but isn't available/valid
-                    if debug:
-                        print(f"⚠️ No valid data for app_id {app_id}. Skipping.")
                     cache[str(app_id)] = None
                     return False, None, "invalid_data"
             
             elif store_res.status_code == 429:
-                # Rate limited! Handle gracefully without reporting error
+                # Handle 429s more conservatively
                 if attempt < max_retries - 1:
-                    # Calculate backoff delay for this specific 429
-                    backoff_delay = current_delay * (2 ** attempt) + random.uniform(0, 1)
+                    backoff_delay = current_delay * (3 ** attempt) + random.uniform(2, 5)
                     backoff_delay = min(backoff_delay, 120)  # Max 2 minutes
                     
-                    if debug and attempt == 0:  # Only log on first 429 for this app
-                        print(f"🔄 Rate limited for app {app_id}. Waiting {backoff_delay:.1f}s...")
+                    if debug and attempt == 0:
+                        print(f"🔄 429 for app {app_id}. Waiting {backoff_delay:.1f}s...")
                     
                     time.sleep(backoff_delay)
-                    continue  # Retry
+                    continue
                 else:
-                    # Max retries reached for this app - still not an error, just rate limiting
                     return False, "429_max_retries", "rate_limit"
             
             else:
-                # Other HTTP error - could be real issue
-                if debug:
-                    print(f"⚠️ HTTP {store_res.status_code} for app_id {app_id}. Skipping.")
+                # Other HTTP error
                 cache[str(app_id)] = None
                 return False, f"HTTP_{store_res.status_code}", "http_error"
         
         except requests.exceptions.Timeout:
-            # Timeout is not a real error in this context - just slow network
-            if debug and attempt == 0:
-                print(f"⚠️ Timeout for app_id {app_id}. Retrying...")
             if attempt < max_retries - 1:
                 time.sleep(current_delay * (attempt + 1))
                 continue
@@ -306,32 +293,21 @@ def fetch_game_details_no_error_reporting(app_id, cache, current_delay, max_retr
         
         except requests.exceptions.RequestException as e:
             if "429" in str(e):
-                # This is a 429 error wrapped in an exception
                 if attempt < max_retries - 1:
-                    backoff_delay = current_delay * (2 ** attempt) + random.uniform(0, 1)
-                    if debug and attempt == 0:
-                        print(f"🔄 Rate limit exception for app {app_id}. Waiting {backoff_delay:.1f}s...")
+                    backoff_delay = current_delay * (3 ** attempt) + random.uniform(2, 5)
                     time.sleep(backoff_delay)
                     continue
                 else:
                     return False, "429_exception", "rate_limit"
             else:
-                # Real network error
-                if debug:
-                    print(f"⚠️ Network error for app_id {app_id}: {e}. Skipping.")
                 cache[str(app_id)] = None
                 return False, str(e), "network_error"
         
         except Exception as e:
-            # Truly unexpected error
-            if debug:
-                print(f"⚠️ Unexpected error for app_id {app_id}: {e}. Skipping.")
             cache[str(app_id)] = None
             return False, str(e), "real_error"
     
-    # If we get here, we exhausted retries
     return False, "max_retries_exhausted", "real_error"
-
 
 def extract_developer_safely(game_info):
     """Safely extract developer information from Steam API response"""

@@ -16,7 +16,7 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                                        test_results=None, test_mode=False, rate_limiter=None, 
                                        session_monitor=None):
     """
-    Enhanced Steam Community scraper with strict validation to prevent false positives
+    Steam Community scraper with strict validation to prevent false positives
     """
     
     # Security validation

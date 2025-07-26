@@ -585,7 +585,7 @@ class SlopScraper:
             print("  ⚠️ Some games still have only generic options")
             print("  → This is normal for games with unrecognized engines")
         else:
-            print("  ✅ No generic-only games found - bug appears fixed!")
+            print("  ✅ No generic-only games found.")
         
         for scraper, data in stats['scraper_success_rates'].items():
             if data['attempts'] > 0:
