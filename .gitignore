@@ -14,10 +14,11 @@ SecurityAudit.MD
 slop_scraper/appdetails_cache.json
 appdetails_cache.json
 */appdetails_cache
-appdetails_cache.json
+/appdetails_cache
 */appdetails_cache.json
+appdetails_cache.json
 */old_scraper
-old_scraper'
+old_scraper
 
 # build
 dist
