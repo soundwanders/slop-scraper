@@ -9,12 +9,15 @@ try:
     # Try relative imports first (when run as module)
     from ..utils.cache import load_cache, save_cache
     from ..utils.security_config import SecurityConfig, SessionMonitor, RateLimiter
+    from ..utils import extract_engine
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from utils.cache import load_cache, save_cache
     from utils.security_config import SecurityConfig, SessionMonitor, RateLimiter
+    from utils.extract_engine import extract_engine
+    from validation import LaunchOptionsValidator, ValidationLevel, EngineType  
 
 def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=False, 
                        debug=False, cache_file='appdetails_cache.json', 
@@ -332,7 +335,6 @@ def fetch_game_details_no_error_reporting(app_id, cache, current_delay, max_retr
     # If we get here, we exhausted retries
     return False, "max_retries_exhausted", "real_error"
 
-
 def extract_developer_safely(game_info):
     """Safely extract developer information from Steam API response"""
     try:
@@ -344,7 +346,6 @@ def extract_developer_safely(game_info):
         return ''
     except Exception:
         return ''
-
 
 def extract_publisher_safely(game_info):
     """Safely extract publisher information from Steam API response"""
@@ -358,7 +359,6 @@ def extract_publisher_safely(game_info):
     except Exception:
         return ''
 
-
 def extract_release_date_safely(game_info):
     """Safely extract release date from Steam API response"""
     try:
@@ -369,50 +369,7 @@ def extract_release_date_safely(game_info):
     except Exception:
         return ''
 
-
 def extract_engine_safely(game_info):
-    """Safely extract or detect game engine from Steam API response"""
-    try:
-        # Method 1: Check if engine is directly provided (rare)
-        engine = game_info.get('engine', '')
-        if engine:
-            return engine
-        
-        # Method 2: Detect engine from game title and metadata
-        title = game_info.get('name', '').lower()
-        developers = game_info.get('developers', [])
-        categories = game_info.get('categories', [])
-        
-        # Convert lists to searchable text
-        dev_text = ''
-        if isinstance(developers, list):
-            dev_text = ' '.join(developers).lower()
-        elif isinstance(developers, str):
-            dev_text = developers.lower()
-        
-        category_text = ''
-        if isinstance(categories, list):
-            category_text = ' '.join([cat.get('description', '') for cat in categories if isinstance(cat, dict)]).lower()
-        
-        all_text = f"{title} {dev_text} {category_text}"
-        
-        # Engine detection patterns (same as game_specific.py)
-        if any(indicator in all_text for indicator in ['valve corporation', 'valve software', 'source engine', 'source 2']):
-            return 'Source Engine'
-        elif any(indicator in all_text for indicator in ['unity', 'unity technologies', 'made with unity']):
-            return 'Unity Engine'
-        elif any(indicator in all_text for indicator in ['unreal engine', 'epic games']):
-            return 'Unreal Engine'
-        elif any(indicator in all_text for indicator in ['id software', 'id tech']):
-            return 'id Tech'
-        elif any(indicator in all_text for indicator in ['electronic arts', 'ea games', 'frostbite']):
-            return 'Frostbite Engine'
-        elif 'minecraft' in title and 'java' in all_text:
-            return 'Java (Minecraft)'
-        elif any(game in title for game in ['skyrim', 'fallout', 'elder scrolls', 'starfield']):
-            return 'Creation Engine'
-        else:
-            return 'Unknown'
-            
-    except Exception:
-        return 'Unknown'
+    """Enhanced engine detection wrapper"""
+    app_id = game_info.get('appid') or game_info.get('steam_appid')
+    return extract_engine(game_info, app_id)

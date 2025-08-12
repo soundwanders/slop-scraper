@@ -18,7 +18,7 @@ except ImportError:
     # Fall back to absolute imports (when run directly)
     from core.scraper import SlopScraper
     from utils.security_config import SecurityConfig, validate_usage_pattern
-    from database.supabase import SupabaseClient, get_database_stats  # Import for stats
+    from database.supabase import SupabaseClient, get_database_stats
  
 def get_script_dir():
     """Get directory where this script (slop_scraper) is located"""

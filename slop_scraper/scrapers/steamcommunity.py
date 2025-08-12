@@ -6,11 +6,13 @@ from bs4 import BeautifulSoup
 try:
     # Try relative imports first (when run as module)
     from ..utils.security_config import SecureRequestHandler
+    from ..validation import LaunchOptionsValidator, ValidationLevel, EngineType
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from utils.security_config import SecureRequestHandler
+    from validation import LaunchOptionsValidator, ValidationLevel, EngineType
 
 def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=None, debug=False, 
                                        test_results=None, test_mode=False, rate_limiter=None, 
@@ -343,7 +345,7 @@ def extract_validated_steam_launch_options(text, guide_title, debug=False):
     
     # Validate each match with STRICT criteria
     for match in all_matches:
-        if is_valid_steam_launch_option_ultra_strict(match, debug=debug):
+        if validate_steam_option(match, debug=debug):
             # Get clean description
             description = get_clean_description_for_option(match, text, guide_title)
             
@@ -361,155 +363,16 @@ def extract_validated_steam_launch_options(text, guide_title, debug=False):
     
     return options
 
-def is_valid_steam_launch_option_ultra_strict(command, debug=False):
-    """
-    ULTRA STRICT validation for Steam launch options
-    """
-    if not command or not isinstance(command, str):
-        return False
+def validate_steam_option(command: str, debug: bool = False) -> bool:
+    """Production-ready validation for Steam Community options"""
     
-    command = command.strip()
+    validator = LaunchOptionsValidator(ValidationLevel.PERMISSIVE)
+    is_valid, reason = validator.validate_option(command, EngineType.SOURCE)
     
-    # Length check
-    if len(command) < 2 or len(command) > 35:
-        if debug:
-            print(f"🔍 Length validation failed for '{command}'")
-        return False
+    if debug and not is_valid:
+        print(f"🔍 Steam Community: Rejected '{command}' - {reason}")
     
-    # Must start with - or +
-    if not (command.startswith('-') or command.startswith('+')):
-        if debug:
-            print(f"🔍 Prefix validation failed for '{command}'")
-        return False
-    
-    # Remove prefix for validation
-    cmd_body = command[1:].split()[0]  # Take only the command part, not parameters
-    
-    # Body must start with a letter and be reasonable length
-    if not cmd_body or len(cmd_body) < 1 or not cmd_body[0].isalpha():
-        if debug:
-            print(f"🔍 Body validation failed for '{command}'")
-        return False
-    
-    # Only allow alphanumeric, underscore, dash
-    if not re.match(r'^[a-zA-Z][a-zA-Z0-9_\-]*$', cmd_body):
-        if debug:
-            print(f"🔍 Character validation failed for '{command}'")
-        return False
-    
-    # COMPREHENSIVE BLACKLIST
-    cmd_lower = command.lower()
-    
-    blacklist = {
-        # HTML/markup artifacts
-        '-ref', '+ref', '-br', '+br', '-div', '+div', '-span', '+span', '-html', '+html',
-        '-href', '+href', '-src', '+src', '-alt', '+alt', '-class', '+class', '-style', '+style',
-        
-        # Numbers/IDs that might get picked up
-        '-2011012614', '+2011012614', '-3833', '+3833', '-123', '+123',
-        
-        # Common English words that aren't launch options
-        '-and', '+and', '-the', '+the', '-for', '+for', '-with', '+with', '-this', '+this',
-        '-that', '+that', '-are', '+are', '-will', '+will', '-can', '+can', '-may', '+may',
-        '-present', '+present', '-unavailable', '+unavailable', '-windows', '+windows',
-        '-activation', '+activation', '-prompt', '+prompt', '-executable', '+executable',
-        
-        # File system artifacts
-        '-exe', '+exe', '-dll', '+dll', '-com', '+com', '-net', '+net', '-org', '+org',
-        '-www', '+www', '-http', '+http', '-https', '+https',
-        
-        # Meta references (people talking about launch options)
-        '-command', '+command', '-option', '+option', '-parameter', '+parameter',
-        '-launch', '+launch', '-startup', '+startup', '-flag', '+flag',
-        
-        # Random short combinations that aren't real
-        '-a', '+a', '-b', '+b', '-c', '+c', '-x', '+x', '-y', '+y', '-z', '+z',
-        '-aa', '+aa', '-bb', '+bb', '-cc', '+cc',
-    }
-    
-    if cmd_lower in blacklist:
-        if debug:
-            print(f"🔍 Blacklist validation failed for '{command}'")
-        return False
-    
-    # WHITELIST of known valid Steam launch options
-    whitelist = {
-        # Performance options
-        '-fps_max', '+fps_max', '-novid', '-high', '-low', '-threads', '-nojoy', '-nosound',
-        '-heapsize', '-autoconfig', '-refresh', '-freq',
-        
-        # Display options
-        '-windowed', '-fullscreen', '-borderless', '-w', '-h', '-width', '-height',
-        '-x', '-y', '-xpos', '-ypos', '-noborder',
-        
-        # Graphics API
-        '-dx11', '-dx12', '-vulkan', '-opengl', '-gl', '-dxlevel', '-force_vendor_id',
-        '-force_device_id',
-        
-        # Console/debug
-        '-console', '-condebug', '-dev', '-developer', '+developer', '+con_enable',
-        
-        # Source engine specific
-        '+mat_queue_mode', '+cl_showfps', '+fps_max', '+rate', '+cl_updaterate',
-        '+cl_cmdrate', '+cl_interp', '+cl_interp_ratio',
-        
-        # Audio
-        '-primarysound', '-snoforceformat', '-wavonly',
-        
-        # Compatibility
-        '-safe', '-autoexec', '+exec', '-userconfig',
-        
-        # Game-specific common ones
-        '-skipintro', '-nointro', '-language', '-applaunch',
-    }
-    
-    if cmd_lower in whitelist:
-        if debug:
-            print(f"🔍 Whitelist validation passed for '{command}'")
-        return True
-    
-    # For unknown options, apply very strict heuristics
-    # Only allow if it looks like a real launch option pattern
-    
-    # Must contain typical launch option keywords or patterns
-    valid_keywords = [
-        'fps', 'res', 'width', 'height', 'window', 'screen', 'display',
-        'force', 'disable', 'enable', 'no', 'skip', 'max', 'min',
-        'dx', 'gl', 'vulkan', 'sound', 'audio', 'mouse', 'key'
-    ]
-    
-    has_valid_keyword = any(keyword in cmd_lower for keyword in valid_keywords)
-    
-    if not has_valid_keyword and len(command) > 8:
-        if debug:
-            print(f"🔍 Keyword validation failed for '{command}' (no valid keywords)")
-        return False
-    
-    # Additional pattern checks for unknown options
-    # Reject if it looks like random text
-    if len(cmd_body) > 3:
-        # Check for reasonable consonant/vowel distribution
-        vowels = 'aeiou'
-        consonants = 'bcdfghjklmnpqrstvwxyz'
-        
-        vowel_count = sum(1 for c in cmd_lower if c in vowels)
-        consonant_count = sum(1 for c in cmd_lower if c in consonants)
-        
-        # Reject if it's all consonants or has very weird distribution
-        if vowel_count == 0 and consonant_count > 3:
-            if debug:
-                print(f"🔍 Pattern validation failed for '{command}' (no vowels)")
-            return False
-        
-        # Reject if it has too many consecutive consonants (likely not a real word)
-        if re.search(r'[bcdfghjklmnpqrstvwxyz]{5,}', cmd_lower):
-            if debug:
-                print(f"🔍 Pattern validation failed for '{command}' (too many consecutive consonants)")
-            return False
-    
-    if debug:
-        print(f"🔍 Heuristic validation passed for '{command}'")
-    return True
+    return is_valid
 
 def get_clean_description_for_option(option, context_text, guide_title):
     """
@@ -558,7 +421,7 @@ def final_validation_and_dedup(options, debug=False):
             continue
         
         # Final validation check
-        if is_valid_steam_launch_option_ultra_strict(command, debug=debug):
+        if validate_steam_option(command, debug=debug):
             seen_commands.add(command.lower())
             validated_options.append(option)
             

@@ -6,12 +6,12 @@ from urllib.parse import quote
 
 try:
     # Try relative imports first (when run as module)
-    from ..utils.security_config import SecureRequestHandler
+    from ..validation import LaunchOptionsValidator, ValidationLevel, EngineType
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from utils.security_config import SecureRequestHandler
+    from validation import LaunchOptionsValidator, ValidationLevel, EngineType
 
 def fetch_pcgamingwiki_launch_options(game_title, rate_limit=None, debug=False, test_results=None, 
                                     test_mode=False, rate_limiter=None, session_monitor=None):
@@ -132,7 +132,7 @@ def validate_pcgaming_options(options, debug=False):
         description = option.get('description', '').strip()
         
         # STRICT validation for command
-        if not is_valid_launch_command_strict(command, debug=debug):
+        if not validate_pcgw_option(command, debug=debug):
             if debug:
                 print(f"🔍 PCGamingWiki: REJECTED command '{command}' - failed strict validation")
             continue
@@ -153,127 +153,16 @@ def validate_pcgaming_options(options, debug=False):
     
     return validated_options
 
-def is_valid_launch_command_strict(command, debug=False):
-    """
-    EXTREMELY strict validation for launch commands to prevent false positives
-    """
-    if not command or not isinstance(command, str):
-        return False
+def validate_pcgw_option(command: str, debug: bool = False) -> bool:
+    """Production-ready validation for PCGamingWiki options"""
     
-    command = command.strip()
+    validator = LaunchOptionsValidator(ValidationLevel.PERMISSIVE)
+    is_valid, reason = validator.validate_option(command, EngineType.UNIVERSAL)
     
-    # Length check - reasonable launch options are typically 2-30 characters
-    if len(command) < 2 or len(command) > 35:
-        if debug:
-            print(f"🔍 Length check failed for '{command}' (len={len(command)})")
-        return False
+    if debug and not is_valid:
+        print(f"🔍 PCGamingWiki: Rejected '{command}' - {reason}")
     
-    # Must start with - or + (launch options always do)
-    if not (command.startswith('-') or command.startswith('+')):
-        if debug:
-            print(f"🔍 Prefix check failed for '{command}' (no -/+ prefix)")
-        return False
-    
-    # Remove prefix for further validation
-    cmd_body = command[1:]
-    
-    # Body must start with a letter
-    if not cmd_body or not cmd_body[0].isalpha():
-        if debug:
-            print(f"🔍 Letter check failed for '{command}' (body doesn't start with letter)")
-        return False
-    
-    # Only allow alphanumeric, underscore, dash in body
-    if not re.match(r'^[a-zA-Z][a-zA-Z0-9_\-]*$', cmd_body):
-        if debug:
-            print(f"🔍 Character check failed for '{command}' (invalid chars in body)")
-        return False
-    
-    # BLACKLIST: Obvious false positives and HTML artifacts
-    false_positives = {
-        # HTML/XML tags
-        '-ref', '-/ref', '+ref', '+/ref', '-br', '+br', '-div', '+div', '-span', '+span',
-        '-html', '+html', '-xml', '+xml', '-tag', '+tag', '-href', '+href', '-src', '+src',
-        
-        # Wiki markup artifacts  
-        '-pagename', '+pagename', '-pageid', '+pageid', '-infobox', '+infobox',
-        '-template', '+template', '-category', '+category', '-namespace', '+namespace',
-        
-        # Numbers/IDs that got picked up
-        '-2011012614', '+2011012614', '-3833', '+3833',
-        
-        # Random words that aren't launch options
-        '-and', '+and', '-the', '+the', '-for', '+for', '-with', '+with', '-are', '+are',
-        '-this', '+this', '-that', '+that', '-will', '+will', '-can', '+can', '-may', '+may',
-        '-present', '+present', '-unavailable', '+unavailable', '-windows', '+windows',
-        
-        # File paths/extensions that got picked up
-        '-exe', '+exe', '-dll', '+dll', '-cfg', '+cfg', '-ini', '+ini', '-txt', '+txt',
-        '-com', '+com', '-net', '+net', '-org', '+org', '-www', '+www',
-        
-        # Meta references
-        '-command', '+command', '-option', '+option', '-parameter', '+parameter',
-        '-launch', '+launch', '-startup', '+startup'
-    }
-    
-    if command.lower() in false_positives:
-        if debug:
-            print(f"🔍 Blacklist check failed for '{command}' (known false positive)")
-        return False
-    
-    # WHITELIST: Known valid launch options (more conservative)
-    known_valid = {
-        # Performance
-        '-fps_max', '-novid', '-high', '-low', '-threads', '-nojoy', '-nosound',
-        '+fps_max', '+mat_queue_mode', '+cl_showfps',
-        
-        # Display  
-        '-windowed', '-fullscreen', '-borderless', '-w', '-h', '-width', '-height',
-        '-freq', '-refresh', '-dxlevel', '-gl', '-dx11', '-dx12', '-vulkan',
-        
-        # Engine specific
-        '-console', '-condebug', '-autoconfig', '-heapsize', '-safe', '-dev',
-        '+developer', '+con_enable', '+exec',
-        
-        # Game specific
-        '-skipintro', '-nointro', '-language', '-applaunch'
-    }
-    
-    if command.lower() in known_valid:
-        if debug:
-            print(f"🔍 Whitelist check passed for '{command}' (known valid)")
-        return True
-    
-    # For unknown commands, apply heuristic validation
-    # More conservative - reject unless it really looks like a launch option
-    cmd_lower = command.lower()
-    
-    # Reject if it contains suspicious patterns
-    suspicious_patterns = [
-        r'\d{8,}',  # Long numbers (like page IDs)
-        r'[<>{}|]', # HTML/markup characters
-        r'ref.*ref', # Reference patterns
-        r'window.*unavailable', # Wiki text patterns
-        r'activation.*prompt', # Descriptive text patterns
-    ]
-    
-    for pattern in suspicious_patterns:
-        if re.search(pattern, cmd_lower):
-            if debug:
-                print(f"🔍 Suspicious pattern check failed for '{command}' (pattern: {pattern})")
-            return False
-    
-    # Final heuristic: if it's not in whitelist and longer than 15 chars, be very suspicious
-    if len(command) > 15:
-        # Must have typical launch option structure
-        if not any(keyword in cmd_lower for keyword in ['fps', 'res', 'window', 'screen', 'force', 'disable', 'enable', 'max', 'min']):
-            if debug:
-                print(f"🔍 Heuristic check failed for '{command}' (too long without keywords)")
-            return False
-    
-    if debug:
-        print(f"🔍 Validation passed for '{command}' (heuristic approval)")
-    return True
+    return is_valid
 
 def clean_wiki_description(description, debug=False):
     """
@@ -411,7 +300,7 @@ def parse_wikitext_for_launch_options_strict(wikitext, debug=False):
                 
                 for match in matches:
                     # Apply strict validation before adding
-                    if is_valid_launch_command_strict(match, debug=debug):
+                    if validate_pcgw_option(match, debug=debug):
                         # Get description from context
                         desc = extract_description_from_context_safe(match, context_text)
                         

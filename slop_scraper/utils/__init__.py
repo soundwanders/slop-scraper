@@ -19,6 +19,12 @@ try:
         SessionMonitor,
         validate_usage_pattern
     )
+    from .extract_engine import (
+        EngineDetector,
+        extract_engine,
+        update_unknown_engines_batch,
+        get_fresh_steam_data_engine
+    )
 except ImportError:
     # Fall back to absolute imports (when run directly)
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -39,6 +45,12 @@ except ImportError:
         SessionMonitor,
         validate_usage_pattern
     )
+    from extract_engine import (
+        EngineDetector,
+        extract_engine,
+        update_unknown_engines_batch,
+        get_fresh_steam_data_engine
+    )
 
 # Define public API for the utils package
 __all__ = [
@@ -56,5 +68,11 @@ __all__ = [
     "SecureRequestHandler",
     "CredentialManager",
     "SessionMonitor",
-    "validate_usage_pattern"
+    "validate_usage_pattern",
+    
+    # Engine detection utilities
+    "EngineDetector",
+    "extract_engine",
+    "update_unknown_engines_batch",
+    "get_fresh_steam_data_engine"
 ]
