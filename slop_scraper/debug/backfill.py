@@ -11,8 +11,7 @@ import json
 import requests
 from tqdm import tqdm
 from dotenv import load_dotenv
-
-from ..utils import extract_engine
+from utils import extract_engine
 
 # Add current directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -388,7 +387,7 @@ def extract_release_date_safely(game_info):
 
 
 def extract_engine_safely(game_info):
-    """Engine detection wrapper"""
+    """Enhanced engine detection wrapper"""
     app_id = game_info.get('appid') or game_info.get('steam_appid')
     return extract_engine(game_info, app_id)
 
