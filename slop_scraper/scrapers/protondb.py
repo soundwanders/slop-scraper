@@ -6,11 +6,13 @@ from bs4 import BeautifulSoup
 try:
     # Try relative imports first (when run as module)
     from ..utils.security_config import SecureRequestHandler
+    from ..validation import LaunchOptionsValidator, ValidationLevel, EngineType
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from utils.security_config import SecureRequestHandler
+    from validation import LaunchOptionsValidator, ValidationLevel, EngineType
 
 def fetch_protondb_launch_options(app_id, game_title=None, rate_limit=None, debug=False, 
                                  test_results=None, test_mode=False, rate_limiter=None, 
@@ -238,6 +240,35 @@ def fetch_protondb_launch_options(app_id, game_title=None, rate_limit=None, debu
             print(f"🔍 ProtonDB: Error for app_id {app_id_int}: {e}")
         
         return []
+
+def validate_protondb_option(command: str, debug: bool = False) -> bool:
+    """Relaxed validation for ProtonDB options (includes Wine/Proton specifics)"""
+    
+    validator = LaunchOptionsValidator(ValidationLevel.RELAXED)
+    is_valid, reason = validator.validate_option(command, EngineType.UNIVERSAL)
+    
+    # ProtonDB has many environment variables and special options
+    if not is_valid:
+        # Additional ProtonDB-specific patterns
+        protondb_patterns = [
+            r'^PROTON_[A-Z_]+=.+$',     # Proton environment variables
+            r'^DXVK_[A-Z_]+=.+$',       # DXVK settings
+            r'^VKD3D_[A-Z_]+=.+$',      # VKD3D settings
+            r'^gamemode$',               # GameMode
+            r'^mangohud$',               # MangoHud
+        ]
+        
+        import re
+        for pattern in protondb_patterns:
+            if re.match(pattern, command):
+                is_valid = True
+                reason = "ProtonDB-specific option"
+                break
+    
+    if debug and not is_valid:
+        print(f"🔍 ProtonDB: Rejected '{command}' - {reason}")
+    
+    return is_valid
 
 def extract_options_from_reports(reports, debug=False):
     """Extract launch options from ProtonDB API reports"""

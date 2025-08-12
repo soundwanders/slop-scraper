@@ -2,7 +2,6 @@ import os
 import sys
 import signal
 import shutil
-import time
 from tqdm import tqdm
 
 try:
@@ -23,6 +22,7 @@ try:
     from ..scrapers.game_specific import fetch_game_specific_options
     from ..scrapers.protondb import fetch_protondb_launch_options
     from ..utils.results_utils import save_test_results, save_game_results
+    from ..validation import LaunchOptionsValidator, ValidationLevel, EngineType
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import sys
@@ -44,12 +44,23 @@ except ImportError:
     from scrapers.game_specific import fetch_game_specific_options
     from scrapers.protondb import fetch_protondb_launch_options
     from utils.results_utils import save_test_results, save_game_results
+    from validation import LaunchOptionsValidator, ValidationLevel, EngineType
 
 class SlopScraper:
     def __init__(self, test_mode=False, cache_file='appdetails_cache.json', 
                  rate_limit=None, force_refresh=False, max_games=100, 
                  output_dir="./test-output", debug=False, skip_existing=True):
-        """Initialize with configuration options and security validation"""
+        
+        # Add validation statistics tracking
+        self.validation_stats = {
+            'total_options_processed': 0,
+            'options_accepted': 0,
+            'options_rejected': 0,
+            'rejection_reasons': {}
+        }
+        
+        # Initialize validator for statistics
+        self.validator = LaunchOptionsValidator(ValidationLevel.PERMISSIVE)
         
         # Security validation first
         self.test_mode = test_mode
@@ -539,6 +550,36 @@ class SlopScraper:
             print(f"  🔍 Deduplication: {len(all_options)} → {len(unique_options)} options")
         
         return unique_options
+    
+    def track_validation_stats(self, option: str, is_valid: bool, reason: str):
+        """Track validation statistics for monitoring"""
+        self.validation_stats['total_options_processed'] += 1
+        
+        if is_valid:
+            self.validation_stats['options_accepted'] += 1
+        else:
+            self.validation_stats['options_rejected'] += 1
+            self.validation_stats['rejection_reasons'][reason] = \
+                self.validation_stats['rejection_reasons'].get(reason, 0) + 1
+    
+    def print_validation_statistics(self):
+        """Print validation statistics at end of run"""
+        stats = self.validation_stats
+        total = stats['total_options_processed']
+        
+        if total == 0:
+            return
+        
+        print(f"\n📊 VALIDATION STATISTICS:")
+        print(f"   Total options processed: {total}")
+        print(f"   Accepted: {stats['options_accepted']} ({stats['options_accepted']/total*100:.1f}%)")
+        print(f"   Rejected: {stats['options_rejected']} ({stats['options_rejected']/total*100:.1f}%)")
+        
+        if stats['rejection_reasons']:
+            print(f"   Top rejection reasons:")
+            sorted_reasons = sorted(stats['rejection_reasons'].items(), key=lambda x: x[1], reverse=True)
+            for reason, count in sorted_reasons[:5]:
+                print(f"     {reason}: {count}")
 
     def print_scraper_diagnostics(self, stats):
         """Print comprehensive diagnostics specifically for the generic options issue"""
@@ -585,7 +626,7 @@ class SlopScraper:
             print("  ⚠️ Some games still have only generic options")
             print("  → This is normal for games with unrecognized engines")
         else:
-            print("  ✅ No generic-only games found - bug appears fixed!")
+            print("  ✅ No generic-only games found.")
         
         for scraper, data in stats['scraper_success_rates'].items():
             if data['attempts'] > 0:

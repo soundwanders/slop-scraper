@@ -11,6 +11,7 @@ import json
 import requests
 from tqdm import tqdm
 from dotenv import load_dotenv
+from utils import extract_engine
 
 # Add current directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -384,52 +385,11 @@ def extract_release_date_safely(game_info):
     except Exception:
         return ''
 
+
 def extract_engine_safely(game_info):
-    """Safely extract or detect game engine from Steam API response"""
-    try:
-        # Method 1: Check if engine is directly provided (rare)
-        engine = game_info.get('engine', '')
-        if engine:
-            return engine
-        
-        # Method 2: Detect engine from game title and metadata
-        title = game_info.get('name', '').lower()
-        developers = game_info.get('developers', [])
-        categories = game_info.get('categories', [])
-        
-        # Convert lists to searchable text
-        dev_text = ''
-        if isinstance(developers, list):
-            dev_text = ' '.join(developers).lower()
-        elif isinstance(developers, str):
-            dev_text = developers.lower()
-        
-        category_text = ''
-        if isinstance(categories, list):
-            category_text = ' '.join([cat.get('description', '') for cat in categories if isinstance(cat, dict)]).lower()
-        
-        all_text = f"{title} {dev_text} {category_text}"
-        
-        # Engine detection patterns
-        if any(indicator in all_text for indicator in ['valve corporation', 'valve software', 'source engine', 'source 2']):
-            return 'Source Engine'
-        elif any(indicator in all_text for indicator in ['unity', 'unity technologies', 'made with unity']):
-            return 'Unity Engine'
-        elif any(indicator in all_text for indicator in ['unreal engine', 'epic games']):
-            return 'Unreal Engine'
-        elif any(indicator in all_text for indicator in ['id software', 'id tech']):
-            return 'id Tech'
-        elif any(indicator in all_text for indicator in ['electronic arts', 'ea games', 'frostbite']):
-            return 'Frostbite Engine'
-        elif 'minecraft' in title and 'java' in all_text:
-            return 'Java (Minecraft)'
-        elif any(game in title for game in ['skyrim', 'fallout', 'elder scrolls', 'starfield']):
-            return 'Creation Engine'
-        else:
-            return 'Unknown'
-            
-    except Exception:
-        return 'Unknown'
+    """Enhanced engine detection wrapper"""
+    app_id = game_info.get('appid') or game_info.get('steam_appid')
+    return extract_engine(game_info, app_id)
 
 if __name__ == "__main__":
     import argparse

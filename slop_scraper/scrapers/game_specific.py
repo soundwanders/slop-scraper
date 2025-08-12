@@ -1,7 +1,17 @@
+import os
+
+try:
+    # Try relative imports first (when run as module)
+    from ..validation import LaunchOptionsValidator, ValidationLevel, EngineType
+except ImportError:
+    # Fall back to absolute imports (when run directly)
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from validation import LaunchOptionsValidator, ValidationLevel, EngineType
+
 """
 Game-Specific Launch Options Scraper
 """
-
 def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mode=False):
     """
     Fetch game-specific launch options based on engine detection and game patterns
@@ -357,3 +367,23 @@ def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mo
         test_results['options_by_source'][source_name] += len(options)
     
     return options
+
+def validate_game_specific_option(command: str, engine_hint: str = None, debug: bool = False) -> bool:
+    """Engine-aware validation for game-specific options"""
+    
+    # Map engine strings to enum
+    engine_map = {
+        'source engine': EngineType.SOURCE,
+        'unity engine': EngineType.UNITY, 
+        'unreal engine': EngineType.UNREAL
+    }
+    
+    engine_type = engine_map.get(engine_hint.lower() if engine_hint else None, EngineType.UNIVERSAL)
+    
+    validator = LaunchOptionsValidator(ValidationLevel.STRICT)
+    is_valid, reason = validator.validate_option(command, engine_type)
+    
+    if debug and not is_valid:
+        print(f"🔍 Game-Specific: Rejected '{command}' for {engine_hint or 'Universal'} - {reason}")
+    
+    return is_valid

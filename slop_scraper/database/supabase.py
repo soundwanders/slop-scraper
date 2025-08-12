@@ -600,10 +600,6 @@ class SupabaseClient:
         
         return recommendations
 
-# ========================================
-# EXISTING FUNCTIONS (preserved as-is)
-# ========================================
-
 def fetch_steam_launch_options_from_db(app_id, supabase):
     try:
         # Query the junction table, embed related launch_options
@@ -724,7 +720,7 @@ def save_to_database(game, options, supabase):
         print("Make sure your Supabase tables are set up correctly with the right columns")
 
 # ========================================
-# SQL FUNCTIONS FOR IMPROVED PERFORMANCE
+# SQL HELPER FUNCTIONS
 # ========================================
 
 # Run this SQL in your Supabase SQL editor for better performance:
