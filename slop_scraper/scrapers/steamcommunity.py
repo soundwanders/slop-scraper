@@ -18,7 +18,8 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                                        test_results=None, test_mode=False, rate_limiter=None, 
                                        session_monitor=None):
     """
-    Steam Community scraper with strict validation to prevent false positives
+    Steam Community scraper with launch option extraction
+    and strict validation to prevent unwanted strings or chars like HTML artifacts
     """
     
     # Security validation
@@ -73,17 +74,17 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
             if debug:
                 print(f"🔍 Steam Community: Found {len(guide_elements)} guide links")
             
-            # Filter guides to focus on launch options and performance guides
-            relevant_guides = filter_relevant_guides(guide_elements, debug=debug)
+            # Filter guides with improved criteria
+            relevant_guides = filter_relevant_guides_improved(guide_elements, debug=debug)
             
             if debug:
                 print(f"🔍 Steam Community: Processing {len(relevant_guides)} relevant guides")
             
-            # Process the most relevant guides
-            for i, guide in enumerate(relevant_guides[:5]):  # Limit to top 5 relevant guides
+            # Process more guides for better success rate
+            for i, guide in enumerate(relevant_guides[:10]):  # Increased from 5 to 10
                 try:
                     if debug:
-                        print(f"🔍 Steam Community: Processing guide {i+1}/{len(relevant_guides[:5])}: {guide['title'][:30]}...")
+                        print(f"🔍 Steam Community: Processing guide {i+1}/{len(relevant_guides[:10])}: {guide['title'][:40]}...")
                     
                     # Rate limiting between guide requests
                     if rate_limiter:
@@ -105,8 +106,8 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                     if guide_response.status_code == 200:
                         guide_soup = BeautifulSoup(guide_response.text, 'html.parser')
                         
-                        # Extract launch options with strict validation
-                        extracted_options = extract_launch_options_from_guide_content_strict(
+                        # Extract launch options with improved cleaning and validation
+                        extracted_options = extract_launch_options_clean_and_validated(
                             guide_soup, 
                             guide['title'],
                             debug=debug
@@ -167,23 +168,25 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
         
         return []
 
-def filter_relevant_guides(guide_elements, debug=False):
+def filter_relevant_guides_improved(guide_elements, debug=False):
     """
-    Filter guides to focus on those likely to contain launch options
+    Improved guide filtering - better success rate while maintaining quality
     """
     relevant_guides = []
     
-    # Keywords that indicate a guide might contain launch options
+    # Expanded relevant keywords for better coverage
     relevant_keywords = [
         'launch', 'option', 'command', 'performance', 'optimize', 'fps', 'fix',
         'setting', 'config', 'tweak', 'parameter', 'argument', 'startup',
-        'graphics', 'video', 'resolution', 'crash', 'error', 'problem'
+        'graphics', 'video', 'resolution', 'crash', 'error', 'problem',
+        'improve', 'boost', 'better', 'smooth', 'run', 'setup', 'install'
     ]
     
-    # Keywords that indicate guides to avoid
+    # More targeted avoid keywords (less restrictive but still quality-focused)
     avoid_keywords = [
-        'walkthrough', 'guide to', 'story', 'ending', 'achievement', 'trophy',
-        'level', 'boss', 'secret', 'easter egg', 'mod', 'cheat', 'save'
+        'walkthrough complete', 'story walkthrough', 'boss guide', 'achievement guide',
+        'save file', 'cheat engine', 'trainer', 'hack'
+        # Removed: 'guide to', 'mod', 'level' - these often contain launch options
     ]
     
     for guide_elem in guide_elements:
@@ -198,31 +201,34 @@ def filter_relevant_guides(guide_elements, debug=False):
             guide_url = 'https://steamcommunity.com/' + guide_url
         
         # Get guide title
-        title = guide_elem.get_text(strip=True)[:100] or "Untitled Guide"
+        title = guide_elem.get_text(strip=True)[:150] or "Untitled Guide"
         title_lower = title.lower()
         
-        # Score the guide based on relevance
+        # Improved scoring system
         relevance_score = 0
         
         # Add points for relevant keywords
         for keyword in relevant_keywords:
             if keyword in title_lower:
-                relevance_score += 2
+                relevance_score += 1
         
-        # Subtract points for avoid keywords
+        # Subtract points for avoid keywords (but less harsh)
         for keyword in avoid_keywords:
             if keyword in title_lower:
-                relevance_score -= 3
+                relevance_score -= 2
         
         # Bonus points for explicit launch option mentions
         if 'launch option' in title_lower or 'launch command' in title_lower:
             relevance_score += 5
         
         if 'startup option' in title_lower or 'command line' in title_lower:
-            relevance_score += 5
+            relevance_score += 4
+            
+        if 'properties' in title_lower and ('steam' in title_lower or 'game' in title_lower):
+            relevance_score += 2
         
-        # Only include guides with positive relevance score
-        if relevance_score > 0:
+        # Include guides with neutral or positive scores
+        if relevance_score >= 0:
             relevant_guides.append({
                 'title': title,
                 'url': guide_url,
@@ -230,20 +236,21 @@ def filter_relevant_guides(guide_elements, debug=False):
             })
             
             if debug:
-                print(f"🔍 Steam Community: Relevant guide (score {relevance_score}): {title[:40]}...")
+                print(f"🔍 Steam Community: Relevant guide (score {relevance_score}): {title[:50]}...")
     
     # Sort by relevance score (highest first)
     relevant_guides.sort(key=lambda g: g['score'], reverse=True)
     
     return relevant_guides
 
-def extract_launch_options_from_guide_content_strict(guide_soup, guide_title, debug=False):
+def extract_launch_options_clean_and_validated(guide_soup, guide_title, debug=False):
     """
-    Extract launch options with STRICT validation to prevent false positives
+    PRODUCTION VERSION: Extract launch options with thorough cleaning and validation
+    Prevents HTML artifacts while finding legitimate options
     """
     options = []
     
-    # Look for the main guide content area
+    # Find guide content using established selectors
     content_selectors = [
         '.guide_body',
         '.subSectionContents', 
@@ -264,89 +271,188 @@ def extract_launch_options_from_guide_content_strict(guide_soup, guide_title, de
             break
     
     if not guide_content:
-        # Fallback: use the entire body but exclude navigation
         guide_content = guide_soup.find('body')
         if debug:
             print(f"🔍 Steam Community: Using fallback content extraction")
     
     if not guide_content:
         return options
-    
-    # Method 1: Look for code blocks and pre-formatted text (most reliable)
+
+    # Method 1: Extract from code blocks and formatted text (highest quality)
     code_elements = guide_content.find_all(['code', 'pre', 'tt', 'kbd', 'samp'])
     
     for element in code_elements:
-        text = element.get_text(strip=True)
-        if len(text) > 500:  # Skip very long code blocks
-            continue
+        clean_text = get_clean_text_from_element(element)
         
-        # Extract validated launch options
-        extracted_options = extract_validated_steam_launch_options(text, guide_title, debug)
-        options.extend(extracted_options)
-        
-        if debug and extracted_options:
-            print(f"🔍 Steam Community: Found {len(extracted_options)} options in code block")
-    
-    # Method 2: Look for paragraphs with launch option context (only if we haven't found many)
-    if len(options) < 3:
-        paragraphs = guide_content.find_all(['p', 'div', 'li'])
-        
-        for para in paragraphs[:20]:  # Limit for performance
-            text = para.get_text(strip=True)
+        if clean_text and len(clean_text.strip()) > 0:
+            extracted_options = extract_validated_steam_options(clean_text, guide_title, debug)
+            options.extend(extracted_options)
             
-            if len(text) > 1000:  # Skip very long paragraphs
+            if debug and extracted_options:
+                print(f"🔍 Steam Community: Found {len(extracted_options)} clean options in code block")
+
+    # Method 2: Extract from paragraphs with explicit launch option context
+    if len(options) < 5:  # Process more if we haven't found many
+        paragraphs = guide_content.find_all(['p', 'div', 'li', 'td'])
+        
+        for para in paragraphs[:30]:  # Increased from 20
+            clean_text = get_clean_text_from_element(para)
+            
+            if not clean_text or len(clean_text) > 800:
                 continue
             
-            text_lower = text.lower()
-            
-            # Only process paragraphs that explicitly mention launch options
-            explicit_indicators = [
-                'launch option', 'launch parameter', 'startup option', 'command line option',
-                'launch command', 'startup parameter', 'add this to launch options'
-            ]
-            
-            has_explicit_context = any(indicator in text_lower for indicator in explicit_indicators)
-            
-            if has_explicit_context:
-                extracted_options = extract_validated_steam_launch_options(text, guide_title, debug)
+            # Only process text that explicitly mentions launch options
+            if has_explicit_launch_option_context(clean_text):
+                extracted_options = extract_validated_steam_options(clean_text, guide_title, debug)
                 options.extend(extracted_options)
                 
                 if debug and extracted_options:
-                    print(f"🔍 Steam Community: Found {len(extracted_options)} options in explicit paragraph")
+                    print(f"🔍 Steam Community: Found {len(extracted_options)} options in paragraph")
     
     return options
 
-def extract_validated_steam_launch_options(text, guide_title, debug=False):
+def get_clean_text_from_element(element):
     """
-    Extract and validate Steam launch options from text with STRICT validation
+    Extract clean text from HTML element, removing artifacts that cause database pollution
+    KEY IMPROVEMENT: Thorough HTML cleaning prevents <ref>hmo and similar artifacts
     """
-    options = []
+    if not element:
+        return ""
     
-    # Patterns for valid Steam launch options (more conservative)
-    patterns = [
-        r'(?<!\w)(-[a-zA-Z][a-zA-Z0-9_\-]{1,25})(?=\s|$|[^\w\-])',  # -command
-        r'(?<!\w)(\+[a-zA-Z][a-zA-Z0-9_\-]{1,25}(?:\s+[a-zA-Z0-9_\-\.]{1,15})?)(?=\s|$|[^\w\-])',  # +command param
+    try:
+        # Remove problematic elements completely
+        for unwanted in element(["script", "style", "ref", "sup", "a"]):
+            unwanted.extract()
+        
+        # Get text with preserved spacing
+        text = element.get_text(separator=' ')
+        
+        # Apply comprehensive cleaning
+        text = clean_extracted_text(text)
+        
+        return text
+        
+    except Exception:
+        return ""
+
+def clean_extracted_text(text):
+    """
+    Comprehensive text cleaning to prevent database pollution
+    Removes HTML artifacts, BB code, and other junk that was causing issues
+    """
+    if not text:
+        return ""
+    
+    # Remove HTML artifacts that sneak through
+    text = re.sub(r'<[^>]+>', '', text)  # Remove HTML tags
+    text = re.sub(r'&[a-zA-Z0-9#]+;', '', text)  # Remove HTML entities
+    text = re.sub(r'\[/?[a-zA-Z0-9="\s]+\]', '', text)  # Remove BB code
+    
+    # Remove Steam Community specific artifacts
+    text = re.sub(r'https?://[^\s]+', ' ', text)  # Remove URLs
+    text = re.sub(r'steamcommunity\.com[^\s]*', ' ', text)  # Remove Steam URLs
+    text = re.sub(r'Right-click.*?Properties.*?General.*?Launch Options', 'Launch Options', text, flags=re.IGNORECASE)
+    
+    # Remove common UI artifacts that were causing pollution
+    text = re.sub(r'properties[/\-]', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'[<>{}|]+', ' ', text)  # Remove bracket artifacts
+    text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+    
+    return text.strip()
+
+def has_explicit_launch_option_context(text):
+    """
+    Strict context checking - only process text explicitly about launch options
+    Prevents false positives while ensuring we capture legitimate options
+    """
+    if not text or len(text) < 10:
+        return False
+        
+    text_lower = text.lower()
+    
+    # Must contain explicit launch option terminology
+    explicit_indicators = [
+        'launch option', 'launch parameter', 'launch command',
+        'startup option', 'startup parameter', 'command line option',
+        'steam launch', 'game properties', 'launch properties',
+        'add to launch options', 'set launch options',
+        'properties > general > launch options',
+        'properties → general → launch options',
+        'right click properties general',
+        'steam properties launch'
     ]
     
-    if debug:
-        print(f"🔍 Steam Community: Analyzing text: {text[:100]}...")
+    # Also accept if contains common launch options (high confidence)
+    common_options_mentioned = [
+        '-novid', '-windowed', '-fullscreen', '-console', '-high', '-dx11', '-dx12'
+    ]
     
+    has_explicit = any(indicator in text_lower for indicator in explicit_indicators)
+    has_common_options = any(option in text_lower for option in common_options_mentioned)
+    
+    return has_explicit or has_common_options
+
+def extract_validated_steam_options(text, guide_title, debug=False):
+    """
+    PRODUCTION VERSION: Extract and validate Steam launch options
+    Uses comprehensive patterns and strict validation against known options
+    """
+    if not text or len(text.strip()) < 3:
+        return []
+    
+    options = []
+    
+    # Comprehensive extraction patterns based on commands.md reference
+    patterns = [
+        # Universal Steam options (most common)
+        r'(?:^|\s)(-(?:novid|windowed|fullscreen|console|high|low|noborder|sw)(?:\s|$))',
+        
+        # Graphics API options
+        r'(?:^|\s)(-(?:dx9|dx11|dx12|gl|vulkan|opengl)(?:\s|$))',
+        
+        # Parameterized options (with values)
+        r'(?:^|\s)(-(?:w|h|refresh|freq)\s+\d{3,5}(?:\s|$))',
+        r'(?:^|\s)(-dxlevel\s+(?:80|81|90|95|100)(?:\s|$))',
+        r'(?:^|\s)(-threads\s+[1-8](?:\s|$))',
+        
+        # Console commands (+ prefix)
+        r'(?:^|\s)(\+(?:fps_max|mat_queue_mode|cl_forcepreload|cl_showfps|exec|connect)\s*\d*(?:\s|$))',
+        
+        # Unity engine options
+        r'(?:^|\s)(-(?:force-d3d11|force-d3d12|force-vulkan|force-opengl|force-metal)(?:\s|$))',
+        r'(?:^|\s)(-(?:screen-width|screen-height|screen-quality)\s*\d*(?:\s|$))',
+        r'(?:^|\s)(-(?:nographics|nolog|no-stereo-rendering|popupwindow)(?:\s|$))',
+        
+        # Unreal engine options
+        r'(?:^|\s)(-(?:USEALLAVAILABLECORES|ONETHREAD|sm4|sm5|borderless|lowmemory)(?:\s|$))',
+        r'(?:^|\s)(-(?:ResX|ResY)=\d{3,5}(?:\s|$))',
+        r'(?:^|\s)(-malloc=\w+(?:\s|$))',
+        
+        # Source engine specific
+        r'(?:^|\s)(-(?:nopreload|softparticlesdefaultoff|primarysound|sndmono|insecure|enablefakeip)(?:\s|$))',
+        r'(?:^|\s)(-(?:multirun|noaddons|noworkshop|useallavailablecores|sillygibs)(?:\s|$))',
+        
+        # Performance and debugging
+        r'(?:^|\s)(-(?:nosound|nojoy|dev|safe|autoconfig|condebug|allowdebug|showfps)(?:\s|$))',
+    ]
+    
+    # Extract using comprehensive patterns
     all_matches = []
-    
     for pattern in patterns:
         matches = re.findall(pattern, text, re.IGNORECASE)
         for match in matches:
             if isinstance(match, tuple):
-                match = match[0] if match[0] else match[1]
-            all_matches.append(match.strip())
+                match = next(m for m in match if m.strip())
+            clean_match = match.strip()
+            if clean_match and len(clean_match) > 1:
+                all_matches.append(clean_match)
     
-    if debug:
-        print(f"🔍 Steam Community: Raw matches found: {all_matches}")
+    if debug and all_matches:
+        print(f"🔍 Steam Community: Pattern matches found: {all_matches}")
     
-    # Validate each match with STRICT criteria
+    # STRICT validation against known Steam launch options
     for match in all_matches:
-        if validate_steam_option(match, debug=debug):
-            # Get clean description
+        if validate_against_commands_reference(match, debug=debug):
             description = get_clean_description_for_option(match, text, guide_title)
             
             options.append({
@@ -359,69 +465,84 @@ def extract_validated_steam_launch_options(text, guide_title, debug=False):
                 print(f"🔍 Steam Community: VALIDATED option: {match}")
         else:
             if debug:
-                print(f"🔍 Steam Community: REJECTED option: {match}")
+                print(f"🔍 Steam Community: REJECTED unknown option: {match}")
     
     return options
 
-def validate_steam_option(command: str, debug: bool = False) -> bool:
-    """Production-ready validation for Steam Community options"""
-    
+def validate_against_commands_reference(command, debug=False):
+    """
+    Use existing LaunchOptionsValidator for validation
+    IMPROVED: Uses your comprehensive validation system instead of duplicating logic
+    """
     validator = LaunchOptionsValidator(ValidationLevel.PERMISSIVE)
-    is_valid, reason = validator.validate_option(command, EngineType.SOURCE)
+    is_valid, reason = validator.validate_option(command, EngineType.UNIVERSAL)
     
     if debug and not is_valid:
-        print(f"🔍 Steam Community: Rejected '{command}' - {reason}")
+        print(f"🔍 Steam Community: Validation rejected '{command}' - {reason}")
     
     return is_valid
 
 def get_clean_description_for_option(option, context_text, guide_title):
     """
-    Get a clean description for a launch option
+    Generate clean descriptions that won't pollute the database
+    Removes artifacts while preserving meaningful context
     """
-    # Try to extract meaningful context
-    lines = context_text.split('\n')
+    # Clean the context text thoroughly
+    clean_context = clean_extracted_text(context_text)
+    
+    # Try to find meaningful description
+    lines = clean_context.split('.')
     
     for line in lines:
-        if option in line:
-            # Clean the line
-            desc = line.strip()
+        line = line.strip()
+        if option in line and len(line) > len(option) + 5:
+            # Clean the line further
+            desc = line.replace(option, '').strip()
             
-            # Remove the option itself
-            desc = desc.replace(option, '').strip()
+            # Remove common prefixes that add no value
+            prefixes_to_remove = [
+                'add', 'use', 'try', 'set', 'put', 'include', 'apply',
+                'right click', 'properties', 'general', 'launch options'
+            ]
             
-            # Remove common prefixes
-            prefixes_to_remove = ['add', 'use', 'try', 'set', 'put', 'include', 'apply']
             for prefix in prefixes_to_remove:
                 if desc.lower().startswith(prefix):
                     desc = desc[len(prefix):].strip()
             
-            # Clean up punctuation
+            # Clean up punctuation and artifacts
             desc = re.sub(r'^[:\-\.,\s]+', '', desc)
             desc = re.sub(r'[:\-\.,\s]+$', '', desc)
             
-            # If we have a meaningful description, use it
+            # Ensure option description is clean and meaningful
             if desc and len(desc) > 10 and len(desc) < 200:
-                return desc
+                # Final artifact check
+                if not re.search(r'[<>{}|]', desc) and not desc.startswith('/'):
+                    return desc
     
-    # Fallback: generic description
-    return f"Launch option from Steam Community guide: {guide_title[:50]}"
+    # Fallback to safe, generic description
+    return f"Launch option from Steam Community guide"
 
 def final_validation_and_dedup(options, debug=False):
     """
-    Final validation and deduplication step
+    Final validation and deduplication with quality checks
     """
     validated_options = []
     seen_commands = set()
     
     for option in options:
         command = option.get('command', '').strip()
+        description = option.get('description', '').strip()
         
         # Skip if already seen
         if command.lower() in seen_commands:
             continue
         
-        # Final validation check
-        if validate_steam_option(command, debug=debug):
+        # Final quality check - no artifacts in command or description
+        if (command and len(command) >= 2 and 
+            not re.search(r'[<>{}|]', command) and 
+            not command.startswith('/') and
+            not re.search(r'[<>{}|]', description)):
+            
             seen_commands.add(command.lower())
             validated_options.append(option)
             
@@ -431,5 +552,5 @@ def final_validation_and_dedup(options, debug=False):
             if debug:
                 print(f"🔍 Steam Community: Final validation failed for: {command}")
     
-    # Limit total options to prevent spam
-    return validated_options[:15]
+    # Limit total options to prevent spam (increased slightly for better coverage)
+    return validated_options[:20]
