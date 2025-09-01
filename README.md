@@ -239,21 +239,6 @@ When using `--test`, the tool creates these files in your output directory:
 - **`game_[appid].json`** — Individual game data with found launch options
 - **`appdetails_cache.json`** — Steam API response cache
 
-### Example test_results.json structure:
-```json
-{
-  "games_processed": 10,
-  "games_with_options": 8,
-  "total_options_found": 42,
-  "options_by_source": {
-    "PCGamingWiki": 15,
-    "Steam Community": 12,
-    "Game-Specific Knowledge": 15
-  },
-  "games": [...]
-}
-```
-
 ## 🏗️ Project Architecture
 
 ```
@@ -349,5 +334,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 🙏 Acknowledgments
 
 - [PCGamingWiki](https://www.pcgamingwiki.com/) for comprehensive game information
+- [ProtonDB](https://www.protondb.com) for community-verified game launch options
 - [Steam Community](https://steamcommunity.com/) for user-generated guides
 - [Supabase](https://supabase.com/) for database infrastructure
