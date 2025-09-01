@@ -11,13 +11,14 @@ package-lock.json
 node_modules
 changelog.md
 SecurityAudit.MD
-slop_scraper/appdetails_cache.json
-appdetails_cache.json
-*/appdetails_cache
 appdetails_cache.json
 */appdetails_cache.json
+*/appdetails_cache
+/appdetails_cache
+test-output
+*/test-output/
 */old_scraper
-old_scraper'
+old_scraper
 
 # build
 dist
