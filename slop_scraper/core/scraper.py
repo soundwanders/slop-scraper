@@ -46,10 +46,13 @@ except ImportError:
     from utils.results_utils import save_test_results, save_game_results
     from validation import LaunchOptionsValidator, ValidationLevel, EngineType
 
+RESCAN_PROGRESS_FILE = 'rescan_progress.json'
+
 class SlopScraper:
-    def __init__(self, test_mode=False, cache_file='appdetails_cache.json', 
-                 rate_limit=None, force_refresh=False, max_games=100, 
-                 output_dir="./test-output", debug=False, skip_existing=True):
+    def __init__(self, test_mode=False, cache_file='appdetails_cache.json',
+                 rate_limit=None, force_refresh=False, max_games=100,
+                 output_dir="./test-output", debug=False, skip_existing=True,
+                 rescan=False):
         
         # Add validation statistics tracking
         self.validation_stats = {
@@ -74,6 +77,7 @@ class SlopScraper:
         self.supabase = None
         self.skip_existing = skip_existing  # Store skip_existing setting
         self.db_client = None  # Database client wrapper
+        self.rescan = rescan  # Re-scan games already in the database
 
         # Security monitoring and rate limiting
         self.session_monitor = SessionMonitor()
@@ -177,6 +181,88 @@ class SlopScraper:
             supabase=self.supabase
         )
 
+    # ---------- Rescan support ----------
+
+    def _load_rescan_progress(self):
+        """Return the set of app_ids already re-scanned in this campaign."""
+        import json
+        try:
+            if os.path.exists(RESCAN_PROGRESS_FILE):
+                with open(RESCAN_PROGRESS_FILE) as f:
+                    return {int(k) for k in json.load(f)}
+        except Exception as e:
+            print(f"⚠️ Could not read {RESCAN_PROGRESS_FILE}: {e}")
+        return set()
+
+    def _mark_rescanned(self, app_id):
+        """Record a completed rescan so interrupted campaigns resume."""
+        import json
+        from datetime import datetime
+        try:
+            data = {}
+            if os.path.exists(RESCAN_PROGRESS_FILE):
+                with open(RESCAN_PROGRESS_FILE) as f:
+                    data = json.load(f)
+            data[str(app_id)] = datetime.now().isoformat(timespec='seconds')
+            with open(RESCAN_PROGRESS_FILE, 'w') as f:
+                json.dump(data, f, indent=1)
+        except Exception as e:
+            print(f"⚠️ Could not update {RESCAN_PROGRESS_FILE}: {e}")
+
+    def _get_rescan_games(self):
+        """
+        Pull games already in the database for re-scanning, thinnest first.
+
+        Games with the fewest stored options benefit most from the fixed
+        scrapers, so ordering by total_options_count ascending front-loads
+        the biggest wins. Already-rescanned games (tracked locally in
+        rescan_progress.json) are excluded so the campaign can be run in
+        --limit sized chunks across many sessions.
+        """
+        if not self.supabase:
+            print("❌ Rescan requires a database connection")
+            return []
+
+        done = self._load_rescan_progress()
+
+        try:
+            response = (
+                self.supabase.table("games")
+                .select("app_id, title, developer, publisher, release_date, engine, total_options_count")
+                .gt("total_options_count", 0)
+                .order("total_options_count", desc=False)
+                .execute()
+            )
+        except Exception as e:
+            print(f"⚠️ Rescan query failed: {e}")
+            return []
+
+        rows = response.data or []
+        total_candidates = len(rows)
+
+        games = []
+        for row in rows:
+            if row['app_id'] in done:
+                continue
+            games.append({
+                'appid': row['app_id'],
+                'name': row['title'],
+                'developer': row.get('developer') or '',
+                'publisher': row.get('publisher') or '',
+                'release_date': row.get('release_date') or '',
+                'engine': row.get('engine') or 'Unknown',
+            })
+            if len(games) >= self.max_games:
+                break
+
+        remaining = total_candidates - len(done)
+        print(f"🔁 Rescan: {total_candidates} games with options in DB, "
+              f"{len(done)} already re-scanned, {max(0, remaining)} remaining")
+        if not games and total_candidates:
+            print(f"✅ Rescan campaign complete — delete {RESCAN_PROGRESS_FILE} to start a new one")
+
+        return games
+
     def show_database_stats(self):  # Method to show database statistics
         """Show comprehensive database statistics"""
         if self.test_mode:
@@ -226,20 +312,25 @@ class SlopScraper:
             if hasattr(self, 'session_monitor'):
                 self.session_monitor.check_runtime_limit()
             
-            # Get list of games (limited by max_games) with database checking
-            games = get_steam_game_list(
-                limit=self.max_games,
-                force_refresh=self.force_refresh,
-                cache=self.cache,
-                test_mode=self.test_mode,
-                debug=self.debug,
-                cache_file=self.cache_file,
-                rate_limiter=getattr(self, 'rate_limiter', None),
-                session_monitor=getattr(self, 'session_monitor', None),
-                db_client=self.supabase,  # Pass database client for skip-existing logic
-                skip_existing=self.skip_existing,  # Pass skip_existing setting
-                db_client_wrapper=self.db_client  # Pass the database wrapper
-            )
+            # Get list of games (limited by max_games) with database checking.
+            # Rescan mode re-processes games already in the DB instead of
+            # discovering new ones — options are added, never overwritten.
+            if self.rescan:
+                games = self._get_rescan_games()
+            else:
+                games = get_steam_game_list(
+                    limit=self.max_games,
+                    force_refresh=self.force_refresh,
+                    cache=self.cache,
+                    test_mode=self.test_mode,
+                    debug=self.debug,
+                    cache_file=self.cache_file,
+                    rate_limiter=getattr(self, 'rate_limiter', None),
+                    session_monitor=getattr(self, 'session_monitor', None),
+                    db_client=self.supabase,  # Pass database client for skip-existing logic
+                    skip_existing=self.skip_existing,  # Pass skip_existing setting
+                    db_client_wrapper=self.db_client  # Pass the database wrapper
+                )
             
             if not games:
                 print("⚠️ No new games found to process")
@@ -276,9 +367,10 @@ class SlopScraper:
                             self.session_monitor.start_scraper_timing("Game-specific")
                         
                         game_specific_options = fetch_game_specific_options(
-                            app_id=app_id, 
-                            title=title, 
+                            app_id=app_id,
+                            title=title,
                             cache=self.cache,
+                            engine=game.get('engine'),
                             test_results=getattr(self, 'test_results', None),
                             test_mode=self.test_mode
                         )
@@ -321,7 +413,8 @@ class SlopScraper:
                             self.session_monitor.start_scraper_timing("PCGamingWiki")
                         
                         pcgaming_options = fetch_pcgamingwiki_launch_options(
-                            title, 
+                            title,
+                            app_id=app_id,
                             rate_limit=self.rate_limit,
                             debug=self.debug,
                             test_results=getattr(self, 'test_results', None),
@@ -472,6 +565,10 @@ class SlopScraper:
                     if source_options:
                         sources_str = ", ".join(f"{k}({len(v)})" for k, v in source_options.items())
                         game_pbar.write(f"   Sources: {sources_str}\n")
+
+                    # Record rescan progress so an interrupted campaign resumes
+                    if self.rescan and not self.test_mode:
+                        self._mark_rescanned(app_id)
                     
                     # Periodically save cache during execution
                     if app_id % 3 == 0:
@@ -543,8 +640,14 @@ class SlopScraper:
                 
                 if new_priority > existing_priority:
                     seen_commands[cmd] = option
-        
-        unique_options = list(seen_commands.values())
+
+        # Collapse parameterized twins: when both "-threads" and "-threads 4"
+        # survive, keep only the parameterized form — it is strictly more useful.
+        parameterized_bases = {cmd.split()[0] for cmd in seen_commands if ' ' in cmd}
+        unique_options = [
+            opt for cmd, opt in seen_commands.items()
+            if ' ' in cmd or cmd not in parameterized_bases
+        ]
         
         if self.debug:
             print(f"  🔍 Deduplication: {len(all_options)} → {len(unique_options)} options")

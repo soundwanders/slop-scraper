@@ -49,6 +49,11 @@ def setup_argument_parser():
                        help='Process all games, including those already in database')
     parser.add_argument('--db-stats', action='store_true',
                        help='Show database statistics and exit')
+    parser.add_argument('--rescan', action='store_true',
+                       help='Re-scan games already in the database (thinnest option counts first); '
+                            'new options are added, existing data is never overwritten')
+    parser.add_argument('--rescan-reset', action='store_true',
+                       help='Clear rescan progress tracking and start the rescan campaign over')
     parser.add_argument('--debug', action='store_true',
                        help='Enable debug output including database stats')
     
@@ -155,7 +160,8 @@ def test_single_game_scrapers(game_input, debug=True):
         print(f"   → Searching for: '{game_name}'")
         pcg_options = fetch_pcgamingwiki_launch_options(
             game_name,  # PCGamingWiki uses game name
-            rate_limit=1.0, 
+            app_id=app_id,  # Steam AppID enables exact Cargo lookup
+            rate_limit=1.0,
             debug=debug,
             test_mode=True
         )
@@ -299,8 +305,25 @@ def main():
     else:
         print("⚠️  Configuration: Use cached data but process all games")
     
+    # Rescan mode setup
+    if args.rescan_reset:
+        from core.scraper import RESCAN_PROGRESS_FILE
+        if os.path.exists(RESCAN_PROGRESS_FILE):
+            os.remove(RESCAN_PROGRESS_FILE)
+            print(f"🔁 Cleared rescan progress ({RESCAN_PROGRESS_FILE})")
+        else:
+            print("🔁 No rescan progress file to clear")
+        if not args.rescan:
+            sys.exit(0)
+
+    if args.rescan:
+        if args.test:
+            print("❌ --rescan requires production mode (it re-processes database games); drop --test")
+            sys.exit(1)
+        print("🔁 Rescan mode: re-processing existing database games, thinnest option counts first")
+
     # Provide guidance on skip_existing behavior
-    if not args.test and not args.skip_existing:
+    if not args.test and not args.skip_existing and not args.rescan:
         print("⚠️  Warning: You're processing ALL games, including those already in the database.")
         print("   This may result in duplicate processing and longer run times.")
         print("   Consider using --skip-existing to avoid re-processing existing games.")
@@ -317,7 +340,8 @@ def main():
         output_dir=args.output,
         force_refresh=args.force_refresh,
         debug=slops_debug,  # Pass debug flag
-        skip_existing=args.skip_existing  # Pass skip_existing flag
+        skip_existing=args.skip_existing,  # Pass skip_existing flag
+        rescan=args.rescan  # Re-scan existing database games
     )
     
     # Only test the database connection if requested

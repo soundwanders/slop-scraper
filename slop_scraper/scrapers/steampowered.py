@@ -50,8 +50,10 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
         cached_app_ids = {int(app_id) for app_id in cache.keys() if cache.get(app_id)}
         print(f"💾 Found {len(cached_app_ids)} games in cache")
     
-    # Combine existing and cached IDs to skip
-    skip_app_ids = existing_app_ids | cached_app_ids
+    # Combine existing and cached IDs to skip. The cache only proves we fetched
+    # a game's metadata, not that its options were scraped — so cached games are
+    # only skipped when skip_existing is on; --no-skip-existing processes them.
+    skip_app_ids = existing_app_ids | (cached_app_ids if skip_existing else set())
     
     if test_mode and limit <= 10:
         print("🧪 Using test data for small limits")
@@ -62,61 +64,121 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
     all_apps = fetch_steam_app_list(rate_limiter, session_monitor, debug)
     
     if not all_apps:
+        # Steam API is unavailable — fall back to games already in our database
+        # that have zero options. This is actually the ideal population to target.
+        if db_client or db_client_wrapper:
+            client = db_client_wrapper.supabase if db_client_wrapper else db_client
+            print("⚠️ Steam API unavailable — falling back to DB games with 0 options")
+            db_games = _get_unprocessed_games_from_db(client, limit, existing_app_ids, debug)
+            if db_games:
+                print(f"✅ Found {len(db_games)} unprocessed games in database")
+                return db_games
         print("❌ Failed to fetch Steam app list")
         return []
 
     # Filter out games we already have
     print(f"🔍 Filtering {len(all_apps)} apps (removing {len(skip_app_ids)} existing/cached games)...")
-    
-    candidate_apps = []
-    for app in all_apps:
-        app_id = app['appid']
-        if app_id not in skip_app_ids:
-            candidate_apps.append(app)
-    
+
+    candidate_apps = [app for app in all_apps if app['appid'] not in skip_app_ids]
+
     print(f"✅ Found {len(candidate_apps)} NEW games to potentially process")
-    
+
     if not candidate_apps:
         print("⚠️ No new games found to process")
         return []
 
     # Apply quality filtering and fetch metadata for new games only
     filtered_games = process_candidate_games(
-        candidate_apps, 
-        limit, 
-        cache, 
-        debug, 
-        rate_limiter, 
-        session_monitor, 
+        candidate_apps,
+        limit,
+        cache,
+        debug,
+        rate_limiter,
+        session_monitor,
         force_refresh
     )
-    
+
     return filtered_games
 
-def fetch_steam_app_list(rate_limiter, session_monitor, debug):
-    """Fetch the complete Steam app list from the API"""
-    url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
-    
+
+def _get_unprocessed_games_from_db(db_client, limit, skip_app_ids, debug=False):
+    """
+    Query our own database for games with total_options_count = 0.
+    Used as a fallback when the Steam app list API is unavailable.
+    Games already in our DB have all the metadata we need (title, developer, etc.).
+    """
     try:
-        if rate_limiter:
-            rate_limiter.wait_if_needed("steam_api")
-        
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        
-        if session_monitor:
-            session_monitor.record_request()
-            
-        all_apps = response.json()['applist']['apps']
-        
+        response = (
+            db_client.table("games")
+            .select("app_id, title, developer, publisher, release_date, engine")
+            .eq("total_options_count", 0)
+            .limit(limit * 5)
+            .execute()
+        )
+
+        games = []
+        for row in (response.data or []):
+            if row['app_id'] not in skip_app_ids:
+                games.append({
+                    'appid': row['app_id'],
+                    'name': row['title'],
+                    'developer': row.get('developer') or '',
+                    'publisher': row.get('publisher') or '',
+                    'release_date': row.get('release_date') or '',
+                    'engine': row.get('engine') or 'Unknown',
+                })
+            if len(games) >= limit:
+                break
+
         if debug:
-            print(f"📊 Retrieved {len(all_apps)} total Steam apps")
-        
-        return all_apps
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error fetching Steam app list: {e}")
+            print(f"🔍 DB fallback: found {len(games)} games with 0 options to process")
+
+        return games
+
+    except Exception as e:
+        print(f"⚠️ DB fallback query failed: {e}")
         return []
+
+def fetch_steam_app_list(rate_limiter, session_monitor, debug):
+    """Fetch the complete Steam app list, trying multiple known endpoints."""
+    candidate_urls = [
+        "https://api.steampowered.com/ISteamApps/GetAppList/v2/",
+        "https://api.steampowered.com/ISteamApps/GetAppList/v0002/",
+        "https://store.steampowered.com/api/ISteamApps/GetAppList/v2/",
+    ]
+
+    if rate_limiter:
+        rate_limiter.wait_if_needed("steam_api")
+
+    for url in candidate_urls:
+        try:
+            if debug:
+                print(f"📥 Trying Steam app list URL: {url}")
+
+            response = requests.get(url, timeout=30)
+
+            if session_monitor:
+                session_monitor.record_request()
+
+            if response.status_code != 200:
+                if debug:
+                    print(f"⚠️ {url} returned {response.status_code}, trying next...")
+                continue
+
+            data = response.json()
+            all_apps = data.get('applist', {}).get('apps', [])
+
+            if all_apps:
+                if debug:
+                    print(f"📊 Retrieved {len(all_apps)} total Steam apps from {url}")
+                return all_apps
+
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ Error fetching Steam app list from {url}: {e}")
+            continue
+
+    print("❌ All Steam app list endpoints failed")
+    return []
 
 def process_candidate_games(candidate_apps, limit, cache, debug, rate_limiter, session_monitor, force_refresh):
     """Process candidate games with quality filtering and metadata fetching"""

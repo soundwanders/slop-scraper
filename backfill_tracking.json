@@ -1,0 +1,4214 @@
+{
+  "18100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:40:41.266951",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3881980": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:40:45.833829",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3880870": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:40:50.421540",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3881630": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:40:57.084830",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3885690": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:01.784079",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3882130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:07.094652",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3881620": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:11.681564",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "36130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:16.317533",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11370": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:20.917468",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33750": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:25.520773",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11240": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:30.145613",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11340": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:34.883383",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11390": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:39.594507",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "36150": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:44.524532",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8320": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:49.199970",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "47500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:53.760625",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31300": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:41:58.345704",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "47520": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:04.579168",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "16620": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:09.189975",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10520": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:15.064367",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41660": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:21.397337",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39360": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:26.076685",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "47570": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:30.710617",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:35.374337",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15350": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:40.976638",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "26500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:45.604891",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:50.988566",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:42:56.549381",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "16200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:43:01.263265",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:43:06.604936",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:43:11.706382",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "16130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:43:18.721049",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46710": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:43:25.424813",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46720": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:43:33.376830",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46760": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:43:38.100411",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46830": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:43:47.769005",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46850": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:43:52.394482",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "47540": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:43:57.244461",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50910": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:01.869586",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33580": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:06.931457",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "56400": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:11.545329",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "27200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:16.084690",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "51020": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:20.889593",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "48900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:25.602614",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "49000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:32.504352",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "27400": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:39.194381",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "24640": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:43.726965",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "24660": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:48.263760",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6250": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:52.836043",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:44:57.596545",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6210": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:02.358535",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40960": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:06.979862",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7260": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:11.570845",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6270": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:16.134610",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37300": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:20.716071",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37310": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:25.269516",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37320": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:31.128927",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37330": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:36.329521",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37380": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:41.022292",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8310": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:45.615893",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37390": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:50.398571",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37230": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:54.962735",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:45:59.793674",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "44350": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:46:04.379948",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37960": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:46:10.669734",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33730": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:46:15.219058",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9850": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:46:24.799930",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38480": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:46:29.543477",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:46:34.143375",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38070": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:46:39.748567",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11180": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:46:44.547623",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11920": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:46:49.221852",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37240": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:46:53.815014",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37260": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:00.022579",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37270": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:05.145834",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37280": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:09.706680",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37290": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:14.323902",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37370": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:18.990644",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:23.717651",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12460": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:29.731982",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12440": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:35.035934",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "21300": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:39.662503",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "21400": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:44.256658",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12450": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:48.862002",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34220": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:53.642248",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "21780": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:47:58.277647",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42920": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:02.864749",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "22140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:07.412894",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31840": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:13.569743",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1313": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:18.945455",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1640": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:23.641823",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1630": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:28.318497",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:32.920343",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:39.043836",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6020": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:45.103200",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1530": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:50.089849",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31920": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:48:57.186692",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1002": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:04.698877",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1690": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:10.933294",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1520": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:15.677635",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:22.077589",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1930": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:27.258485",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6850": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:32.270842",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25890": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:38.828858",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2376280": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:43.841196",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1510": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:48.407661",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:53.963572",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:49:59.036443",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1173770": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:04.128679",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12150": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:08.714552",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42147": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:13.348769",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:17.930270",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25010": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:22.668205",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11230": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:27.310772",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12540": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:37.036908",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10150": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:41.657627",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:46.293655",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32630": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:51.342777",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50920": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:50:56.401272",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11250": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:01.181206",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3884500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:10.284868",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3883680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:14.969910",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "13500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:19.736591",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9970": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:24.356721",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31850": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:30.337428",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1173780": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:35.168828",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "377840": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:39.735785",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "20820": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:44.317621",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31930": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:48.912666",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:51.138592",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:51:56.110939",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3882670": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:01.105988",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "16030": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:05.808731",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "45450": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:13.667345",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2610": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:19.338230",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:24.844349",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:29.510991",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2640": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:35.285239",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3450": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:41.776694",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:46.619249",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:52.260432",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2710": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:52:56.930766",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2720": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:02.838336",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:07.644055",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2810": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:12.208943",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2820": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:16.858927",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2840": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:21.528469",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25620": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:26.184933",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2850": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:31.002857",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2870": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:35.731530",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:40.303653",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2910": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:44.870882",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2990": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:50.824480",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3010": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:55.431071",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3020": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:53:59.974483",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3050": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:04.602526",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:09.224294",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3230": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:13.845318",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3260": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:18.473487",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3270": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:23.499507",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3883150": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:28.393215",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3340": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:33.478997",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3360": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:39.243569",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3380": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:44.095993",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3400": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:48.764921",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3410": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:53.371727",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:54:58.108856",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3430": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:55:02.809253",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:55:07.760638",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3882400": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:55:17.757981",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3880790": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:55:22.739672",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31860": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:55:28.882282",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:55:32.557552",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1173800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:55:39.119881",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "312750": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:55:47.388340",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "346830": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:55:53.084584",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1173790": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:55:58.148864",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "51030": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:00.557202",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3884390": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:05.263566",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31870": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:09.868414",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31810": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:14.437312",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3882060": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:19.179648",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25930": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:23.716400",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33390": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:33.412776",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:37.992563",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1821510": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:42.586517",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:47.211281",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:53.924994",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46250": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:56:59.823300",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "742470": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:04.370724",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1765860": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:10.620934",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4780": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:17.302462",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1594560": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:23.346624",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2703280": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:27.961987",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "45740": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:32.656729",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3882680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:37.226014",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3885420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:41.797541",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3883760": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:46.572895",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "340170": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:51.157978",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "45760": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:57:55.893647",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32110": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:00.548648",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3882360": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:05.202479",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25850": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:14.776333",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2003990": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:19.406996",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1173810": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:24.032226",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32120": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:29.862300",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12650": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:35.273682",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2590": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:39.916722",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31880": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:44.763254",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "924420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:54.525602",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31820": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:58:59.665808",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3730": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:59:09.399526",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "19020": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:59:16.916152",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25980": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:59:24.584972",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8170": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:59:29.497383",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1554380": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:59:36.154743",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25808": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:59:41.827890",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "768480": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:59:47.248643",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25830": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T13:59:58.105512",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3027670": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:02.897303",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2300520": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:07.732188",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1987970": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:12.719802",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1797840": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:17.820354",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4570": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:23.125947",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1456820": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:28.108683",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2078680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:34.066702",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3610": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:42.756047",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "20710": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:50.413634",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2869590": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:55.057054",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1200200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:00:59.919906",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:01:04.525850",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3810": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:01:09.219921",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3820": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:01:14.146404",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:01:25.578113",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2681100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:01:30.297753",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:01:34.861457",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "45720": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:01:39.422790",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34630": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:01:44.509689",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3910": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:01:50.895776",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25910": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:01:56.745630",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12560": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:02.856643",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:07.481803",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1173820": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:13.240019",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "19320": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:18.840991",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12590": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:25.368865",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "21500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:28.008586",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46280": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:33.060545",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6370": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:37.702764",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15270": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:44.741666",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "51060": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:49.373056",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "55000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:53.963356",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3960": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:02:59.568356",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34920": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:04.466450",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46270": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:09.046598",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:13.598597",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41730": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:18.962898",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "47130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:23.516442",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:28.159875",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39520": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:32.730830",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39510": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:37.364615",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12660": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:41.941743",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50930": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:47.855049",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "47110": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:52.821668",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "23530": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:03:57.459748",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:02.101837",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "55040": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:06.743430",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3920": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:11.375495",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:17.002328",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41740": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:21.673269",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46380": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:27.304390",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46400": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:32.381439",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:36.922741",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32150": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:41.830575",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "25990": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:46.440864",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "26000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:51.027719",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46410": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:53.309405",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "23600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:04:57.946367",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4470": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:03.725326",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4530": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:08.284282",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:12.944800",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:18.296468",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3710": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:22.851869",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34640": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:27.455707",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31830": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:32.061800",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12364": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:36.607834",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2484110": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:41.228426",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3570": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:45.852745",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3580": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:50.537935",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46350": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:55.121582",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:05:59.686298",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46550": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:04.365478",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46480": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:09.789120",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46490": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:15.583715",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:20.410954",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2909400": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:24.966952",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4770": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:30.928854",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "23700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:35.533764",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46520": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:40.126878",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31890": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:44.916184",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46440": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:52.520341",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "26800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:06:58.259075",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46540": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:07:03.162055",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46560": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:07:07.728777",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3460": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:07:12.299864",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4870": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:07:17.673390",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33550": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:07:22.633668",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46450": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:07:27.229612",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:07:32.829463",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:07:37.441820",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:07:47.030080",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46460": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:07:54.404161",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:06.454613",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32160": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:11.005032",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:16.076576",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1462040": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:20.707293",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46570": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:25.623756",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "26900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:30.217832",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:34.841642",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:37.301824",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:41.926202",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32390": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:47.477014",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33570": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:53.142798",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34810": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:08:57.779310",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "35070": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:03.446499",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10260": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:08.170606",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46730": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:10.433492",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46740": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:15.629448",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46750": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:20.707022",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "46840": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:25.331536",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "47000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:29.855475",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "47120": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:34.554589",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "47400": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:42.067473",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1026680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:46.659492",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31910": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:51.240410",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "27000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:55.800363",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40210": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:09:58.083893",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32310": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:02.790639",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:07.580733",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34820": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:12.175869",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "23455": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:16.995890",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "48000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:21.540892",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "48110": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:26.603154",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "48190": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:31.186626",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50510": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:35.755561",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "55140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:40.431612",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "55150": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:45.047951",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "55230": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:49.754981",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "57000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:54.337910",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "57300": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:10:59.048935",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50940": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:03.749141",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "27020": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:08.331489",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50960": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:13.724694",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "24200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:19.488617",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "51010": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:24.068600",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32330": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:28.646532",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "24240": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:33.254618",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42210": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:37.960947",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:42.774422",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "48240": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:47.979403",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "55020": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:53.991591",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "359870": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:11:58.784417",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "55110": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:03.650917",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:08.762550",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:15.721616",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40340": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:20.612468",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6010": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:26.103872",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2525": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:31.045828",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "49330": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:33.379485",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40350": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:38.919771",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40380": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:43.519515",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "595520": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:48.172744",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "57680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:12:52.951068",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "49300": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:01.936050",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32340": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:07.291111",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "24420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:13.521621",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "49320": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:21.472181",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40390": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:26.900847",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "48800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:31.481388",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:36.130203",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "57620": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:42.338956",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33610": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:46.866576",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42220": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:51.581967",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4290": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:13:56.182387",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40330": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:14:06.595650",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6060": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:14:11.282752",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "24650": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:14:16.010301",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "35000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:14:20.877906",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42930": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:14:26.826778",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3990": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:14:31.366282",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4240": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:14:42.022443",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "24480": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:14:46.569514",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32350": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:14:51.217222",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "24670": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:14:56.317973",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:01.954178",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42230": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:07.583219",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6300": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:12.603794",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6510": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:19.564583",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33620": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:24.126539",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6910": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:28.786625",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "24460": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:33.567298",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:39.648680",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:41.964657",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33650": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:47.016008",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42940": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:54.300763",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "48950": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:15:59.557538",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32380": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:04.336748",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4850": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:09.595744",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50970": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:14.448657",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50980": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:19.213190",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "51000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:24.178517",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4880": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:29.449029",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4720": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:34.540434",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33520": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:40.685858",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "27800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:45.708316",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50990": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:50.302095",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1433000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:16:55.473391",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:00.062446",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1793840": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:04.612958",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32360": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:09.205880",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:13.771248",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "35130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:18.936063",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "35300": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:23.793577",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "35310": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:28.339540",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1175950": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:34.335227",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1642620": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:38.916700",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7610": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:43.475431",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7670": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:48.022977",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:52.558374",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42810": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:17:57.546957",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42950": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:03.586790",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6040": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:08.222333",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6310": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:13.492312",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:18.046433",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40720": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:22.611695",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:24.848572",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40930": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:29.424608",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "35320": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:36.837893",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "27810": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:42.025770",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "921590": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:47.183515",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "49600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:51.950316",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:18:56.849495",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1490130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:01.436397",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1091500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:05.992281",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "343170": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:10.653959",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33660": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:15.276814",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:19.881681",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42960": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:25.381477",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:30.032677",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7620": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:34.633292",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6840": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:39.185609",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37340": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:41.458197",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37360": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:43.728742",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "29160": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:50.065907",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6860": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:54.598484",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6980": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:19:59.353668",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7840": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:03.964426",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7340": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:08.549560",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6880": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:13.106264",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7660": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:17.741381",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7730": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:22.402453",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7760": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:32.602940",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:39.149720",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7830": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:43.738369",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:48.416090",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "36900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:53.019355",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:20:57.630971",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8190": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:02.540020",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:07.091793",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "27900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:11.713445",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "36910": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:16.294828",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7210": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:22.944661",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:27.592209",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:35.880520",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8080": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:40.554576",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9730": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:45.731591",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9760": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:50.915855",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10120": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:21:55.463816",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:00.084621",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "49800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:04.689726",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "3734470": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:09.871829",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "50000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:12.190072",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40980": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:17.106558",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32410": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:22.402543",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8330": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:29.486975",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:38.493207",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8400": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:44.805481",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:49.624648",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8640": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:54.187519",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8790": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:22:58.891517",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "27920": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:23:03.483917",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8880": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:23:08.104825",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "8970": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:23:13.732631",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "43500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:23:19.756937",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "42990": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:23:24.420802",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9310": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:23:29.073510",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33980": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:23:33.756523",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "49810": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:23:48.366615",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "40990": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:23:52.965800",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9350": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:23:57.520940",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33990": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:02.166319",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9480": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:06.751708",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9710": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:11.443909",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33710": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:16.289276",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "303800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:20.823828",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "27940": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:25.387731",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32430": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:32.862918",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9450": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:37.448481",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "43000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:42.048908",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9460": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:46.646509",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "49900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:52.621300",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33720": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:24:58.677482",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34010": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:04.188725",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "28000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:08.786492",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32440": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:13.598818",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:18.191798",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "43100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:22.825350",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "21100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:29.822371",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41014": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:35.985769",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:41.004252",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "1572990": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:46.435543",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "2477140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:51.094416",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "29120": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:25:55.736331",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32450": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:00.732055",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "19980": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:05.372661",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41050": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:13.538916",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41060": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:23.210572",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "41100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:29.044842",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15710": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:33.641988",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32460": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:38.194498",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32620": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:42.811473",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "17500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:47.452631",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32650": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:52.017013",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "17580": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:26:54.271356",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:00.151195",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18020": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:10.979510",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32660": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:15.737414",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "29130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:20.373303",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "29180": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:25.073355",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32720": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:29.610445",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "23420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:34.884793",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:40.262526",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32730": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:46.159713",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32740": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:53.832746",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32750": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:27:58.392691",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "43600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:28:03.057882",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32760": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:28:07.599317",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "44600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:28:12.264550",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32770": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:28:16.872823",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33320": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:28:21.429471",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38720": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:28:36.111271",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:28:40.677989",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38490": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:28:45.579806",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:28:52.070253",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9940": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:28:57.177845",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9960": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:01.817333",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "9980": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:06.401881",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "19900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:10.934850",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "20200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:17.877702",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "20510": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:22.473304",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "29540": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:27.103211",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33760": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:32.071841",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32470": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:36.615948",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:41.822394",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33110": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:47.365930",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33120": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:51.937014",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:29:57.094776",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33180": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:02.734729",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33220": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:09.536287",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "44100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:14.106940",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "44680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:19.609319",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:26.347421",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10250": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:31.809903",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "44340": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:34.111038",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39110": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:40.959899",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39120": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:46.957532",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39660": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:51.685874",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:30:56.891823",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39160": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:01.542315",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39190": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:06.135719",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:10.813593",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39210": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:15.415030",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:21.319886",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33770": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:25.865656",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:31.594894",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:36.261279",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39560": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:43.909430",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39630": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:49.582652",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39640": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:31:58.500257",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39650": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:03.094803",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10220": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:07.692571",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "29560": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:12.292339",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10230": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:16.811275",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10190": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:24.287366",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:28.862508",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10110": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:33.550524",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:38.109897",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38740": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:42.685438",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10240": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:47.269507",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33670": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:51.972558",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "34830": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:32:56.703899",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "44690": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:33:11.253969",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11260": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:33:16.091450",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "35720": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:33:20.784450",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10460": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:33:26.674397",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "35600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:33:35.168681",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "35700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:33:39.788684",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "29570": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:33:44.428933",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "32510": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:33:49.052325",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "10680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:33:58.587579",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11020": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:34:03.154853",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11040": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:34:12.764141",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11050": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:34:18.153338",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33790": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:34:23.097725",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:34:31.832500",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33950": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:34:36.400809",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:34:41.003384",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11150": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:34:45.887058",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:34:51.215895",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "39690": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:34:56.165897",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11190": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:00.767471",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37400": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:05.648888",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "29580": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:10.340108",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "45100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:15.032280",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38080": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:21.765607",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11550": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:27.082838",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "11610": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:31.777729",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "33900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:34.009373",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "35800": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:38.606871",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "36000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:43.441173",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:48.056665",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37210": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:35:52.669342",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37220": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:36:02.224266",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:36:08.229794",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "29700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:36:13.516763",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "7860": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:36:19.125233",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "45420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:36:25.247689",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12220": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:36:30.848137",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12310": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:36:36.577809",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38090": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:36:46.617984",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:36:52.566933",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6220": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:02.651138",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "6900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:08.068449",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "4760": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:13.573004",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12330": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:20.258928",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "45200": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:24.912568",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "45300": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:29.851846",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "37600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:36.617051",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "21130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:41.773838",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "21660": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:46.716839",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "21680": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:52.000713",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "21690": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:37:56.872662",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12360": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:01.528617",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38110": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:06.784417",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12390": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:12.420879",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12470": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:18.984730",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12480": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:23.735325",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:26.964404",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12430": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:31.899611",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:36.862508",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12380": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:41.445623",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12520": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:46.028471",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "29900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:54.702873",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12530": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:38:59.377526",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12570": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:03.986959",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12580": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:08.694008",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12640": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:14.512620",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "12690": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:19.203211",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38120": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:23.764486",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "45410": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:28.328773",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31100": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:32.910529",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38130": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:37.504834",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "21980": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:42.238647",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18120": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:46.820734",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "13530": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:51.468089",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18300": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:39:56.289444",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "20530": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:00.894428",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15960": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:05.570348",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "16000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:13.774547",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38140": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:18.823793",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18420": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:23.440429",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18460": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:28.251581",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18470": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:32.901959",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18480": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:38.777693",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18500": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:43.359642",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18600": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:48.504477",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "18700": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:40:53.435240",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "22120": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:00.466770",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "23450": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:06.052998",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31170": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:10.916448",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15750": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:15.488865",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15900": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:20.040642",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15920": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:24.682877",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15930": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:29.258689",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "15970": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:34.132927",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "16020": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:38.837402",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "19000": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:44.643588",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "19030": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:51.229182",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "19080": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:41:55.888523",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "22180": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:42:00.469836",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "22230": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:42:10.046914",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "31180": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:42:14.607491",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  },
+  "38160": {
+    "attempt_count": 1,
+    "last_attempt": "2025-09-07T14:42:19.401561",
+    "last_result": "db_error",
+    "notes": "No fields need updating"
+  }
+}
