@@ -21,6 +21,9 @@ test-output
 old_scraper
 .vscode
 
+# rescan log
+rescan_progress.json
+
 # build
 dist
 */dist
