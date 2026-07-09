@@ -12,13 +12,16 @@ except ImportError:
 """
 Game-Specific Launch Options Scraper
 """
-def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mode=False):
+def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=None, test_mode=False):
     """
     Fetch game-specific launch options based on engine detection and game patterns
     launch options for various game engines and specific games.
     :param app_id: The Steam application ID of the game
     :param title: The title of the game
     :param cache: Cache object to retrieve game metadata
+    :param engine: Already-detected engine name (e.g. from the games table or
+                   extract_engine); used directly so games whose metadata is not
+                   in the local cache still get engine-specific options
     :param test_results: Optional dictionary to store test results for validation
     :param test_mode: Boolean indicating if the function is in test mode
     :return: List of launch options with descriptions and sources
@@ -60,8 +63,13 @@ def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mo
     if isinstance(genres, list):
         genre_text = " ".join([genre.get('description', '') for genre in genres if isinstance(genre, dict)]).lower()
     
-    # Combined text for pattern matching
-    all_text = f"{lower_title} {developer_text} {publisher_text} {category_text} {genre_text}"
+    # Combined text for pattern matching. The pipeline's detected engine is
+    # included so the indicator matching below fires even when the local cache
+    # has no metadata for this game (e.g. games loaded from the database).
+    engine_text = (engine or '').lower()
+    if engine_text in ('unknown', 'none'):
+        engine_text = ''
+    all_text = f"{lower_title} {developer_text} {publisher_text} {category_text} {genre_text} {engine_text}"
     
     # ENGINE-SPECIFIC DETECTION AND OPTIONS
     
@@ -301,7 +309,10 @@ def fetch_game_specific_options(app_id, title, cache, test_results=None, test_mo
         ])
     
     # Bethesda Creation Engine games
-    elif any(game in lower_title for game in ['skyrim', 'fallout', 'elder scrolls', 'starfield']):
+    elif any(indicator in all_text for indicator in [
+        'creation engine', 'gamebryo',
+        'skyrim', 'fallout', 'elder scrolls', 'starfield'
+    ]):
         options.extend([
             {
                 'command': '-windowed',
