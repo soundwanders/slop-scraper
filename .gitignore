@@ -19,6 +19,7 @@ test-output
 */test-output/
 */old_scraper
 old_scraper
+.vscode
 
 # build
 dist
@@ -52,6 +53,9 @@ lib-cov
 
 # node-waf configuration
 .lock-wscript
+
+# claude tests
+.claude
 
 # Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
