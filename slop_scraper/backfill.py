@@ -20,6 +20,7 @@ if current_dir not in sys.path:
 try:
     from utils.extract_engine import extract_engine
     from utils.security_config import SecureRequestHandler
+    from utils.dates import normalize_release_date
     from database.supabase import setup_supabase_connection
 except ImportError as e:
     print(f"❌ Import error: {e}")
@@ -271,7 +272,7 @@ def fetch_single_game_metadata(game_data, engine_detector, stats, rate_limit=0.8
         metadata = {
             'developer': extract_developer_safely(game_info),
             'publisher': extract_publisher_safely(game_info),
-            'release_date': extract_release_date_safely(game_info),
+            'release_date': normalize_release_date(extract_release_date_safely(game_info)),
             'engine': engine,
             'engine_confidence': confidence,
             'engine_sources': sources

@@ -9,11 +9,13 @@ from tqdm import tqdm
 
 try:
     from ..utils.extract_engine import extract_engine
+    from ..utils.dates import normalize_release_date
 except ImportError:
     import sys
     import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from utils.extract_engine import extract_engine
+    from utils.dates import normalize_release_date
 
 def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=False, 
                        debug=False, cache_file=None, rate_limiter=None, 
@@ -301,7 +303,7 @@ def fetch_game_metadata(app_id, name, cache, debug, rate_limiter, session_monito
         "name": store_data.get("name", name),
         "developer": extract_developer_safely(store_data),
         "publisher": extract_publisher_safely(store_data),
-        "release_date": extract_release_date_safely(store_data),
+        "release_date": normalize_release_date(extract_release_date_safely(store_data)),
         "engine": extract_engine_safely(store_data, app_id)
     }
     

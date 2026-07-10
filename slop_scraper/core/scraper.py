@@ -46,7 +46,12 @@ except ImportError:
     from utils.results_utils import save_test_results, save_game_results
     from validation import LaunchOptionsValidator, ValidationLevel, EngineType
 
-RESCAN_PROGRESS_FILE = 'rescan_progress.json'
+# Anchored to the project root (parent of the package) so the same progress
+# file is used no matter which directory the scraper is launched from.
+RESCAN_PROGRESS_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    'rescan_progress.json'
+)
 
 class SlopScraper:
     def __init__(self, test_mode=False, cache_file='appdetails_cache.json',
@@ -211,11 +216,12 @@ class SlopScraper:
 
     def _get_rescan_games(self):
         """
-        Pull games already in the database for re-scanning, thinnest first.
+        Pull ALL games already in the database for re-scanning, thinnest first.
 
-        Games with the fewest stored options benefit most from the fixed
-        scrapers, so ordering by total_options_count ascending front-loads
-        the biggest wins. Already-rescanned games (tracked locally in
+        Every stored game is a candidate — including games with zero options,
+        which may simply have been scraped while the scrapers were broken.
+        Ordering by total_options_count ascending front-loads the games that
+        benefit most. Already-rescanned games (tracked locally in
         rescan_progress.json) are excluded so the campaign can be run in
         --limit sized chunks across many sessions.
         """
@@ -225,19 +231,28 @@ class SlopScraper:
 
         done = self._load_rescan_progress()
 
+        # Paginate — Supabase caps selects at 1000 rows by default
+        rows = []
+        page_size = 1000
+        start = 0
         try:
-            response = (
-                self.supabase.table("games")
-                .select("app_id, title, developer, publisher, release_date, engine, total_options_count")
-                .gt("total_options_count", 0)
-                .order("total_options_count", desc=False)
-                .execute()
-            )
+            while True:
+                response = (
+                    self.supabase.table("games")
+                    .select("app_id, title, developer, publisher, release_date, engine, total_options_count")
+                    .order("total_options_count", desc=False)
+                    .range(start, start + page_size - 1)
+                    .execute()
+                )
+                batch = response.data or []
+                rows.extend(batch)
+                if len(batch) < page_size:
+                    break
+                start += page_size
         except Exception as e:
             print(f"⚠️ Rescan query failed: {e}")
             return []
 
-        rows = response.data or []
         total_candidates = len(rows)
 
         games = []
@@ -256,7 +271,7 @@ class SlopScraper:
                 break
 
         remaining = total_candidates - len(done)
-        print(f"🔁 Rescan: {total_candidates} games with options in DB, "
+        print(f"🔁 Rescan: {total_candidates} games in DB, "
               f"{len(done)} already re-scanned, {max(0, remaining)} remaining")
         if not games and total_candidates:
             print(f"✅ Rescan campaign complete — delete {RESCAN_PROGRESS_FILE} to start a new one")

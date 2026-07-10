@@ -608,13 +608,21 @@ def save_to_database(game, options, supabase):
         return
 
     try:
+        # Final guard on date format: every save path (new games, rescan
+        # echoes of existing rows) funnels through here, so normalizing at
+        # this choke point keeps raw Steam date strings out of the DB.
+        try:
+            from ..utils.dates import normalize_release_date
+        except ImportError:
+            from utils.dates import normalize_release_date
+
         # Upsert game metadata (safe: Steam API data is authoritative for name/developer/etc.)
         game_data = {
             "app_id": game['appid'],
             "title": game['name'],
             "developer": game.get('developer', ''),
             "publisher": game.get('publisher', ''),
-            "release_date": game.get('release_date', ''),
+            "release_date": normalize_release_date(game.get('release_date', '')),
             "engine": game.get('engine', 'Unknown')
         }
 

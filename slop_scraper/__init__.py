@@ -3,24 +3,12 @@ SlopScraper - A Python tool for gathering a list of Steam games and scraping the
 
 This package allows users to collect various launch options for Steam games from
 various sources including PCGamingWiki, Steam Community, and custom game-specific
-configurations and save them into a Supabase database. 
+configurations and save them into a Supabase database.
 """
 
 # Version information
 __version__ = "0.10"
 __author__ = "soundwanders"
-
-# Import and expose the main class for ease of use
-from .core.scraper import SlopScraper
-
-# Import main function for CLI usage
-try:
-    from .main import main
-except ImportError:
-    # Fallback if main module has import issues
-    def main():
-        """Fallback main function"""
-        print("Main function not available. Try running the script directly.")
 
 # Define exports
 __all__ = [
@@ -30,10 +18,29 @@ __all__ = [
     "run_scraper",  # CLI runner function
 ]
 
+
+def __getattr__(name):
+    """
+    Lazy attribute access (PEP 562).
+
+    Importing .main or .core.scraper eagerly at package-init time caused
+    `python3 -m slop_scraper.main` to import the main module twice (once via
+    this __init__, once as __main__), triggering a RuntimeWarning about
+    'slop_scraper.main' already being in sys.modules. Resolving the imports
+    only when the attribute is actually requested avoids the double import
+    while keeping `from slop_scraper import SlopScraper` and
+    `from slop_scraper import main` working.
+    """
+    if name == "SlopScraper":
+        from .core.scraper import SlopScraper
+        return SlopScraper
+    if name == "main":
+        from .main import main
+        return main
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 def run_scraper():
     """Run SlopScraper from the command line."""
-    main()
-
-# Only run main if this module is executed directly
-if __name__ == "__main__":
+    from .main import main
     main()

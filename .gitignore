@@ -23,6 +23,7 @@ old_scraper
 
 # rescan log
 rescan_progress.json
+*/rescan_progress.json
 
 # build
 dist
