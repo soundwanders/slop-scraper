@@ -29,107 +29,37 @@ def get_supabase_credentials():
 def setup_supabase_connection():
     """Set up connection to Supabase"""
     url, key = get_supabase_credentials()
-    
+
     if not url or not key:
         print("No valid Supabase credentials found.")
         return None
-        
+
     try:
-        # Connect to Supabase
         supabase = create_client(url, key)
-        
-        # Verify database structure
+
         if verify_db_structure(supabase):
-            # Seed sources if needed
-            seed_sources(supabase)
             return supabase
         else:
             print("Database structure verification failed.")
             return None
-            
+
     except Exception as e:
         print(f"Error connecting to Supabase: {e}")
         return None
 
 def verify_db_structure(supabase):
-    """Verify that the required tables exist in the database"""
+    """Verify that the required tables exist in the database."""
+    required = ["games", "launch_options", "game_launch_options"]
     try:
-        # Check if the games table exists by querying it
-        games_result = supabase.table("games").select("app_id").limit(1).execute()
-        
-        # Check if the launch_options table exists
-        options_result = supabase.table("launch_options").select("id").limit(1).execute()
-        
-        # Check if the sources table exists
-        sources_result = supabase.table("sources").select("id").limit(1).execute()
-        
+        supabase.table("games").select("app_id").limit(1).execute()
+        supabase.table("launch_options").select("id").limit(1).execute()
+        supabase.table("game_launch_options").select("game_app_id").limit(1).execute()
         print("✅ Database structure verification passed.")
         return True
     except Exception as e:
         print(f"⚠️ Database structure verification failed: {e}")
-        print("Please make sure you've created the required tables using the SQL schema.")
-        print("For instructions, see the README.md file or the documentation.")
+        print("Run schema.sql in the Supabase SQL Editor to create the required tables.")
         return False
-
-def seed_sources(supabase):
-    """Seed the sources table with sources if empty"""
-    try:
-        # Check if sources table is empty
-        result = supabase.table("sources").select("count", count="exact").execute()
-        count = result.count if hasattr(result, 'count') else 0
-        
-        if count == 0:
-            sources = [
-                {
-                    "name": "PCGamingWiki",
-                    "description": "Launch options from PCGamingWiki pages",
-                    "reliability_score": 0.9
-                },
-                {
-                    "name": "Steam Community",
-                    "description": "Launch options from Steam community guides",
-                    "reliability_score": 0.7
-                },
-                {
-                    "name": "Source Engine",
-                    "description": "launch options for Source engine games",
-                    "reliability_score": 0.8
-                },
-                {
-                    "name": "Unity Engine",
-                    "description": "launch options for Unity engine games",
-                    "reliability_score": 0.8
-                },
-                {
-                    "name": "Unreal Engine",
-                    "description": "launch options for Unreal engine games",
-                    "reliability_score": 0.8
-                },
-                {
-                    "name": "Launch Option",
-                    "description": "Generic launch options that work across many games",
-                    "reliability_score": 0.6
-                },
-                {
-                    "name": "Universal",
-                    "description": "Universal launch options for unrecognized engines",
-                    "reliability_score": 0.5
-                },
-                {
-                    "name": "Generic",
-                    "description": "Basic generic options",
-                    "reliability_score": 0.3
-                }
-            ]
-            
-            for source in sources:
-                supabase.table("sources").insert(source).execute()
-            
-            print(f"✅ Added {len(sources)} sources to the database.")
-        else:
-            print("✅ Sources table already populated.")
-    except Exception as e:
-        print(f"⚠️ Error seeding sources: {e}")
 
 def test_database_connection(test_mode=False, supabase=None):
     """Test database connection and return status"""
@@ -303,39 +233,30 @@ def get_games_needing_reprocessing(supabase, max_options: int = 3) -> List[Dict]
 
 def get_smart_existing_games(supabase, skip_existing: bool = True, force_reprocess_generic: bool = True) -> Set[int]:
     """
-    OPTIMIZED VERSION - Smart logic for determining which games to skip
-    This fixes the performance bottleneck in the original version
+    Return the set of app_ids that should be skipped during scraping.
+
+    Strategy: skip only games that already have at least one launch option
+    (total_options_count > 0). Games that exist in `games` but have zero
+    options should be processed so we can fill them in.
     """
+    if not skip_existing:
+        return set()
+
     try:
-        if not skip_existing:
-            # Don't skip any games - process all
-            return set()
-        
-        if force_reprocess_generic:
-            # SIMPLIFIED APPROACH - just get all existing games for now
-            # This avoids the expensive reprocessing analysis that was causing the hang
-            
-            print("🔍 Getting existing games (simplified for performance)...")
-            all_games_response = supabase.table("games").select("app_id").execute()
-            
-            if not all_games_response.data:
-                return set()
-            
-            all_app_ids = {game['app_id'] for game in all_games_response.data}
-            
-            # TEMPORARY: Skip the expensive reprocessing analysis
-            # TODO: Optimize this later with proper SQL queries
-            print(f"📊 Found {len(all_app_ids)} existing games in database")
-            print("ℹ️ Using simplified skip logic for better performance")
-            
-            return all_app_ids
-        else:
-            # Standard skip-existing: skip all existing games
-            response = supabase.table("games").select("app_id").execute()
-            if response.data:
-                return {game['app_id'] for game in response.data}
-            return set()
-            
+        response = (
+            supabase.table("games")
+            .select("app_id")
+            .gt("total_options_count", 0)
+            .execute()
+        )
+
+        if response.data:
+            covered = {row['app_id'] for row in response.data}
+            print(f"📊 Skipping {len(covered)} games that already have launch options")
+            return covered
+
+        return set()
+
     except Exception as e:
         print(f"⚠️ Error in smart existing games logic: {e}")
         return set()
@@ -611,97 +532,144 @@ def fetch_steam_launch_options_from_db(app_id, supabase):
         print(f"⚠️ Database query error: {e}")
         return []
 
-def save_to_database(game, options, supabase):
-    """Save game and launch options to Supabase"""
+_LOW_QUALITY_SOURCES = {'Universal', 'Generic', 'Launch Option'}
+
+def _is_meaningful_option(option: dict) -> bool:
+    """Return True if an option is substantive enough to store."""
+    return option.get('source', '') not in _LOW_QUALITY_SOURCES
+
+def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
+    """
+    Return the id for a launch option, inserting it only if it doesn't exist.
+
+    We never overwrite an existing description — the first version wins.
+    This prevents auto-generated fallback descriptions (e.g. "Launch option
+    from PCGamingWiki") from silently replacing a previously curated one.
+    """
+    command = option['command']
+
+    # 1. Try to find an existing record first
     try:
-        # Prepare game data
+        existing = supabase.table("launch_options") \
+            .select("id") \
+            .eq("command", command) \
+            .limit(1) \
+            .execute()
+
+        if existing.data:
+            return existing.data[0]['id']
+    except Exception:
+        pass
+
+    # 2. Not found — insert the new option
+    try:
+        insert_res = supabase.table("launch_options").insert({
+            "command": command,
+            "description": option.get('description', ''),
+            "source": option.get('source', 'Unknown'),
+            "verified": option.get('verified', False)
+        }).execute()
+
+        if insert_res.data:
+            return insert_res.data[0]['id']
+    except Exception:
+        # Race condition: another process inserted between our select and insert.
+        # Try the select one more time.
+        try:
+            retry = supabase.table("launch_options") \
+                .select("id") \
+                .eq("command", command) \
+                .limit(1) \
+                .execute()
+            if retry.data:
+                return retry.data[0]['id']
+        except Exception:
+            pass
+
+    return None
+
+
+def save_to_database(game, options, supabase):
+    """
+    Save game and launch options to Supabase.
+
+    Design rules:
+    - Quality gate: only save if at least one non-generic option is present.
+    - Games: upsert on app_id (safe to refresh metadata from Steam API).
+    - Launch options: select-then-insert — never overwrite an existing description.
+    - Junction: upsert on (game_app_id, launch_option_id) — idempotent.
+    """
+    import time
+
+    # Quality gate — skip games with no meaningful options
+    meaningful = [o for o in options if _is_meaningful_option(o)]
+    if not meaningful:
+        print(f"ℹ️ Skipping {game['name']} — no meaningful options to save")
+        return
+
+    try:
+        # Final guard on date format: every save path (new games, rescan
+        # echoes of existing rows) funnels through here, so normalizing at
+        # this choke point keeps raw Steam date strings out of the DB.
+        try:
+            from ..utils.dates import normalize_release_date
+        except ImportError:
+            from utils.dates import normalize_release_date
+
+        # Upsert game metadata (safe: Steam API data is authoritative for name/developer/etc.)
         game_data = {
             "app_id": game['appid'],
             "title": game['name'],
             "developer": game.get('developer', ''),
-            "publisher": game.get('publisher', ''), 
-            "release_date": game.get('release_date', ''),
+            "publisher": game.get('publisher', ''),
+            "release_date": normalize_release_date(game.get('release_date', '')),
             "engine": game.get('engine', 'Unknown')
         }
-        
-        # Insert game info, using upsert to handle existing games
-        # on_conflict will update existing game if app_id matches
+
         res = supabase.table("games").upsert(
-            game_data, 
-            on_conflict="app_id" 
+            game_data,
+            on_conflict="app_id"
         ).execute()
-        
-        # Check response
+
         if hasattr(res, 'error') and res.error:
-            print(f"Error saving game {game['name']}: {res.error}")
+            print(f"⚠️ Error saving game {game['name']}: {res.error}")
             return
 
         print(f"✅ Saved game {game['name']} to database")
 
-        # Process each launch option - first ensuring they exist in launch_options table
         success_count = 0
         error_count = 0
-        
-        for option in options:
-            # Try up to 3 times for each option
-            for attempt in range(3):
-                try:
-                    # 1. First upsert the launch option itself (if it doesn't exist)
-                    option_data = {
-                        "command": option['command'],
-                        "description": option['description'],
-                        "source": option['source'],
-                        "verified": option.get('verified', False)
-                        # upvotes/downvotes are defaulted to 0 in schema
-                    }
-                    
-                    # Use on_conflict to handle the case where this option already exists
-                    option_res = supabase.table("launch_options")\
-                        .upsert(option_data, on_conflict="command")\
-                        .execute()
-                        
-                    # Extract the launch option id (either new or existing)
-                    if option_res.data and len(option_res.data) > 0:
-                        option_id = option_res.data[0]['id']
-                        
-                        # 2. Now create the association between game and launch option
-                        junction_data = {
-                            "game_app_id": game['appid'],
-                            "launch_option_id": option_id
-                        }
-                        
-                        # Insert into junction table (will fail if already exists)
-                        supabase.table("game_launch_options")\
-                            .upsert(junction_data, on_conflict="game_app_id,launch_option_id")\
-                            .execute()
-                            
-                        success_count += 1
-                        # Break out of retry loop
-                        break
-                    else:
-                        raise Exception("Failed to get launch option ID")
-                        
-                except Exception as inner_e:
-                    # Only print error on last attempt
-                    if attempt == 2:
-                        print(f"Error saving option {option['command']} after 3 attempts: {inner_e}")
-                        error_count += 1
-                    # Small delay before retry
-                    import time
-                    time.sleep(0.5)
-        
-        # Calculate percentage success rate
-        if options:
-            success_rate = (success_count / len(options)) * 100
-            print(f"✅ Saved {success_count}/{len(options)} options ({success_rate:.1f}%) to database")
-            if error_count > 0:
-                print(f"⚠️ Failed to save {error_count} options")
-        else:
-            print("ℹ️ No options to save for this game")
-            
+
+        for option in meaningful:
+            try:
+                option_id = _get_or_create_launch_option(supabase, option)
+
+                if option_id is None:
+                    print(f"⚠️ Could not get/create option '{option['command']}'")
+                    error_count += 1
+                    continue
+
+                supabase.table("game_launch_options").upsert(
+                    {"game_app_id": game['appid'], "launch_option_id": option_id},
+                    on_conflict="game_app_id,launch_option_id"
+                ).execute()
+
+                success_count += 1
+
+            except Exception as inner_e:
+                print(f"⚠️ Error saving option '{option['command']}': {inner_e}")
+                error_count += 1
+                time.sleep(0.3)
+
+        total = len(meaningful)
+        rate = (success_count / total * 100) if total else 0
+        print(f"✅ Saved {success_count}/{total} options ({rate:.1f}%) for {game['name']}")
+        if error_count:
+            print(f"⚠️ Failed to save {error_count} option(s)")
+
     except Exception as e:
-        print(f"⚠️ Database error: {e}")
-        print("Make sure your Supabase tables are set up correctly with the right columns")
+        print(f"⚠️ Database error saving {game.get('name', 'unknown')}: {e}")
+        print("Make sure your Supabase tables are set up correctly.")
 
 # ========================================
 # SQL HELPER FUNCTIONS
