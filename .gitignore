@@ -55,6 +55,11 @@ lib-cov
 # Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 
+# security audits
+SecurityAudit.md
+SECURITY.md
+SECURITY
+
 # node-waf configuration
 .lock-wscript
 
