@@ -184,9 +184,16 @@ def fetch_protondb_launch_options(app_id, game_title=None, rate_limit=None, debu
 def validate_protondb_option(command: str, debug: bool = False) -> bool:
     """Relaxed validation for ProtonDB options (includes Wine/Proton specifics)"""
     
+    # Setup-only env vars (WINEPREFIX=...) are terminal commands, never
+    # launch options — reject before the permissive patterns can accept them
+    if '=' in command and command.split('=', 1)[0] in _ENV_VAR_BLOCKLIST:
+        if debug:
+            print(f"🔍 ProtonDB: Rejected '{command}' - setup-only environment variable")
+        return False
+
     validator = LaunchOptionsValidator(ValidationLevel.RELAXED)
     is_valid, reason = validator.validate_option(command, EngineType.UNIVERSAL)
-    
+
     # ProtonDB has many environment variables and special options
     if not is_valid:
         # Additional ProtonDB-specific patterns
@@ -213,28 +220,73 @@ def validate_protondb_option(command: str, debug: bool = False) -> bool:
     
     return is_valid
 
+# Curated descriptions for the common Proton/Wine environment variables.
+# Keyed by variable NAME — any value maps to the name's description.
+# Report notes are anecdotal prose; scraping description text out of them
+# produced truncated fragments in production. A static table is accurate
+# and clean; unknown vars get a clean generic instead of a fragment.
+PROTON_WINE_DESCRIPTIONS = {
+    'PROTON_NO_ESYNC': 'Disable eventfd-based synchronization (fixes hangs in some games)',
+    'PROTON_NO_FSYNC': 'Disable futex-based synchronization',
+    'PROTON_USE_WINED3D': 'Use OpenGL-based WineD3D instead of Vulkan-based DXVK',
+    'PROTON_USE_D9VK': 'Translate Direct3D 9 to Vulkan for better performance (D9VK)',
+    'PROTON_NO_D3D11': 'Disable Direct3D 11 support (forces older rendering path)',
+    'PROTON_NO_D3D10': 'Disable Direct3D 10 support',
+    'PROTON_FORCE_LARGE_ADDRESS_AWARE': 'Let 32-bit games use up to 4GB of RAM',
+    'PROTON_ENABLE_NVAPI': 'Enable NVIDIA NVAPI support (DLSS and related features)',
+    'PROTON_HIDE_NVIDIA_GPU': 'Hide NVIDIA GPU identity from the game',
+    'PROTON_USE_SECCOMP': 'Enable seccomp-bpf filter (legacy Proton versions)',
+    'DXVK_HUD': 'Show the DXVK performance HUD overlay (e.g. DXVK_HUD=fps)',
+    'DXVK_ASYNC': 'Compile shaders asynchronously to reduce stutter (dxvk-async builds)',
+    'DXVK_FRAME_RATE': 'Cap the frame rate at the DXVK level',
+    'VKD3D_CONFIG': 'VKD3D-Proton (DirectX 12) configuration flags',
+    'WINEDLLOVERRIDES': 'Override how Wine loads specific Windows DLLs',
+    'WINEARCH': 'Set the Wine architecture (win64 or win32)',
+    'WINEESYNC': 'Toggle eventfd-based synchronization in Wine',
+    'WINEFSYNC': 'Toggle futex-based synchronization in Wine',
+    'MANGOHUD': 'Enable the MangoHud performance overlay',
+    'PULSE_LATENCY_MSEC': 'Set PulseAudio latency in ms (fixes crackling audio)',
+}
+
+# Environment variables that are terminal setup commands, never launch options
+_ENV_VAR_BLOCKLIST = {'WINEPREFIX', 'WINESERVER', 'WINELOADER', 'WINEDEBUG'}
+
+
 def extract_options_from_reports(reports, debug=False):
     """
     Extract launch options from ProtonDB report notes.
 
     Report notes are free-form prose, so extraction is tiered by signal:
       - Environment variables (PROTON_*=, DXVK_*=, WINE*=) are unambiguous
-        and kept whenever seen.
+        and kept whenever seen — except setup-only vars like WINEPREFIX,
+        which belong to terminal commands, not Steam launch options.
       - Bare -flag tokens are kept only when they appear next to %command%
         (i.e. inside an actual launch-option string) or in at least two
         independent reports — a single prose match is likely junk.
+
+    Descriptions come from the curated PROTON_WINE_DESCRIPTIONS table, never
+    from report text: report fragments shipped truncated anecdotes to prod.
     """
-    env_var_pattern = re.compile(r'\b(?:PROTON|DXVK|VKD3D|WINE|MANGOHUD)[A-Z0-9_]*=[^\s\'"`]{1,60}')
+    try:
+        from ..validation import is_valid_launch_option
+    except ImportError:
+        from validation import is_valid_launch_option
+
+    env_var_pattern = re.compile(r'\b((?:PROTON|DXVK|VKD3D|WINE|MANGOHUD|PULSE)[A-Z0-9_]*)=([^\s\'"`]{1,60})')
     wrapper_pattern = re.compile(r'\b(gamemoderun|gamemode|mangohud)\b')
     # Anchored: must not continue a word ("90fps-ish" must not yield "-ish")
     flag_pattern = re.compile(r'(?<![\w\-])(-[a-zA-Z][a-zA-Z0-9_\-]{2,30})\b')
 
-    # command -> {'count', 'context', 'high_signal'}
+    # command -> {'count', 'high_signal'}
     found = {}
 
-    def _record(cmd, context, high_signal):
-        cmd = cmd.strip()[:100]
-        entry = found.setdefault(cmd, {'count': 0, 'context': context, 'high_signal': False})
+    def _record(cmd, high_signal):
+        # Strip punctuation the regex grabbed from surrounding prose
+        # ("PROTON_NO_ESYNC=1)" / "PROTON_NO_D3D10=1." / "...=1,")
+        cmd = cmd.strip().rstrip('.,)];:')[:100]
+        if not cmd:
+            return
+        entry = found.setdefault(cmd, {'count': 0, 'high_signal': False})
         entry['count'] += 1
         entry['high_signal'] = entry['high_signal'] or high_signal
 
@@ -247,43 +299,46 @@ def extract_options_from_reports(reports, debug=False):
             continue
 
         for m in env_var_pattern.finditer(text):
-            context = re.sub(r'\s+', ' ', text[max(0, m.start() - 60):m.end() + 60]).strip()
-            _record(m.group(0), context, high_signal=True)
+            var_name = m.group(1)
+            if var_name in _ENV_VAR_BLOCKLIST:
+                continue
+            _record(m.group(0), high_signal=True)
 
         for m in wrapper_pattern.finditer(text):
-            _record(m.group(1).replace('gamemoderun', 'gamemode'), '', high_signal=True)
+            _record(m.group(1).replace('gamemoderun', 'gamemode'), high_signal=True)
 
         for m in flag_pattern.finditer(text):
             # Flags are only trustworthy inside a launch-option string
             nearby = text[max(0, m.start() - 80):m.end() + 80].lower()
             near_command = '%command%' in nearby or 'launch option' in nearby
-            context = re.sub(r'\s+', ' ', text[max(0, m.start() - 60):m.end() + 60]).strip()
-            _record(m.group(1), context, high_signal=near_command)
+            _record(m.group(1), high_signal=near_command)
 
     options = []
     for cmd, entry in found.items():
         if not entry['high_signal'] and entry['count'] < 2:
             continue
 
-        context = entry['context'][:200]
-        if cmd.startswith('PROTON_'):
-            desc = f"Proton compatibility option: {context}"
-        elif cmd.startswith('DXVK_'):
-            desc = f"DXVK graphics option: {context}"
-        elif cmd.startswith('VKD3D_'):
-            desc = f"VKD3D DirectX 12 option: {context}"
-        elif cmd.startswith(('WINE', 'MANGOHUD')):
-            desc = f"Wine/overlay environment option: {context}"
-        elif cmd == 'gamemode':
-            desc = "Enable GameMode for performance optimization"
+        # Final structural check (paths, placeholders, prose words, ...)
+        is_valid, reason = is_valid_launch_option(cmd)
+        if not is_valid:
+            if debug:
+                print(f"🔍 ProtonDB: Rejected '{cmd}' - {reason}")
+            continue
+
+        # Description from the curated table only — never from report prose
+        if cmd == 'gamemode':
+            desc = 'Enable GameMode for performance optimization'
         elif cmd == 'mangohud':
-            desc = "Enable MangoHud overlay for performance monitoring"
+            desc = 'Enable MangoHud overlay for performance monitoring'
+        elif '=' in cmd:
+            var_name = cmd.split('=', 1)[0]
+            desc = PROTON_WINE_DESCRIPTIONS.get(var_name, 'Proton/Wine compatibility option')
         else:
-            desc = f"From ProtonDB user reports: {context}" if context else "From ProtonDB user reports"
+            desc = 'Launch option reported by ProtonDB users'
 
         options.append({
             'command': cmd,
-            'description': desc[:500],
+            'description': desc,
             'source': 'ProtonDB'
         })
 

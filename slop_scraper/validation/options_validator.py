@@ -436,6 +436,146 @@ class LaunchOptionsValidator:
         
         return validator
 
+# ============================================================
+# FINAL SAVE GATE
+# Every scraped option must pass this before reaching the DB,
+# regardless of which scraper produced it. Mirrors the reject
+# patterns from the 2026-07 vanilla-slops production cleanup.
+# ============================================================
+
+# A launch option is what a user pastes into Steam's launch-options box.
+# It is never a terminal setup command, a winetricks invocation, or a path.
+_PATH_INDICATORS = ('/home/', '~/', 'compatdata/', 'steamapps/', '.steam/', '://', '\\')
+
+# English words that regex extraction plucks out of prose as fake "-flags"
+_PROSE_WORDS = {
+    'already', 'time', 'game', 'person', 'hosting', 'man', 'day', 'way', 'year',
+    'work', 'life', 'world', 'hand', 'part', 'place', 'case', 'week', 'and',
+    'company', 'system', 'program', 'question', 'government', 'number', 'the',
+    'night', 'point', 'home', 'water', 'room', 'mother', 'area', 'money',
+    'story', 'fact', 'month', 'lot', 'right', 'study', 'book', 'eye', 'with',
+    'job', 'word', 'business', 'issue', 'side', 'kind', 'head', 'house',
+    'service', 'friend', 'father', 'power', 'hour', 'move', 'city', 'out',
+}
+
+# Wiki/markup tokens that must never appear in a stored description
+_DESCRIPTION_MARKUP_TOKENS = ('[[', ']]', '{{', '}}', '<!--', '-->', '====', "''", '#*', '<ref')
+
+# Dangling function words to trim when a description gets cut at markup
+_DANGLING_WORDS = {
+    'the', 'a', 'an', 'by', 'using', 'use', 'with', 'to', 'of', 'and', 'or',
+    'in', 'on', 'at', 'for', 'from', 'via', 'see', 'run', 'is', 'as',
+}
+
+
+def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool, str]:
+    """
+    Final gate for a scraped launch option COMMAND before database save.
+
+    Returns (is_valid, reason). The description is not judged here (it is
+    cleaned separately by clean_option_description) but accepted for
+    signature compatibility with call sites that have both.
+    """
+    if not command or not isinstance(command, str):
+        return False, "Empty command"
+
+    command = command.strip()
+
+    if len(command) < 2:
+        return False, "Too short"
+
+    # Terminal setup commands, never Steam launch options
+    if command.startswith('WINEPREFIX='):
+        return False, "WINEPREFIX is a terminal setup command, not a launch option"
+
+    # Filesystem paths mean it was scraped out of a shell command
+    if any(ind in command for ind in _PATH_INDICATORS):
+        return False, "Contains filesystem path"
+
+    # Truncated captures and placeholder fragments ({path, <path>, ~/[steam)
+    if any(ch in command for ch in '<{[>}]'):
+        return False, "Contains placeholder/bracket fragment"
+
+    # Punctuation grabbed from surrounding prose
+    if command[-1] in '.,)]=;:':
+        return False, "Ends in punctuation (scraped from prose)"
+
+    # At most one space: 'flag value' is fine, sentences are not
+    if command.count(' ') > 1:
+        return False, "Multiple spaces (prose fragment, not a flag)"
+
+    # Env-var style: NAME=value with an UPPERCASE name (PROTON_NO_ESYNC=1,
+    # DXVK_HUD=fps, WINEDLLOVERRIDES=..., MANGOHUD=1)
+    if '=' in command and not command.startswith(('-', '+')):
+        name = command.split('=', 1)[0]
+        if not re.match(r'^[A-Z][A-Z0-9_]+$', name):
+            return False, "Assignment without a valid env-var name"
+        return True, "Environment variable option"
+
+    # Wrapper commands (gamemoderun %command%, mangohud %command%)
+    if command in ('gamemode', 'gamemoderun', 'mangohud'):
+        return True, "Known wrapper command"
+
+    # Everything else must be a -flag / +flag / --flag
+    if not command.startswith(('-', '+')):
+        return False, "Not a flag, env var, or known wrapper"
+
+    body = command.lstrip('+-').split(' ')[0]
+
+    if not body or not re.search(r'[a-zA-Z]', body):
+        return False, "No letters in flag body"
+
+    # Prose words captured as flags (-already, -out)
+    if body.lower() in _PROSE_WORDS:
+        return False, "Bare English word, not a flag"
+
+    # Title-Case hyphenated phrases are prose/titles (-Out-Of-Luck)
+    parts = body.split('-')
+    if len(parts) >= 2 and any(p and p[0].isupper() for p in parts):
+        return False, "Title-Case hyphenated phrase (prose fragment)"
+
+    return True, "Valid flag"
+
+
+def clean_option_description(description: str, min_length: int = 12) -> Optional[str]:
+    """
+    Clean a scraped description for database save, or return None.
+
+    Cuts at the first wiki-markup token (handles UNCLOSED markup like
+    '[[Glossary:Command line arguments' that closed-pair regexes miss),
+    trims dangling function words left by the cut, and refuses fragments
+    that are too short to mean anything. None means "store no description"
+    — callers should prefer that over a polluted fragment.
+    """
+    if not description or not isinstance(description, str):
+        return None
+
+    text = description.strip()
+
+    # Cut at the first markup token, wherever it appears
+    cut_at = len(text)
+    for token in _DESCRIPTION_MARKUP_TOKENS:
+        idx = text.find(token)
+        if idx != -1:
+            cut_at = min(cut_at, idx)
+    text = text[:cut_at]
+
+    # Remove any leftover markup characters and collapse whitespace
+    text = re.sub(r'[<>{}|]', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+
+    # Trim trailing punctuation and dangling function words ("Use the -x by")
+    words = text.rstrip(' .,:;-–—(').split(' ')
+    while words and words[-1].lower().strip('.,:;()') in _DANGLING_WORDS:
+        words.pop()
+    text = ' '.join(words).rstrip(' .,:;-–—(').strip()
+
+    if len(text) < min_length:
+        return None
+
+    return text
+
+
 # Convenience functions for integration
 def validate_launch_option(option: str, engine_hint: str = None, strict: bool = False) -> bool:
     """

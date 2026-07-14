@@ -190,7 +190,10 @@ def clean_wiki_description(description, debug=False):
     """
     if not description:
         return ""
-    
+
+    # Strip wiki list markers (#, *, :) left over from numbered instructions
+    description = re.sub(r'^[\s#*:;]+', '', description)
+
     # Remove HTML/XML tags
     description = re.sub(r'<[^>]+>', '', description)
     
@@ -204,10 +207,31 @@ def clean_wiki_description(description, debug=False):
     # Remove wiki reference artifacts
     description = re.sub(r'\}\}.*?\{\{', ' ', description)
     description = re.sub(r'\|.*?\|', ' ', description)
-    
+
+    # The regexes above only strip CLOSED pairs. Truncated wikitext leaves
+    # unclosed markup ("Use the -nomovies [[Glossary:Command line arguments")
+    # that reached production. The shared cleaner cuts at the first markup
+    # token, trims dangling function words, and rejects short fragments.
+    try:
+        from ..validation import clean_option_description
+    except ImportError:
+        from validation import clean_option_description
+    description = clean_option_description(description) or ""
+
+    # Reject template-parameter residue and path fragments that survive the
+    # markup cut ("borderless windowed notes = ...", "fix=", "to \tf\custom")
+    if description:
+        if '\\' in description or re.search(r'\b(?:notes|fix|ref|description|comment)\s*=', description):
+            return ""
+        # A 1-2 letter lowercase first word means the context window sliced
+        # the sentence mid-word ("e property ...", "n that playable ...")
+        first_word = description.split(' ', 1)[0]
+        if len(first_word) <= 2 and first_word.islower() and first_word not in ('a',):
+            return ""
+
     # Clean up whitespace
     description = re.sub(r'\s+', ' ', description).strip()
-    
+
     # If description is too long or contains artifacts, truncate/clean
     if len(description) > 200:
         description = description[:200] + "..."

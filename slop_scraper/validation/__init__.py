@@ -8,7 +8,9 @@ from .options_validator import (
     ValidationLevel,
     EngineType,
     validate_launch_option,
-    get_recommended_options
+    get_recommended_options,
+    is_valid_launch_option,
+    clean_option_description
 )
 
 __all__ = [
@@ -16,5 +18,7 @@ __all__ = [
     'ValidationLevel', 
     'EngineType',
     'validate_launch_option',
-    'get_recommended_options'
+    'get_recommended_options',
+    'is_valid_launch_option',
+    'clean_option_description'
 ]

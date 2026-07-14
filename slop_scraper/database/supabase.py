@@ -538,6 +538,23 @@ def _is_meaningful_option(option: dict) -> bool:
     """Return True if an option is substantive enough to store."""
     return option.get('source', '') not in _LOW_QUALITY_SOURCES
 
+def _passes_save_gate(option: dict) -> bool:
+    """
+    Final validation gate — every option from every source must pass before
+    the database is touched. Rejects the junk classes found in the 2026-07
+    production cleanup (WINEPREFIX paths, placeholder fragments, prose words
+    scraped as flags, trailing punctuation).
+    """
+    try:
+        from ..validation import is_valid_launch_option
+    except ImportError:
+        from validation import is_valid_launch_option
+
+    is_valid, reason = is_valid_launch_option(option.get('command', ''))
+    if not is_valid:
+        print(f"🚫 Save gate rejected '{option.get('command', '')}': {reason}")
+    return is_valid
+
 def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     """
     Return the id for a launch option, inserting it only if it doesn't exist.
@@ -561,11 +578,18 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     except Exception:
         pass
 
-    # 2. Not found — insert the new option
+    # 2. Not found — insert the new option.
+    # Descriptions are cleaned at this final boundary: wiki markup is cut,
+    # dangling fragments dropped. None is preferred over a polluted string.
+    try:
+        from ..validation import clean_option_description
+    except ImportError:
+        from validation import clean_option_description
+
     try:
         insert_res = supabase.table("launch_options").insert({
             "command": command,
-            "description": option.get('description', ''),
+            "description": clean_option_description(option.get('description', '')),
             "source": option.get('source', 'Unknown'),
             "verified": option.get('verified', False)
         }).execute()
@@ -601,8 +625,9 @@ def save_to_database(game, options, supabase):
     """
     import time
 
-    # Quality gate — skip games with no meaningful options
-    meaningful = [o for o in options if _is_meaningful_option(o)]
+    # Quality gate — skip games with no meaningful options.
+    # The save gate is the last line of defense against scraped junk.
+    meaningful = [o for o in options if _is_meaningful_option(o) and _passes_save_gate(o)]
     if not meaningful:
         print(f"ℹ️ Skipping {game['name']} — no meaningful options to save")
         return
