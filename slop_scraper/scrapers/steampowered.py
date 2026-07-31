@@ -2,6 +2,7 @@
 Steam Game List Fetcher with Efficient Filtering
 """
 
+import os
 import requests
 import time
 import re
@@ -142,7 +143,16 @@ def _get_unprocessed_games_from_db(db_client, limit, skip_app_ids, debug=False):
         return []
 
 def fetch_steam_app_list(rate_limiter, session_monitor, debug):
-    """Fetch the complete Steam app list, trying multiple known endpoints."""
+    """
+    Fetch a Steam app list for new-game discovery.
+
+    Valve deprecated the keyless ISteamApps/GetAppList endpoints (404 since
+    mid-2026), so the chain is:
+      1. Legacy endpoints (cheap to try in case they come back)
+      2. IStoreService/GetAppList — official replacement, needs STEAM_API_KEY
+      3. SteamSpy — keyless, ordered by owner count, so the most-played games
+         (the ones people actually search launch options for) come first
+    """
     candidate_urls = [
         "https://api.steampowered.com/ISteamApps/GetAppList/v2/",
         "https://api.steampowered.com/ISteamApps/GetAppList/v0002/",
@@ -179,8 +189,163 @@ def fetch_steam_app_list(rate_limiter, session_monitor, debug):
             print(f"⚠️ Error fetching Steam app list from {url}: {e}")
             continue
 
+    apps = _fetch_applist_istoreservice(rate_limiter, session_monitor, debug)
+    if apps:
+        return apps
+
+    apps = _fetch_applist_steamspy(rate_limiter, session_monitor, debug)
+    if apps:
+        return apps
+
     print("❌ All Steam app list endpoints failed")
     return []
+
+
+def _fetch_applist_istoreservice(rate_limiter, session_monitor, debug):
+    """Official GetAppList replacement — requires a (free) Steam Web API key."""
+    api_key = os.getenv('STEAM_API_KEY')
+    if not api_key:
+        if debug:
+            print("ℹ️ STEAM_API_KEY not set — skipping IStoreService (get a free key at steamcommunity.com/dev/apikey)")
+        return []
+
+    apps = []
+    last_appid = 0
+    try:
+        # Paginate; cap pages defensively
+        for _ in range(10):
+            if rate_limiter:
+                rate_limiter.wait_if_needed("steam_api")
+
+            response = requests.get(
+                "https://api.steampowered.com/IStoreService/GetAppList/v1/",
+                params={
+                    "key": api_key,
+                    "include_games": "true",
+                    "include_dlc": "false",
+                    "include_software": "false",
+                    "max_results": 50000,
+                    "last_appid": last_appid,
+                },
+                timeout=30
+            )
+            if session_monitor:
+                session_monitor.record_request()
+
+            if response.status_code != 200:
+                if debug:
+                    print(f"⚠️ IStoreService returned {response.status_code}")
+                break
+
+            payload = response.json().get('response', {})
+            batch = payload.get('apps', [])
+            apps.extend({'appid': a['appid'], 'name': a.get('name', '')} for a in batch)
+
+            if not payload.get('have_more_results'):
+                break
+            last_appid = payload.get('last_appid', 0)
+
+        if apps:
+            print(f"📊 Retrieved {len(apps)} apps from IStoreService")
+        return apps
+
+    except Exception as e:
+        print(f"⚠️ IStoreService app list failed: {e}")
+        return apps
+
+
+# SteamSpy's "all" request is paginated: each page is a STATIC, fixed slice
+# of ~1000 games (page 0 is always the same top-1000-by-owners, page 1 the
+# next 1000, etc. — confirmed zero overlap between consecutive pages).
+# Pages 0-86 return data (~87,000 games total); page 87+ is empty.
+# Fetching only page 0 every run meant discovery permanently dried up once
+# those 1000 games were absorbed into the database. A persisted cursor
+# advances through the catalog on each run instead, wrapping around after
+# the last page so the scraper never runs out of games to consider.
+STEAMSPY_MAX_PAGE = 86
+STEAMSPY_PAGES_PER_RUN = 3  # ~3000 apps/run is plenty of new-candidate headroom
+
+STEAMSPY_CURSOR_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    'steamspy_page_cursor.json'
+)
+
+
+def _load_steamspy_cursor():
+    import json
+    try:
+        if os.path.exists(STEAMSPY_CURSOR_FILE):
+            with open(STEAMSPY_CURSOR_FILE) as f:
+                return json.load(f).get('next_page', 0)
+    except Exception:
+        pass
+    return 0
+
+
+def _save_steamspy_cursor(next_page):
+    import json
+    try:
+        with open(STEAMSPY_CURSOR_FILE, 'w') as f:
+            json.dump({'next_page': next_page}, f)
+    except Exception as e:
+        print(f"⚠️ Could not save SteamSpy page cursor: {e}")
+
+
+def _fetch_applist_steamspy(rate_limiter, session_monitor, debug):
+    """
+    Keyless fallback via SteamSpy, paging through the catalog across runs.
+
+    Each run fetches STEAMSPY_PAGES_PER_RUN pages starting from wherever the
+    last run left off (steamspy_page_cursor.json), then advances the cursor
+    so the next run picks up fresh pages instead of re-requesting the same
+    already-exhausted slice.
+    """
+    start_page = _load_steamspy_cursor()
+    apps = []
+    page = start_page
+
+    for i in range(STEAMSPY_PAGES_PER_RUN):
+        try:
+            if rate_limiter:
+                rate_limiter.wait_if_needed("scraping", domain="steamspy.com")
+            elif i > 0:
+                time.sleep(1)  # be polite between our own sequential page requests
+
+            response = requests.get(
+                "https://steamspy.com/api.php",
+                params={"request": "all", "page": page},
+                timeout=30
+            )
+            if session_monitor:
+                session_monitor.record_request()
+
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, dict) and data:
+                    page_apps = [
+                        {'appid': int(app_id), 'name': info.get('name', '')}
+                        for app_id, info in data.items()
+                        if isinstance(info, dict) and info.get('name')
+                    ]
+                    apps.extend(page_apps)
+                    if debug:
+                        print(f"📥 SteamSpy page {page}: {len(page_apps)} apps")
+            elif debug:
+                print(f"⚠️ SteamSpy page {page} returned {response.status_code}")
+
+        except Exception as e:
+            if debug:
+                print(f"⚠️ SteamSpy page {page} failed: {e}")
+
+        page = (page + 1) % (STEAMSPY_MAX_PAGE + 1)
+
+    _save_steamspy_cursor(page)
+
+    if apps:
+        print(f"📊 Retrieved {len(apps)} apps from SteamSpy "
+              f"(pages {start_page}-{(start_page + STEAMSPY_PAGES_PER_RUN - 1) % (STEAMSPY_MAX_PAGE + 1)}, "
+              f"next run starts at page {page})")
+    return apps
 
 def process_candidate_games(candidate_apps, limit, cache, debug, rate_limiter, session_monitor, force_refresh):
     """Process candidate games with quality filtering and metadata fetching"""
@@ -201,10 +366,11 @@ def process_candidate_games(candidate_apps, limit, cache, debug, rate_limiter, s
         'final fantasy', 'dark souls', 'witcher', 'cyberpunk'
     ]
     
-    # Sort candidates by priority
+    # Stable sort: priority keywords first, otherwise preserve source order.
+    # The app list is ordered most-owned-first (SteamSpy/IStoreService), and
+    # alphabetizing it would bury popular games behind shovelware again.
     sorted_candidates = sorted(candidate_apps, key=lambda x: (
         -any(keyword in x['name'].lower() for keyword in priority_keywords),
-        x['name'].lower()
     ))
     
     filtered_games = []

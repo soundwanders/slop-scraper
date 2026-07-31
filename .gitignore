@@ -25,6 +25,18 @@ old_scraper
 rescan_progress.json
 */rescan_progress.json
 
+# steamspy discovery page cursor
+steamspy_page_cursor.json
+*/steamspy_page_cursor.json
+
+# pcgamingwiki outage recheck tracking
+pcgw_recheck_needed.json
+*/pcgw_recheck_needed.json
+
+slop-scraper-fixes.md
+vanilla-slops-handoff.md
+backfill_tracking.json
+
 # build
 dist
 */dist
