@@ -54,6 +54,10 @@ def setup_argument_parser():
                             'new options are added, existing data is never overwritten')
     parser.add_argument('--rescan-reset', action='store_true',
                        help='Clear rescan progress tracking and start the rescan campaign over')
+    parser.add_argument('--pcgw-recheck', action='store_true',
+                       help='Re-scan only games whose PCGamingWiki result was inconclusive due to '
+                            'a site outage (tracked in pcgw_recheck_needed.json); use once PCGamingWiki '
+                            'is back up to recover data missed during the outage')
     parser.add_argument('--debug', action='store_true',
                        help='Enable debug output including database stats')
     
@@ -322,8 +326,17 @@ def main():
             sys.exit(1)
         print("🔁 Rescan mode: re-processing existing database games, thinnest option counts first")
 
+    if args.pcgw_recheck:
+        if args.test:
+            print("❌ --pcgw-recheck requires production mode (it re-processes database games); drop --test")
+            sys.exit(1)
+        if args.rescan:
+            print("❌ --pcgw-recheck and --rescan are mutually exclusive game sources; pick one")
+            sys.exit(1)
+        print("🔎 PCGamingWiki recheck mode: re-processing only games flagged during a prior outage")
+
     # Provide guidance on skip_existing behavior
-    if not args.test and not args.skip_existing and not args.rescan:
+    if not args.test and not args.skip_existing and not args.rescan and not args.pcgw_recheck:
         print("⚠️  Warning: You're processing ALL games, including those already in the database.")
         print("   This may result in duplicate processing and longer run times.")
         print("   Consider using --skip-existing to avoid re-processing existing games.")
@@ -341,7 +354,8 @@ def main():
         force_refresh=args.force_refresh,
         debug=slops_debug,  # Pass debug flag
         skip_existing=args.skip_existing,  # Pass skip_existing flag
-        rescan=args.rescan  # Re-scan existing database games
+        rescan=args.rescan,  # Re-scan existing database games
+        pcgw_recheck=args.pcgw_recheck  # Re-scan only PCGamingWiki-outage-flagged games
     )
     
     # Only test the database connection if requested

@@ -17,7 +17,7 @@ try:
         get_database_stats  # Import stats function
     )
     from ..scrapers.steampowered import get_steam_game_list
-    from ..scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options
+    from ..scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options, pcgamingwiki_needs_recheck
     from ..scrapers.steamcommunity import fetch_steam_community_launch_options
     from ..scrapers.game_specific import fetch_game_specific_options
     from ..scrapers.protondb import fetch_protondb_launch_options
@@ -39,7 +39,7 @@ except ImportError:
         get_database_stats 
     )
     from scrapers.steampowered import get_steam_game_list
-    from scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options
+    from scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options, pcgamingwiki_needs_recheck
     from scrapers.steamcommunity import fetch_steam_community_launch_options
     from scrapers.game_specific import fetch_game_specific_options
     from scrapers.protondb import fetch_protondb_launch_options
@@ -48,16 +48,22 @@ except ImportError:
 
 # Anchored to the project root (parent of the package) so the same progress
 # file is used no matter which directory the scraper is launched from.
-RESCAN_PROGRESS_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    'rescan_progress.json'
-)
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+RESCAN_PROGRESS_FILE = os.path.join(_PROJECT_ROOT, 'rescan_progress.json')
+
+# Games saved while PCGamingWiki returned an inconclusive empty result (site
+# outage/circuit breaker, not a confirmed "no options on wiki"). skip_existing
+# and the rescan progress file would otherwise never revisit these games, so
+# their PCGamingWiki data would be silently lost for good once the site
+# recovers. Tracked separately so `--pcgw-recheck` can target exactly these.
+PCGW_RECHECK_FILE = os.path.join(_PROJECT_ROOT, 'pcgw_recheck_needed.json')
 
 class SlopScraper:
     def __init__(self, test_mode=False, cache_file='appdetails_cache.json',
                  rate_limit=None, force_refresh=False, max_games=100,
                  output_dir="./test-output", debug=False, skip_existing=True,
-                 rescan=False):
+                 rescan=False, pcgw_recheck=False):
         
         # Add validation statistics tracking
         self.validation_stats = {
@@ -83,6 +89,7 @@ class SlopScraper:
         self.skip_existing = skip_existing  # Store skip_existing setting
         self.db_client = None  # Database client wrapper
         self.rescan = rescan  # Re-scan games already in the database
+        self.pcgw_recheck = pcgw_recheck  # Re-scan only games flagged for a PCGamingWiki recheck
 
         # Security monitoring and rate limiting
         self.session_monitor = SessionMonitor()
@@ -278,6 +285,103 @@ class SlopScraper:
 
         return games
 
+    # ---------- PCGamingWiki recheck support ----------
+    # A game whose PCGamingWiki result was inconclusive (site outage) gets
+    # flagged here at save time. `--pcgw-recheck` targets exactly these games
+    # later, instead of a blind full rescan, once the site is back up.
+
+    def _load_pcgw_recheck(self):
+        """Return {app_id: title} for games flagged for a PCGamingWiki recheck."""
+        import json
+        try:
+            if os.path.exists(PCGW_RECHECK_FILE):
+                with open(PCGW_RECHECK_FILE) as f:
+                    data = json.load(f)
+                return {int(k): v.get('title', '') for k, v in data.items()}
+        except Exception as e:
+            print(f"⚠️ Could not read {PCGW_RECHECK_FILE}: {e}")
+        return {}
+
+    def _flag_pcgw_recheck(self, app_id, title):
+        """Record a game whose PCGamingWiki result could not be trusted this run."""
+        import json
+        from datetime import datetime
+        try:
+            data = {}
+            if os.path.exists(PCGW_RECHECK_FILE):
+                with open(PCGW_RECHECK_FILE) as f:
+                    data = json.load(f)
+            data[str(app_id)] = {
+                'title': title,
+                'flagged_at': datetime.now().isoformat(timespec='seconds')
+            }
+            with open(PCGW_RECHECK_FILE, 'w') as f:
+                json.dump(data, f, indent=1)
+        except Exception as e:
+            print(f"⚠️ Could not update {PCGW_RECHECK_FILE}: {e}")
+
+    def _clear_pcgw_recheck(self, app_id):
+        """Remove a game once PCGamingWiki has given it a confident answer."""
+        import json
+        try:
+            if not os.path.exists(PCGW_RECHECK_FILE):
+                return
+            with open(PCGW_RECHECK_FILE) as f:
+                data = json.load(f)
+            if str(app_id) in data:
+                del data[str(app_id)]
+                with open(PCGW_RECHECK_FILE, 'w') as f:
+                    json.dump(data, f, indent=1)
+        except Exception as e:
+            print(f"⚠️ Could not update {PCGW_RECHECK_FILE}: {e}")
+
+    def _get_pcgw_recheck_games(self):
+        """
+        Pull games flagged for a PCGamingWiki recheck, capped at max_games.
+
+        These are games that were saved to the database while PCGamingWiki
+        was unreachable — their empty PCGamingWiki result is unconfirmed, not
+        a verified "no options on the wiki". Metadata comes from the games
+        table since these games are already fully scraped by every other source.
+        """
+        flagged = self._load_pcgw_recheck()
+        if not flagged:
+            print("✅ No games flagged for a PCGamingWiki recheck")
+            return []
+
+        if not self.supabase:
+            print("❌ PCGamingWiki recheck requires a database connection")
+            return []
+
+        app_ids = list(flagged.keys())[:self.max_games]
+
+        try:
+            response = (
+                self.supabase.table("games")
+                .select("app_id, title, developer, publisher, release_date, engine")
+                .in_("app_id", app_ids)
+                .execute()
+            )
+        except Exception as e:
+            print(f"⚠️ PCGamingWiki recheck query failed: {e}")
+            return []
+
+        games = [
+            {
+                'appid': row['app_id'],
+                'name': row['title'],
+                'developer': row.get('developer') or '',
+                'publisher': row.get('publisher') or '',
+                'release_date': row.get('release_date') or '',
+                'engine': row.get('engine') or 'Unknown',
+            }
+            for row in (response.data or [])
+        ]
+
+        print(f"🔎 PCGamingWiki recheck: {len(flagged)} games flagged, "
+              f"processing {len(games)} this run")
+        return games
+
     def show_database_stats(self):  # Method to show database statistics
         """Show comprehensive database statistics"""
         if self.test_mode:
@@ -330,7 +434,9 @@ class SlopScraper:
             # Get list of games (limited by max_games) with database checking.
             # Rescan mode re-processes games already in the DB instead of
             # discovering new ones — options are added, never overwritten.
-            if self.rescan:
+            if self.pcgw_recheck:
+                games = self._get_pcgw_recheck_games()
+            elif self.rescan:
                 games = self._get_rescan_games()
             else:
                 games = get_steam_game_list(
@@ -443,14 +549,26 @@ class SlopScraper:
                             timing_info = f" ({elapsed:.1f}s)"
                         else:
                             timing_info = ""
-                        
+
+                        # An empty result during an outage isn't a confirmed
+                        # "no options" — flag the game so --pcgw-recheck can
+                        # retarget it once PCGamingWiki is back up. A confident
+                        # result (whether or not options were found) clears
+                        # any prior flag for this game.
+                        if not self.test_mode:
+                            if pcgamingwiki_needs_recheck():
+                                self._flag_pcgw_recheck(app_id, title)
+                                game_pbar.write(f"  ⚠️ PCGamingWiki result unconfirmed (site outage) — flagged for recheck")
+                            else:
+                                self._clear_pcgw_recheck(app_id)
+
                         if pcgaming_options:
                             scraper_stats['scraper_success_rates']['PCGamingWiki']['success'] += 1
                             source_options['PCGamingWiki'] = pcgaming_options
                             all_options.extend(pcgaming_options)
-                        
+
                         game_pbar.write(f"  ✅ PCGamingWiki: {len(pcgaming_options)} options found{timing_info}")
-                        
+
                     except Exception as e:
                         game_pbar.write(f"  ❌ PCGamingWiki: Error - {e}")
 

@@ -13,6 +13,48 @@ except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from validation import LaunchOptionsValidator, ValidationLevel, EngineType
 
+# Circuit breaker for PCGamingWiki outages. Observed 2026-07: the site's
+# frontend responds instantly but api.php can go fully unresponsive (TLS
+# handshake completes, zero bytes ever received) for extended periods. Without
+# this, every game in a run pays the full ~15s+10s*variations timeout chain
+# (~70s observed) for a source that's going to return nothing anyway. Two
+# consecutive network-level failures (timeouts/connection errors — NOT
+# legitimate "page not found" results) opens the circuit for a cooldown.
+_CIRCUIT_FAILURE_THRESHOLD = 2
+_CIRCUIT_COOLDOWN_SECONDS = 120
+_circuit_state = {'consecutive_failures': 0, 'open_until': 0.0}
+
+
+def _circuit_is_open():
+    return time.time() < _circuit_state['open_until']
+
+
+def _record_network_failure():
+    _circuit_state['consecutive_failures'] += 1
+    if _circuit_state['consecutive_failures'] >= _CIRCUIT_FAILURE_THRESHOLD:
+        _circuit_state['open_until'] = time.time() + _CIRCUIT_COOLDOWN_SECONDS
+
+
+def _record_network_success():
+    _circuit_state['consecutive_failures'] = 0
+    _circuit_state['open_until'] = 0.0
+
+
+# Tracks whether the MOST RECENT fetch_pcgamingwiki_launch_options call could
+# not reach a confident answer (site was down for all or part of the lookup),
+# as opposed to a genuine "queried successfully, found nothing". Callers that
+# save an empty result to the database should check this immediately after
+# calling and record the game for a later recheck rather than treating the
+# empty list as confirmed. Safe as module state because games are processed
+# one at a time, sequentially, in the scraper's main loop.
+_last_call_needs_recheck = False
+
+
+def pcgamingwiki_needs_recheck():
+    """True if the last call's empty/partial result may be an outage artifact."""
+    return _last_call_needs_recheck
+
+
 def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, debug=False,
                                     test_results=None, test_mode=False, rate_limiter=None,
                                     session_monitor=None):
@@ -25,10 +67,21 @@ def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, 
       3. Full-text search over title variations (including the original title)
     """
 
+    global _last_call_needs_recheck
+    _last_call_needs_recheck = False
+
     # Security validation
     if not game_title or len(game_title) > 200:
         if debug:
             print("⚠️ Invalid game title for PCGamingWiki lookup")
+        return []
+
+    if _circuit_is_open():
+        if debug:
+            remaining = _circuit_state['open_until'] - time.time()
+            print(f"🔍 PCGamingWiki API: Circuit open (site unresponsive), "
+                  f"skipping for {remaining:.0f}s more")
+        _last_call_needs_recheck = True
         return []
 
     if rate_limiter:
@@ -85,22 +138,30 @@ def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, 
                 test_results['options_by_source'][source] = 0
             test_results['options_by_source'][source] += len(options)
         
+        # An empty result while the circuit is now open (it may have tripped
+        # partway through this very call) means we never got a confident
+        # answer — don't let it look like a confirmed "no options on wiki".
+        if not options and _circuit_is_open():
+            _last_call_needs_recheck = True
+
         if debug:
             print(f"🔍 PCGamingWiki API: Final result: {len(options)} validated options found")
             for opt in options[:3]:
                 print(f"🔍 PCGamingWiki API:   {opt['command']}: {opt['description'][:40]}...")
-        
+
         return options
-        
+
     except Exception as e:
         if session_monitor:
             session_monitor.record_error()
-        
+
+        _last_call_needs_recheck = True
+
         if debug:
             print(f"🔍 PCGamingWiki API: Error for '{game_title}': {e}")
         else:
             print(f"🔍 PCGamingWiki API: Error for '{game_title}': {e}")
-        
+
         return []
 
 def _cargo_find_page(where_clause, debug=False, session_monitor=None):
@@ -118,6 +179,9 @@ def _cargo_find_page(where_clause, debug=False, session_monitor=None):
             },
             timeout=15
         )
+        # A response was received at all — the network path works, whatever
+        # the status code. Reset the circuit breaker.
+        _record_network_success()
 
         if session_monitor:
             session_monitor.record_request()
@@ -136,6 +200,13 @@ def _cargo_find_page(where_clause, debug=False, session_monitor=None):
             print(f"🔍 PCGamingWiki API: Found page '{page_info.get('Page')}' (ID: {page_info.get('PageID')})")
         return page_info.get("PageID")
 
+    except requests.exceptions.RequestException as e:
+        # Timeout / connection error — the site itself is unreachable, not
+        # just this particular query. Feeds the circuit breaker.
+        _record_network_failure()
+        if debug:
+            print(f"🔍 PCGamingWiki API: Cargo query network error: {e}")
+        return None
     except Exception as e:
         if debug:
             print(f"🔍 PCGamingWiki API: Cargo query error: {e}")
@@ -535,6 +606,14 @@ def try_alternative_search(game_title, debug=False):
         if not variation:
             continue
 
+        # Stop trying further variations the moment the circuit opens mid-loop
+        # (e.g. this variation just timed out) — no point paying 10s each for
+        # remaining variations when the site has gone unresponsive.
+        if _circuit_is_open():
+            if debug:
+                print(f"🔍 PCGamingWiki API: Circuit open, abandoning remaining variations")
+            break
+
         try:
             if debug:
                 print(f"🔍 PCGamingWiki API: Searching variation: '{variation}'")
@@ -548,6 +627,7 @@ def try_alternative_search(game_title, debug=False):
             }
 
             response = requests.get(search_url, params=search_params, timeout=10)
+            _record_network_success()
 
             if response.status_code == 200:
                 search_data = response.json()
@@ -568,6 +648,10 @@ def try_alternative_search(game_title, debug=False):
                                 options.extend(alt_options)
                                 break  # Stop at first variation that yields results
 
+        except requests.exceptions.RequestException as e:
+            _record_network_failure()
+            if debug:
+                print(f"🔍 PCGamingWiki API: Variation search network error for '{variation}': {e}")
         except Exception as e:
             if debug:
                 print(f"🔍 PCGamingWiki API: Variation search error for '{variation}': {e}")

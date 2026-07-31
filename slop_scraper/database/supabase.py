@@ -581,34 +581,62 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     # 2. Not found — insert the new option.
     # Descriptions are cleaned at this final boundary: wiki markup is cut,
     # dangling fragments dropped. None is preferred over a polluted string.
+    # Risk/category/engine metadata is computed here too — a pure function of
+    # the command and source, so every option gets tagged going forward with
+    # no extra scraping (see migrations/001_add_launch_option_metadata.sql
+    # and validation/metadata_tagging.py).
     try:
-        from ..validation import clean_option_description
+        from ..validation import clean_option_description, classify_option_metadata
     except ImportError:
-        from validation import clean_option_description
+        from validation import clean_option_description, classify_option_metadata
+
+    source = option.get('source', 'Unknown')
+    metadata = classify_option_metadata(command, source=source)
+
+    base_fields = {
+        "command": command,
+        "description": clean_option_description(option.get('description', '')),
+        "source": source,
+        "verified": option.get('verified', False)
+    }
 
     try:
         insert_res = supabase.table("launch_options").insert({
-            "command": command,
-            "description": clean_option_description(option.get('description', '')),
-            "source": option.get('source', 'Unknown'),
-            "verified": option.get('verified', False)
+            **base_fields,
+            "risk_level": metadata['risk_level'],
+            "categories": metadata['categories'],
+            "engine_compatibility": metadata['engine_compatibility']
         }).execute()
 
         if insert_res.data:
             return insert_res.data[0]['id']
-    except Exception:
-        # Race condition: another process inserted between our select and insert.
-        # Try the select one more time.
-        try:
-            retry = supabase.table("launch_options") \
-                .select("id") \
-                .eq("command", command) \
-                .limit(1) \
-                .execute()
-            if retry.data:
-                return retry.data[0]['id']
-        except Exception:
-            pass
+    except Exception as e:
+        # If migrations/001_add_launch_option_metadata.sql hasn't been run yet,
+        # these columns don't exist and every insert would otherwise fail —
+        # fall back to the legacy shape rather than breaking scraping entirely.
+        error_text = str(e).lower()
+        if 'risk_level' in error_text or 'categories' in error_text or 'engine_compatibility' in error_text:
+            print("⚠️ launch_options metadata columns not found — run "
+                  "migrations/001_add_launch_option_metadata.sql; inserting without them for now")
+            try:
+                insert_res = supabase.table("launch_options").insert(base_fields).execute()
+                if insert_res.data:
+                    return insert_res.data[0]['id']
+            except Exception:
+                pass
+        else:
+            # Race condition: another process inserted between our select and insert.
+            # Try the select one more time.
+            try:
+                retry = supabase.table("launch_options") \
+                    .select("id") \
+                    .eq("command", command) \
+                    .limit(1) \
+                    .execute()
+                if retry.data:
+                    return retry.data[0]['id']
+            except Exception:
+                pass
 
     return None
 

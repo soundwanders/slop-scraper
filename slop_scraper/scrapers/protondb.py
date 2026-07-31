@@ -7,12 +7,14 @@ try:
     # Try relative imports first (when run as module)
     from ..utils.security_config import SecureRequestHandler
     from ..validation import LaunchOptionsValidator, ValidationLevel, EngineType
+    from ..validation.metadata_tagging import PROTON_WINE_DESCRIPTIONS, ENV_VAR_BLOCKLIST
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from utils.security_config import SecureRequestHandler
     from validation import LaunchOptionsValidator, ValidationLevel, EngineType
+    from validation.metadata_tagging import PROTON_WINE_DESCRIPTIONS, ENV_VAR_BLOCKLIST
 
 def fetch_protondb_launch_options(app_id, game_title=None, rate_limit=None, debug=False, 
                                  test_results=None, test_mode=False, rate_limiter=None, 
@@ -186,7 +188,7 @@ def validate_protondb_option(command: str, debug: bool = False) -> bool:
     
     # Setup-only env vars (WINEPREFIX=...) are terminal commands, never
     # launch options — reject before the permissive patterns can accept them
-    if '=' in command and command.split('=', 1)[0] in _ENV_VAR_BLOCKLIST:
+    if '=' in command and command.split('=', 1)[0] in ENV_VAR_BLOCKLIST:
         if debug:
             print(f"🔍 ProtonDB: Rejected '{command}' - setup-only environment variable")
         return False
@@ -219,38 +221,6 @@ def validate_protondb_option(command: str, debug: bool = False) -> bool:
         print(f"🔍 ProtonDB: Rejected '{command}' - {reason}")
     
     return is_valid
-
-# Curated descriptions for the common Proton/Wine environment variables.
-# Keyed by variable NAME — any value maps to the name's description.
-# Report notes are anecdotal prose; scraping description text out of them
-# produced truncated fragments in production. A static table is accurate
-# and clean; unknown vars get a clean generic instead of a fragment.
-PROTON_WINE_DESCRIPTIONS = {
-    'PROTON_NO_ESYNC': 'Disable eventfd-based synchronization (fixes hangs in some games)',
-    'PROTON_NO_FSYNC': 'Disable futex-based synchronization',
-    'PROTON_USE_WINED3D': 'Use OpenGL-based WineD3D instead of Vulkan-based DXVK',
-    'PROTON_USE_D9VK': 'Translate Direct3D 9 to Vulkan for better performance (D9VK)',
-    'PROTON_NO_D3D11': 'Disable Direct3D 11 support (forces older rendering path)',
-    'PROTON_NO_D3D10': 'Disable Direct3D 10 support',
-    'PROTON_FORCE_LARGE_ADDRESS_AWARE': 'Let 32-bit games use up to 4GB of RAM',
-    'PROTON_ENABLE_NVAPI': 'Enable NVIDIA NVAPI support (DLSS and related features)',
-    'PROTON_HIDE_NVIDIA_GPU': 'Hide NVIDIA GPU identity from the game',
-    'PROTON_USE_SECCOMP': 'Enable seccomp-bpf filter (legacy Proton versions)',
-    'DXVK_HUD': 'Show the DXVK performance HUD overlay (e.g. DXVK_HUD=fps)',
-    'DXVK_ASYNC': 'Compile shaders asynchronously to reduce stutter (dxvk-async builds)',
-    'DXVK_FRAME_RATE': 'Cap the frame rate at the DXVK level',
-    'VKD3D_CONFIG': 'VKD3D-Proton (DirectX 12) configuration flags',
-    'WINEDLLOVERRIDES': 'Override how Wine loads specific Windows DLLs',
-    'WINEARCH': 'Set the Wine architecture (win64 or win32)',
-    'WINEESYNC': 'Toggle eventfd-based synchronization in Wine',
-    'WINEFSYNC': 'Toggle futex-based synchronization in Wine',
-    'MANGOHUD': 'Enable the MangoHud performance overlay',
-    'PULSE_LATENCY_MSEC': 'Set PulseAudio latency in ms (fixes crackling audio)',
-}
-
-# Environment variables that are terminal setup commands, never launch options
-_ENV_VAR_BLOCKLIST = {'WINEPREFIX', 'WINESERVER', 'WINELOADER', 'WINEDEBUG'}
-
 
 def extract_options_from_reports(reports, debug=False):
     """
@@ -300,7 +270,7 @@ def extract_options_from_reports(reports, debug=False):
 
         for m in env_var_pattern.finditer(text):
             var_name = m.group(1)
-            if var_name in _ENV_VAR_BLOCKLIST:
+            if var_name in ENV_VAR_BLOCKLIST:
                 continue
             _record(m.group(0), high_signal=True)
 
