@@ -6,6 +6,7 @@ import os
 import requests
 import time
 import re
+import unicodedata
 from tqdm import tqdm
 
 try:
@@ -347,17 +348,47 @@ def _fetch_applist_steamspy(rate_limiter, session_monitor, debug):
               f"next run starts at page {page})")
     return apps
 
+# Scripts that indicate a genuinely non-Latin title (Vanilla Slops is an
+# English-language site). Deliberately narrow: symbols/punctuation/accented
+# Latin are NOT included, so legitimate Western titles using (R)/(TM) or
+# accented characters (Nancy Drew(R), Cesar, etc.) are never rejected. An
+# earlier version of this check used `[^\x00-\x7F]` (any non-ASCII byte),
+# which would have wrongly flagged ~15% of the real catalog on trademark
+# symbols alone — see slop-scraper issue: '救済の日' slipped through instead,
+# because that check only ran on the pre-fetch discovery name, not the
+# final officially-fetched Steam name that actually gets saved.
+_NON_LATIN_SCRIPT_MARKERS = (
+    'CJK', 'HIRAGANA', 'KATAKANA', 'HANGUL', 'CYRILLIC', 'ARABIC',
+    'HEBREW', 'THAI', 'DEVANAGARI', 'GREEK'
+)
+
+
+def _has_non_latin_script(title):
+    """True if the title contains characters from a non-Latin script."""
+    if not title:
+        return False
+    for ch in title:
+        if ord(ch) < 128:
+            continue
+        try:
+            char_name = unicodedata.name(ch)
+        except ValueError:
+            continue
+        if any(marker in char_name for marker in _NON_LATIN_SCRIPT_MARKERS):
+            return True
+    return False
+
+
 def process_candidate_games(candidate_apps, limit, cache, debug, rate_limiter, session_monitor, force_refresh):
     """Process candidate games with quality filtering and metadata fetching"""
-    
+
     # Quality filtering patterns
     blocklist_terms = [
-        'dlc', 'soundtrack', 'beta', 'demo', 'test', 'adult', 'hentai', 
+        'dlc', 'soundtrack', 'beta', 'demo', 'test', 'adult', 'hentai',
         'xxx', 'mature', 'expansion', 'tool', 'software'
     ]
-    
+
     blocklist_pattern = re.compile(r'(?i)(' + '|'.join(re.escape(term) for term in blocklist_terms) + ')')
-    non_latin_pattern = re.compile(r'[^\x00-\x7F]')
     only_numeric_special = re.compile(r'^[0-9\s\-_+=.,!@#$%^&*()\[\]{}|\\/<>?;:\'"`~]*$')
     
     # High-priority games to process first
@@ -389,9 +420,9 @@ def process_candidate_games(candidate_apps, limit, cache, debug, rate_limiter, s
             if not name or len(name) < 3 or len(name) > 100:
                 continue
                 
-            if (blocklist_pattern.search(name) or 
-                non_latin_pattern.search(name) or 
-                only_numeric_special.match(name)):
+            if (blocklist_pattern.search(name) or
+                    _has_non_latin_script(name) or
+                    only_numeric_special.match(name)):
                 continue
             
             # Fetch detailed metadata
@@ -462,17 +493,30 @@ def fetch_game_metadata(app_id, name, cache, debug, rate_limiter, session_monito
         return None
     if store_data.get("release_date", {}).get("coming_soon", False):
         return None
-    
+
+    official_name = store_data.get("name", name)
+
+    # Authoritative non-Latin-script check: the pre-fetch filter in
+    # process_candidate_games only sees the discovery source's name, which
+    # can differ from Steam's own official name (e.g. a blank/placeholder
+    # name from a bulk listing vs. the real title once we ask Steam
+    # directly). This check runs on the name that actually gets saved, so
+    # it can't be bypassed by a source/official name mismatch.
+    if _has_non_latin_script(official_name):
+        if debug:
+            print(f"⚠️ Rejecting non-Latin-script title: {official_name!r} ({app_id})")
+        return None
+
     # Extract complete metadata
     enriched_game = {
         "appid": app_id,
-        "name": store_data.get("name", name),
+        "name": official_name,
         "developer": extract_developer_safely(store_data),
         "publisher": extract_publisher_safely(store_data),
         "release_date": normalize_release_date(extract_release_date_safely(store_data)),
         "engine": extract_engine_safely(store_data, app_id)
     }
-    
+
     return enriched_game
 
 def get_test_games(limit, skip_app_ids, cache, debug, rate_limiter, session_monitor):
