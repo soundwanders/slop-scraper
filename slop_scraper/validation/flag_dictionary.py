@@ -86,8 +86,9 @@ FLAG_DICTIONARY = {
         'effect': 'Forces the Vulkan rendering backend instead of DirectX or OpenGL. '
                   'Only has an effect in engines with a Vulkan path; ignored elsewhere.',
         'usage_example': '-vulkan',
-        'authority': 'Valve — Source 2 Vulkan support (Dota 2, CS2, Half-Life: Alyx)',
-        'scope': 'Source 2 and id Tech 6/7 only',
+        'authority': 'Valve — Source 2 Vulkan support (Dota 2, CS2, Half-Life: Alyx); '
+                     'Unreal Engine 4 Vulkan RHI',
+        'scope': 'only engines with a Vulkan backend — Source 2, id Tech 6/7, UE4',
     },
     '-nostartupmovies': {
         'description': 'Skip the startup movies',

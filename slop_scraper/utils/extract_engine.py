@@ -41,20 +41,30 @@ class EngineDetector:
             ],
             
             'Creation Engine': [
-                # Bethesda games
-                'bethesda', 'elder scrolls', 'skyrim', 'fallout', 'starfield',
+                # 'bethesda' removed: Bethesda Softworks publishes id Tech
+                # games (Quake, Wolfenstein) and others, so the publisher name
+                # actively mislabels them.
+                'elder scrolls', 'skyrim', 'fallout', 'starfield',
                 'creation engine', 'gamebryo'
             ],
             
             'Frostbite Engine': [
-                # EA/DICE games
-                'electronic arts', 'ea games', 'dice', 'frostbite',
+                # Publisher names are NOT engine evidence and were removed:
+                # 'electronic arts' and 'ea games' labelled every EA-published
+                # title Frostbite regardless of engine (PopCap's Chuzzle Deluxe,
+                # Plants vs. Zombies). 'dice' was worse still — it matched any
+                # description mentioning dice.
+                'frostbite',
                 'battlefield', 'fifa', 'need for speed', 'mass effect andromeda'
             ],
             
             'id Tech': [
-                # id Software
-                'id software', 'id tech', 'doom', 'quake', 'wolfenstein', 'rage'
+                # 'rage' removed: as a bare word it is a common noun, and it
+                # matched game descriptions rather than the RAGE franchise.
+                # 'id software' is a publisher/developer signal, kept because it
+                # is unambiguous, unlike 'electronic arts' which publishes
+                # across many engines.
+                'id software', 'id tech', 'doom', 'quake', 'wolfenstein'
             ],
             
             'CryEngine': [
@@ -139,23 +149,65 @@ class EngineDetector:
         
         return 'Unknown'
     
+    # Patterns that actually name an engine. Only these may be matched against
+    # free-form store prose; a franchise or studio name appearing in a
+    # description ("inspired by DOOM", "roll the dice") says nothing about what
+    # the game is built on.
+    # Deliberately excludes engine names that are also ordinary English:
+    # bare 'unity' ("a sense of unity"), bare 'unreal' ("an unreal
+    # experience"), and 'game maker' ("every game maker dreams of this") all
+    # appear in normal marketing copy. Their unambiguous forms are kept, so a
+    # description saying "made with Unity" or "GameMaker" still resolves.
+    _ENGINE_NAME_PATTERNS = {
+        'unity3d', 'unityengine', 'made with unity', 'unity player',
+        'unreal engine', 'unrealengine',
+        'source engine', 'source 2',
+        'creation engine', 'gamebryo',
+        'frostbite',
+        'id tech',
+        'cryengine', 'cry engine',
+        'gamemaker',
+        'godot engine',
+        'rpg maker', 'rpgmaker',
+        'construct 2', 'construct 3',
+        'adobe flash', 'adobe air', 'macromedia flash',
+    }
+
     def _extract_direct_engine(self, game_info: Dict) -> str:
-        """Extract engine if directly provided by Steam API"""
-        # Check various fields where engine might be mentioned
-        fields_to_check = [
-            'engine', 'game_engine', 'technology',
-            'detailed_description', 'about_the_game'
-        ]
-        
-        for field in fields_to_check:
+        """
+        Extract the engine when a Steam field states it outright.
+
+        This runs before every other method, so a loose match here overrides
+        all the more careful ones. It used to substring-match every pattern —
+        including franchise and studio names — against the full store
+        description, which is how a blurb mentioning dice produced "Frostbite"
+        and one mentioning doom produced "id Tech".
+
+        Now: explicit engine fields may match any pattern, but free-form prose
+        may only match a string that actually names an engine, and always on
+        word boundaries.
+        """
+        explicit_fields = ('engine', 'game_engine', 'technology')
+        prose_fields = ('detailed_description', 'about_the_game')
+
+        def _matches(pattern, content):
+            return re.search(r'(?<![\w])' + re.escape(pattern) + r'(?![\w])', content) is not None
+
+        for field in explicit_fields:
             if field in game_info:
                 content = str(game_info[field]).lower()
-                
-                # Look for direct engine mentions
                 for engine, patterns in self.engine_patterns.items():
-                    if any(pattern in content for pattern in patterns):
+                    if any(_matches(p, content) for p in patterns):
                         return engine
-        
+
+        for field in prose_fields:
+            if field in game_info:
+                content = str(game_info[field]).lower()
+                for engine, patterns in self.engine_patterns.items():
+                    named = [p for p in patterns if p in self._ENGINE_NAME_PATTERNS]
+                    if any(_matches(p, content) for p in named):
+                        return engine
+
         return 'Unknown'
     
     def _detect_engine_by_patterns(self, game_info: Dict) -> str:
@@ -195,20 +247,37 @@ class EngineDetector:
         # Combine all text
         all_text = ' '.join(text_fields)
         
-        # Score each engine based on pattern matches
+        # Score each engine based on pattern matches.
+        #
+        # Matching is WORD-BOUNDED. Plain substring matching mislabelled a
+        # large share of the catalogue, because short patterns appear inside
+        # ordinary words: 'rage' inside "storage"/"average", 'dice' inside any
+        # description that mentions dice, 'doom' inside "doomed". That is how
+        # "It Takes Two" became GameMaker Studio and "Chuzzle Deluxe" became
+        # Frostbite.
+        #
+        # Store-page prose is also the weakest evidence available, so a match
+        # found only in the description no longer scores at all — a game whose
+        # blurb says "roll the dice" tells us nothing about its engine. Only
+        # the title and the developer/publisher fields count, and the engine
+        # name itself still counts wherever it appears.
         engine_scores = {}
+        title_text = text_fields[0] if text_fields else ''
+        attribution_text = ' '.join(text_fields[1:6])
+
         for engine, patterns in self.engine_patterns.items():
             score = 0
             for pattern in patterns:
-                if pattern in all_text:
-                    # Weight different types of matches
-                    if pattern in text_fields[0]:  # Title match
-                        score += 3
-                    elif any(pattern in dev for dev in text_fields[1:6]):  # Developer/publisher match  
-                        score += 2
-                    else:  # General match
-                        score += 1
-            
+                bounded = re.compile(r'(?<![\w])' + re.escape(pattern) + r'(?![\w])')
+                if bounded.search(title_text):
+                    score += 3
+                elif bounded.search(attribution_text):
+                    score += 2
+                elif engine.lower().split()[0] in pattern and bounded.search(all_text):
+                    # The engine's own name (e.g. "cryengine", "id tech") is
+                    # meaningful anywhere; a franchise or studio name is not.
+                    score += 1
+
             if score > 0:
                 engine_scores[engine] = score
         

@@ -196,14 +196,17 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
         'gears of war', 'mass effect', 'batman arkham', 'mortal kombat'
     ]):
         options.extend([
+            # Emitted with a concrete value: Unreal requires -ResX=<number>,
+            # and a bare '-ResX=' is rejected by the save gate as ending in
+            # punctuation, so the old form could never be stored at all.
             {
-                'command': '-ResX=',
-                'description': 'Set horizontal resolution (e.g., -ResX=1920)',
+                'command': '-ResX=1920',
+                'description': 'Set horizontal resolution (substitute your own width)',
                 'source': 'Unreal Engine'
             },
             {
-                'command': '-ResY=',
-                'description': 'Set vertical resolution (e.g., -ResY=1080)',
+                'command': '-ResY=1080',
+                'description': 'Set vertical resolution (substitute your own height)',
                 'source': 'Unreal Engine'
             },
             {
@@ -226,11 +229,14 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
                 'description': 'Force DirectX 11 renderer',
                 'source': 'Unreal Engine'
             },
-            {
-                'command': '-vulkan',
-                'description': 'Force Vulkan renderer',
-                'source': 'Unreal Engine'
-            },
+            # '-vulkan' was listed here. Unreal Engine 4 does have a Vulkan RHI,
+            # but this block is keyed on title keywords ('mass effect',
+            # 'batman arkham', 'borderlands') that overwhelmingly resolve to
+            # UE3-era games with no Vulkan path at all — it was attached to 40
+            # games, almost none of which could use it. There is no reliable
+            # UE3-vs-UE4 signal here, so it is omitted rather than guessed;
+            # PCGamingWiki and Steam Community still surface it per-game where
+            # a source actually documents it.
             {
                 'command': '-sm4',
                 'description': 'Force Shader Model 4.0',
@@ -332,9 +338,12 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
         ])
     
     # Frostbite Engine (EA games)
+    # Match the ENGINE, not the publisher. 'electronic arts' and 'ea games'
+    # used to be triggers here, which classified every EA-published game as
+    # Frostbite regardless of what it actually runs on — that is how UE3-era
+    # titles like Mass Effect (2007) ended up carrying Frostbite options.
     elif any(indicator in all_text for indicator in [
-        'electronic arts', 'ea games', 'frostbite',
-        'battlefield', 'fifa', 'need for speed', 'mass effect andromeda'
+        'frostbite', 'battlefield', 'fifa', 'need for speed', 'mass effect andromeda'
     ]):
         options.extend([
             {
@@ -342,11 +351,10 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
                 'description': 'Run in windowed mode',
                 'source': 'Frostbite Engine'
             },
-            {
-                'command': '-novid',
-                'description': 'Skip intro videos',
-                'source': 'Frostbite Engine'
-            },
+            # '-novid' was listed here and is NOT a Frostbite option — it is a
+            # Source engine flag. It was attached to 164 Frostbite games, none
+            # of which support it. Removed rather than replaced: no confirmed
+            # Frostbite equivalent could be verified.
             {
                 'command': '-dx12',
                 'description': 'Force DirectX 12 if supported',
