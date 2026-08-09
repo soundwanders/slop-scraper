@@ -109,7 +109,17 @@ def _flag_body(base: str) -> str:
     return base.lstrip('-+').lower()
 
 
-def classify_risk_level(command: str) -> str:
+# Categories curated for exactly the kind of cosmetic/client-side option
+# that's safe to promote out of the unreviewed default: window size, render
+# backend, intro-skip, and audio toggles have no meaningful side effects
+# beyond the game's own presentation. Network and Debug-Dev are deliberately
+# excluded — those can touch multiplayer integrity, dev/cheat tooling, or
+# things anti-cheat systems care about, so they stay 'experimental' pending
+# case-by-case review (see _CAUTION_EXACT / _ANTICHEAT_KEYWORDS above).
+_SAFE_CATEGORIES = {'Display', 'Performance', 'Skip-Intro', 'Audio'}
+
+
+def classify_risk_level(command: str, source: Optional[str] = None) -> str:
     """
     'safe' = known-good, no side effects.
     'caution' = can affect anti-cheat, saves, cloud-sync, or security.
@@ -147,6 +157,14 @@ def classify_risk_level(command: str) -> str:
         | _validator.game_specific_options
     )
     if base in known_safe or (base.startswith('+') and base[1:] in _validator.console_commands):
+        return 'safe'
+
+    # Not individually curated, but classify_categories already recognized it
+    # (via exact-flag or keyword match) as belonging to a well-understood,
+    # low-impact functional category — that's a real vetting signal, not a
+    # guess, so promote it rather than leaving it looking as unreviewed as a
+    # genuinely unrecognized flag.
+    if _SAFE_CATEGORIES & set(classify_categories(command, source=source)):
         return 'safe'
 
     return 'experimental'
@@ -292,7 +310,7 @@ def classify_engine_compatibility(command: str, source: Optional[str] = None) ->
 def classify_option_metadata(command: str, source: Optional[str] = None) -> dict:
     """Convenience wrapper: all three classifications for one command."""
     return {
-        'risk_level': classify_risk_level(command),
+        'risk_level': classify_risk_level(command, source=source),
         'categories': classify_categories(command, source=source),
         'engine_compatibility': classify_engine_compatibility(command, source=source),
     }

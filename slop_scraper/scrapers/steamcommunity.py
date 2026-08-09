@@ -141,9 +141,10 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                         
                         # Extract launch options with improved cleaning and validation
                         extracted_options = extract_launch_options_clean_and_validated(
-                            guide_soup, 
+                            guide_soup,
                             guide['title'],
-                            debug=debug
+                            debug=debug,
+                            guide_url=guide['url']
                         )
                         
                         if extracted_options:
@@ -285,7 +286,7 @@ def filter_relevant_guides_improved(guide_elements, min_score=1, debug=False):
     
     return relevant_guides
 
-def extract_launch_options_clean_and_validated(guide_soup, guide_title, debug=False):
+def extract_launch_options_clean_and_validated(guide_soup, guide_title, debug=False, guide_url=None):
     """
     PRODUCTION VERSION: Extract launch options with thorough cleaning and validation
     Prevents HTML artifacts while finding legitimate options
@@ -350,6 +351,10 @@ def extract_launch_options_clean_and_validated(guide_soup, guide_title, debug=Fa
 
                     if debug and extracted_options:
                         print(f"🔍 Steam Community: Found {len(extracted_options)} options in paragraph")
+
+    if guide_url:
+        for opt in options:
+            opt['source_url'] = guide_url
 
     return options
 

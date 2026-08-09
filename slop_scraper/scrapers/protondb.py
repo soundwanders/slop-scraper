@@ -146,12 +146,14 @@ def fetch_protondb_launch_options(app_id, game_title=None, rate_limit=None, debu
                 print(f"🔍 ProtonDB: Summary API returned {response.status_code}")
         
         # Remove duplicates and limit results
+        protondb_page_url = f"https://www.protondb.com/app/{app_id_int}"
         seen_commands = set()
         unique_options = []
         for option in options:
             cmd = option['command'].lower()
             if cmd not in seen_commands:
                 seen_commands.add(cmd)
+                option['source_url'] = protondb_page_url
                 unique_options.append(option)
         
         options = unique_options[:25]  # Limit total options

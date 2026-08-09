@@ -555,6 +555,55 @@ def _passes_save_gate(option: dict) -> bool:
         print(f"🚫 Save gate rejected '{option.get('command', '')}': {reason}")
     return is_valid
 
+_SCRAPED_VERIFICATION_METHODS = {
+    'PCGamingWiki': 'pcgamingwiki-scrape',
+    'ProtonDB': 'protondb-scrape',
+    'Steam Community': 'steam-community-scrape',
+    'Steam Community Guides': 'steam-community-scrape',
+}
+
+
+def _verification_method_for_source(source: str) -> str:
+    """
+    How last_verified_at was established. Live-scraped sources get their own
+    tag; manual_curation is 'manual'; everything else (game_specific.py's
+    engine-block lists, documentation-derived sources) is re-emitted from a
+    static list each run rather than freshly fetched, so 'curated' rather
+    than implying a live re-check happened.
+    """
+    if source in _SCRAPED_VERIFICATION_METHODS:
+        return _SCRAPED_VERIFICATION_METHODS[source]
+    if source == 'manual_curation':
+        return 'manual'
+    return 'curated'
+
+
+def _touch_launch_option_verification(supabase, option_id: int, option: dict, existing_source_url: Optional[str]) -> None:
+    """
+    Stamp last_verified_at/verification_method on a re-encountered option,
+    and backfill source_url if we now have one and the row didn't before.
+    Never overwrites an existing source_url — same "first curated value wins"
+    rule as description. Silently no-ops if migrations/002 hasn't been run
+    yet (columns don't exist) — this is a nice-to-have freshness signal, not
+    something that should ever break scraping.
+    """
+    import datetime
+
+    source = option.get('source', 'Unknown')
+    update_fields = {
+        "last_verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "verification_method": _verification_method_for_source(source),
+    }
+    new_source_url = option.get('source_url')
+    if new_source_url and not existing_source_url:
+        update_fields["source_url"] = new_source_url
+
+    try:
+        supabase.table("launch_options").update(update_fields).eq("id", option_id).execute()
+    except Exception:
+        pass
+
+
 def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     """
     Return the id for a launch option, inserting it only if it doesn't exist.
@@ -568,15 +617,28 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     # 1. Try to find an existing record first
     try:
         existing = supabase.table("launch_options") \
-            .select("id") \
+            .select("id, source_url") \
             .eq("command", command) \
             .limit(1) \
             .execute()
 
         if existing.data:
-            return existing.data[0]['id']
+            option_id = existing.data[0]['id']
+            _touch_launch_option_verification(supabase, option_id, option, existing.data[0].get('source_url'))
+            return option_id
     except Exception:
-        pass
+        # source_url column may not exist yet (migration 002 not run) — retry
+        # the lookup without it so re-encountering an option never breaks.
+        try:
+            existing = supabase.table("launch_options") \
+                .select("id") \
+                .eq("command", command) \
+                .limit(1) \
+                .execute()
+            if existing.data:
+                return existing.data[0]['id']
+        except Exception:
+            pass
 
     # 2. Not found — insert the new option.
     # Descriptions are cleaned at this final boundary: wiki markup is cut,
@@ -590,6 +652,8 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     except ImportError:
         from validation import clean_option_description, classify_option_metadata
 
+    import datetime
+
     source = option.get('source', 'Unknown')
     metadata = classify_option_metadata(command, source=source)
 
@@ -599,44 +663,51 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
         "source": source,
         "verified": option.get('verified', False)
     }
+    metadata_fields = {
+        "risk_level": metadata['risk_level'],
+        "categories": metadata['categories'],
+        "engine_compatibility": metadata['engine_compatibility']
+    }
+    verification_fields = {
+        "source_url": option.get('source_url'),
+        "last_verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "verification_method": _verification_method_for_source(source),
+    }
 
-    try:
-        insert_res = supabase.table("launch_options").insert({
-            **base_fields,
-            "risk_level": metadata['risk_level'],
-            "categories": metadata['categories'],
-            "engine_compatibility": metadata['engine_compatibility']
-        }).execute()
-
-        if insert_res.data:
-            return insert_res.data[0]['id']
-    except Exception as e:
-        # If migrations/001_add_launch_option_metadata.sql hasn't been run yet,
-        # these columns don't exist and every insert would otherwise fail —
-        # fall back to the legacy shape rather than breaking scraping entirely.
-        error_text = str(e).lower()
-        if 'risk_level' in error_text or 'categories' in error_text or 'engine_compatibility' in error_text:
-            print("⚠️ launch_options metadata columns not found — run "
-                  "migrations/001_add_launch_option_metadata.sql; inserting without them for now")
-            try:
-                insert_res = supabase.table("launch_options").insert(base_fields).execute()
-                if insert_res.data:
-                    return insert_res.data[0]['id']
-            except Exception:
-                pass
-        else:
-            # Race condition: another process inserted between our select and insert.
-            # Try the select one more time.
-            try:
-                retry = supabase.table("launch_options") \
-                    .select("id") \
-                    .eq("command", command) \
-                    .limit(1) \
-                    .execute()
-                if retry.data:
-                    return retry.data[0]['id']
-            except Exception:
-                pass
+    # Tiered fallback: newest columns first, dropping back a tier whenever a
+    # migration hasn't been run yet, rather than ever failing the insert.
+    for fields in (
+        {**base_fields, **metadata_fields, **verification_fields},
+        {**base_fields, **metadata_fields},
+        base_fields,
+    ):
+        try:
+            insert_res = supabase.table("launch_options").insert(fields).execute()
+            if insert_res.data:
+                return insert_res.data[0]['id']
+            break
+        except Exception as e:
+            error_text = str(e).lower()
+            missing_column = any(
+                col in error_text for col in
+                ('risk_level', 'categories', 'engine_compatibility',
+                 'source_url', 'last_verified_at', 'verification_method')
+            )
+            if not missing_column:
+                # Race condition: another process inserted between our select
+                # and insert. Try the select one more time.
+                try:
+                    retry = supabase.table("launch_options") \
+                        .select("id") \
+                        .eq("command", command) \
+                        .limit(1) \
+                        .execute()
+                    if retry.data:
+                        return retry.data[0]['id']
+                except Exception:
+                    pass
+                break
+            # else: fall through to the next, narrower tier
 
     return None
 

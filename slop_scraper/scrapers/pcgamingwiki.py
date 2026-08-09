@@ -236,7 +236,8 @@ def validate_pcgaming_options(options, debug=False):
         validated_options.append({
             'command': command,
             'description': clean_description,
-            'source': 'PCGamingWiki'
+            'source': 'PCGamingWiki',
+            'source_url': option.get('source_url')
         })
         
         if debug:
@@ -373,6 +374,9 @@ def get_launch_options_from_page_api(page_id, debug=False):
 
                 # Parse wikitext for launch options with strict validation
                 parsed_options = parse_wikitext_for_launch_options_strict(wikitext, debug=debug)
+                page_url = f"https://www.pcgamingwiki.com/w/index.php?curid={page_id}"
+                for opt in parsed_options:
+                    opt['source_url'] = page_url
                 options.extend(parsed_options)
 
     except Exception as e:
@@ -418,8 +422,27 @@ def _is_plausible_launch_option(cmd: str) -> bool:
         'story', 'fact', 'month', 'lot', 'right', 'study', 'book', 'eye',
         'job', 'word', 'business', 'issue', 'side', 'kind', 'head', 'house',
         'service', 'friend', 'father', 'power', 'hour', 'move', 'city',
+        # Added 2026-08-08 after a production cleanup found these extracted
+        # from prose sentences on PCGamingWiki pages (e.g. "-based" from
+        # "team-based", "-related" from "-related issues"). Verified against
+        # a live snapshot of 55 junk rows before adding — see
+        # cleanup_wikitext_junk.py for the full review.
+        'based', 'related', 'friendly', 'developed', 'protected', 'saboteur',
+        'sync', 'order', 'releases', 'bit', 'made', 'platform', 'seamless',
+        'core', 'line', 'lit', 'end', 'run', 'print', 'screen', 'source',
+        'party', 'processing', 'click', 'compliant', 'doubling', 'episode',
+        'fixes', 'gfx', 'nexus', 'prelude', 'in', 'axis', 'aliasing',
+        'localization',
     }
     if inner.lower() in _COMMON_WORDS:
+        return False
+
+    # Reject hash/GUID fragments (e.g. "-a214-f68e547dd54c"): a run of 8+
+    # characters using only hex digits (0-9a-f). Real flags mixing letters
+    # and digits are short structured technical terms (d3d12, glcore42,
+    # r1600x900x32) that always include a letter outside a-f, so this can't
+    # false-positive on them.
+    if re.search(r'(?i)[0-9a-f]{8,}', inner):
         return False
 
     return True
