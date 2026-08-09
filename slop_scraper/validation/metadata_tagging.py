@@ -60,6 +60,24 @@ PROTON_WINE_DESCRIPTIONS = {
 # Canonical location — scrapers/protondb.py imports this too.
 ENV_VAR_BLOCKLIST = {'WINEPREFIX', 'WINESERVER', 'WINELOADER', 'WINEDEBUG'}
 
+# Variables that turn up in scraped community reports but could not be
+# confirmed against Proton or DXVK documentation. Some look like typos or
+# misremembered variants of real ones (DXVK_ASYNC is real, PROTON_DXVK_ASYNC
+# is not; PROTON_USE_WINE3D is PROTON_USE_WINED3D missing a letter). Publishing
+# a flag we cannot explain accurately is worse than omitting it, so these are
+# rejected at the save gate rather than stored with a vague description.
+UNVERIFIED_ENV_VARS = {
+    'PROTON_NO_GLSL',
+    'PROTON_USE_GALLIUM_NINE',
+    'PROTON_DXVK_ASYNC',
+    'DXVK_FAKE_DX10_SUPPORT',
+    'DXVK_FAKE_DX11_SUPPORT',
+    # Typos / placeholders, not real variables
+    'PROTON_USE_WINE3D',
+    'PROTON_USE_WINE3D11',
+    'PROTON_VARIABLE',
+}
+
 # Shared validator instance purely to reuse its curated engine option sets —
 # not used for its validate_option() behavior here.
 _validator = LaunchOptionsValidator(ValidationLevel.PERMISSIVE)

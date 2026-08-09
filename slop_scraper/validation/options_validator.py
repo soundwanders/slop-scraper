@@ -522,6 +522,13 @@ def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool,
         # these because they carry no recognisable path prefix.
         if '/' in value or '$' in value:
             return False, "Env-var value is a path or shell expansion"
+        # Variables we cannot document accurately — see UNVERIFIED_ENV_VARS.
+        try:
+            from .metadata_tagging import UNVERIFIED_ENV_VARS
+        except ImportError:
+            from metadata_tagging import UNVERIFIED_ENV_VARS
+        if name in UNVERIFIED_ENV_VARS:
+            return False, "Unverified environment variable (cannot be documented accurately)"
         return True, "Environment variable option"
 
     # Wrapper commands (gamemoderun %command%, mangohud %command%)
