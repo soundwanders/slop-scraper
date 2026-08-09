@@ -456,6 +456,12 @@ _PROSE_WORDS = {
     'story', 'fact', 'month', 'lot', 'right', 'study', 'book', 'eye', 'with',
     'job', 'word', 'business', 'issue', 'side', 'kind', 'head', 'house',
     'service', 'friend', 'father', 'power', 'hour', 'move', 'city', 'out',
+    # Verified against production 2026-08-09. Deliberately excludes words that
+    # are real flags in lowercase — '-steam' enables the Steam overlay, while
+    # '-Steam' is a scraped title fragment. The Title-Case rule below splits
+    # those two correctly, so they must not be blocked by word alone.
+    'run', 'install', 'start', 'made', 'order', 'based', 'related', 'friendly',
+    'click', 'print', 'screen', 'source', 'party', 'line', 'core', 'end',
 }
 
 # Wiki/markup tokens that must never appear in a stored description
@@ -533,6 +539,20 @@ def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool,
     parts = body.split('-')
     if len(parts) >= 2 and any(p and p[0].isupper() for p in parts):
         return False, "Title-Case hyphenated phrase (prose fragment)"
+
+    # A single Title-Case word is a scraped page/section fragment, never a
+    # flag (-Xbox, -Mods, -Install, -Jaycee). Real options are lowercase
+    # (-novid), ALLCAPS (-USEALLAVAILABLECORES), or carry internal capitals
+    # (-ResX, -EpicPortal, -NoSplash) — none of which match this.
+    # Case-sensitive on purpose: '-steam' is a real flag, '-Steam' is not.
+    if re.match(r'^[A-Z][a-z]+$', body):
+        return False, "Single Title-Case word (page/section fragment)"
+
+    # Hash/GUID fragments scraped out of URLs and asset names. Restricted to
+    # hex characters so technical flags that mix letters and digits
+    # (-force-d3d11, -r1600x900x32, -glcore42) can never match.
+    if re.search(r'(?i)[0-9a-f]{8,}', body):
+        return False, "Hash/GUID fragment, not a flag"
 
     return True, "Valid flag"
 

@@ -398,8 +398,13 @@ def _is_plausible_launch_option(cmd: str) -> bool:
     """
     inner = cmd.lstrip('+-')
 
-    # Reject URL slugs: 3 or more hyphens total in the command
-    if cmd.count('-') >= 3:
+    # Reject URL slugs: 3 or more hyphens total in the command.
+    # Real hyphenated flags exist though (--no-vr, -no-stereo-rendering,
+    # -force-low-power-device, -force-d3d11-no-singlethreaded), and a plain
+    # hyphen count rejects all of them. Options built from these known flag
+    # prefixes are exempt — a URL slug never starts that way.
+    _FLAG_PREFIXES = ('--', '-force-', '-no-', '-enable-', '-disable-', '-use-', '-set-')
+    if cmd.count('-') >= 3 and not cmd.startswith(_FLAG_PREFIXES):
         return False
 
     # Reject Title-Case hyphenated phrases (page title or category fragments)
