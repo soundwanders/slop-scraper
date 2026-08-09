@@ -1,0 +1,8 @@
+#!/bin/sh
+# Strip AI co-author trailers before a commit is recorded.
+#
+# This repository's history was rewritten once to remove them; PR refs that
+# GitHub retains permanently still carry the old ones, so the only thing we
+# control is that no NEW commit reintroduces the attribution.
+grep -viE '^[[:space:]]*co-authored-by:.*(claude|anthropic)' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+exit 0

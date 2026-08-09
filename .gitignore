@@ -125,3 +125,6 @@ flag_dictionary_draft.md
 flag_dict_rollback_*.json
 link_rollback_*.json
 engine_rollback_*.json
+
+# local-only working data (rollbacks, scratch)
+_local/
