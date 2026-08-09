@@ -555,6 +555,23 @@ def _passes_save_gate(option: dict) -> bool:
         print(f"🚫 Save gate rejected '{option.get('command', '')}': {reason}")
     return is_valid
 
+# Placeholder descriptions a scraper emits when it found a command but no real
+# explanation of it. They carry no more information than an empty column, so
+# they must never be written over a NULL description — the site renders the
+# source link for a missing description, which is more useful and more honest
+# than "Launch option from PCGamingWiki".
+_PLACEHOLDER_DESCRIPTIONS = {
+    'launch option from pcgamingwiki',
+    'launch option from steam community guide',
+    'launch option reported by protondb users',
+    'proton/wine compatibility option',
+}
+
+
+def _is_placeholder_description(text: str) -> bool:
+    return (text or '').strip().rstrip('.').lower() in _PLACEHOLDER_DESCRIPTIONS
+
+
 _SCRAPED_VERIFICATION_METHODS = {
     'PCGamingWiki': 'pcgamingwiki-scrape',
     'ProtonDB': 'protondb-scrape',
@@ -578,14 +595,21 @@ def _verification_method_for_source(source: str) -> str:
     return 'curated'
 
 
-def _touch_launch_option_verification(supabase, option_id: int, option: dict, existing_source_url: Optional[str]) -> None:
+def _touch_launch_option_verification(supabase, option_id: int, option: dict, existing: dict) -> None:
     """
     Stamp last_verified_at/verification_method on a re-encountered option,
-    and backfill source_url if we now have one and the row didn't before.
-    Never overwrites an existing source_url — same "first curated value wins"
-    rule as description. Silently no-ops if migrations/002 hasn't been run
-    yet (columns don't exist) — this is a nice-to-have freshness signal, not
-    something that should ever break scraping.
+    and backfill source_url / description if we now have one and the row
+    doesn't. Never overwrites an existing non-empty value — the rule is
+    "first GOOD value wins", not "first value ever seen wins".
+
+    The description backfill matters because bad descriptions get nulled out
+    rather than replaced (a wrong description is worse than none — see
+    cleanup_bad_descriptions.py). Without this, a nulled row could never be
+    repaired, since the insert path only runs for commands that don't exist
+    yet. With it, the next scrape/rescan that finds clean text heals the row.
+
+    Silently no-ops if migrations/002 hasn't been run yet (columns don't
+    exist) — freshness tracking should never break scraping.
     """
     import datetime
 
@@ -594,9 +618,21 @@ def _touch_launch_option_verification(supabase, option_id: int, option: dict, ex
         "last_verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "verification_method": _verification_method_for_source(source),
     }
-    new_source_url = option.get('source_url')
-    if new_source_url and not existing_source_url:
-        update_fields["source_url"] = new_source_url
+
+    if option.get('source_url') and not existing.get('source_url'):
+        update_fields["source_url"] = option['source_url']
+
+    if not (existing.get('description') or '').strip():
+        try:
+            from ..validation import clean_option_description
+        except ImportError:
+            from validation import clean_option_description
+        fresh_description = clean_option_description(option.get('description', ''))
+        # Only a genuine description heals a blank row. Backfilling the
+        # scraper's own placeholder would turn an honest "we don't know" into
+        # text that looks like an answer without being one.
+        if fresh_description and not _is_placeholder_description(fresh_description):
+            update_fields["description"] = fresh_description
 
     try:
         supabase.table("launch_options").update(update_fields).eq("id", option_id).execute()
@@ -617,14 +653,14 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     # 1. Try to find an existing record first
     try:
         existing = supabase.table("launch_options") \
-            .select("id, source_url") \
+            .select("id, source_url, description") \
             .eq("command", command) \
             .limit(1) \
             .execute()
 
         if existing.data:
             option_id = existing.data[0]['id']
-            _touch_launch_option_verification(supabase, option_id, option, existing.data[0].get('source_url'))
+            _touch_launch_option_verification(supabase, option_id, option, existing.data[0])
             return option_id
     except Exception:
         # source_url column may not exist yet (migration 002 not run) — retry

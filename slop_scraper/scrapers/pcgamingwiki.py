@@ -575,35 +575,67 @@ def clean_wikitext(wikitext):
 
     return cleaned
 
+def _strip_leading_command(text, command):
+    """
+    Remove the command from the front of a description without mangling it.
+
+    The old approach (`text.replace(command, '')`) deleted the command from
+    ANYWHERE in the sentence, which shredded descriptions where the command is
+    grammatically load-bearing:
+        "Use the -hz=x command line argument"  -> "Use the =x command line argument"
+        "Use the -mod:X to launch modded ..."  -> "Use the to launch modded ..."
+        "MESA_EXTENSION_OVERRIDE=-GL_ARB_..."  -> "MESA_EXTENSION_OVERRIDE="
+    Only a leading occurrence is redundant with the command column; anywhere
+    else it's part of the prose and must be preserved.
+    """
+    stripped = text.strip()
+    if stripped.startswith(command):
+        stripped = stripped[len(command):]
+        # Drop the separator left behind ("-novid: skips intro" -> "skips intro")
+        stripped = re.sub(r'^[\s:\-–—=,|]+', '', stripped)
+    return stripped.strip()
+
+
 def extract_description_from_context_safe(command, context):
     """
-    Safely extract description for a command from its context
+    Safely extract description for a command from its context.
+
+    The `description=` template parameter is preferred when it genuinely
+    belongs to THIS command, but it must be scoped to the command's own
+    template block. Searching the whole context window for any `description=`
+    attached the nearest neighbour's text to the wrong flag — that's how
+    `-resx=1920` ended up documented as "Enable Direct3D 11" and
+    `-localization=english` as "Disable SLI/Crossfire" in production. A
+    confidently wrong description is worse than none, so scope strictly and
+    fall through rather than guess.
     """
-    # Prefer a Fixbox/template description= parameter when present — it is a
-    # human-written summary ("Use the -windowed property") rather than markup soup.
-    desc_match = re.search(r'description\s*=\s*([^|}]{5,150})', context)
-    if desc_match:
-        desc = clean_wiki_description(desc_match.group(1).strip())
-        if desc and len(desc) > 5:
+    # Only consider a description= that lives in the same {{...}} block as the
+    # command itself.
+    for block in re.finditer(r'\{\{([^{}]{0,600})\}\}', context):
+        block_text = block.group(1)
+        if command not in block_text:
+            continue
+        desc_match = re.search(r'description\s*=\s*([^|}]{5,150})', block_text)
+        if desc_match:
+            desc = clean_wiki_description(desc_match.group(1).strip())
+            if desc and len(desc) > 5:
+                return desc
+        break
+
+    for line in context.split('\n'):
+        if command not in line:
+            continue
+
+        desc = clean_wiki_description(_strip_leading_command(line, command))
+
+        # A description that still contains the command mid-sentence is an
+        # instruction ABOUT using it, not a definition of it — and once the
+        # command is left in place it duplicates the command column. Reject
+        # rather than mangle; the fallback below is honest about not knowing.
+        if desc and 5 < len(desc) < 150 and command not in desc:
             return desc
 
-    lines = context.split('\n')
-    
-    for line in lines:
-        if command in line:
-            # Clean up the line
-            desc = line.strip()
-            
-            # Remove the command itself from description
-            desc = desc.replace(command, '').strip()
-            
-            # Clean up wiki markup from description
-            desc = clean_wiki_description(desc)
-            
-            if desc and len(desc) > 5 and len(desc) < 150:
-                return desc
-    
-    return f"Launch option from PCGamingWiki"
+    return "Launch option from PCGamingWiki"
 
 def try_alternative_search(game_title, debug=False):
     """
