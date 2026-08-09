@@ -578,12 +578,23 @@ def _vetted_description(option: dict) -> Optional[str]:
     description straight back.
     """
     try:
-        from ..validation import clean_option_description, acceptable_description
+        from ..validation import (clean_option_description, acceptable_description,
+                                  curated_description)
     except ImportError:
-        from validation import clean_option_description, acceptable_description
+        from validation import (clean_option_description, acceptable_description,
+                                curated_description)
+
+    command = option.get('command', '')
+
+    # The curated dictionary is authoritative: a description verified against
+    # primary documentation beats anything a scraper pulled out of a forum post,
+    # so it overrides rather than merely filling a gap.
+    curated = curated_description(command)
+    if curated:
+        return curated
 
     cleaned = clean_option_description(option.get('description', ''))
-    return acceptable_description(option.get('command', ''), cleaned)
+    return acceptable_description(command, cleaned)
 
 
 def _verification_method_for_source(source: str) -> str:
@@ -708,6 +719,20 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
         "last_verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "verification_method": _verification_method_for_source(source),
     }
+
+    # Usage docs come only from the curated dictionary — these fields exist to
+    # tell a user how to actually apply a flag, so a scraped guess would defeat
+    # the purpose. Absent for anything not yet documented.
+    try:
+        from ..validation import lookup_flag
+    except ImportError:
+        from validation import lookup_flag
+    curated_entry = lookup_flag(command) or {}
+    if curated_entry:
+        verification_fields.update({
+            "effect": curated_entry.get('effect'),
+            "usage_example": curated_entry.get('usage_example'),
+        })
 
     # Tiered fallback: newest columns first, dropping back a tier whenever a
     # migration hasn't been run yet, rather than ever failing the insert.

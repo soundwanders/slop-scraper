@@ -21,6 +21,11 @@ from .metadata_tagging import (
     PROTON_WINE_DESCRIPTIONS,
     ENV_VAR_BLOCKLIST
 )
+from .flag_dictionary import (
+    FLAG_DICTIONARY,
+    lookup_flag,
+    curated_description
+)
 from .description_quality import (
     is_junk_description,
     is_placeholder_description,
@@ -46,5 +51,8 @@ __all__ = [
     'is_junk_description',
     'is_placeholder_description',
     'acceptable_description',
-    'PLACEHOLDER_DESCRIPTIONS'
+    'PLACEHOLDER_DESCRIPTIONS',
+    'FLAG_DICTIONARY',
+    'lookup_flag',
+    'curated_description'
 ]
