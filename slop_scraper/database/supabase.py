@@ -555,29 +555,35 @@ def _passes_save_gate(option: dict) -> bool:
         print(f"🚫 Save gate rejected '{option.get('command', '')}': {reason}")
     return is_valid
 
-# Placeholder descriptions a scraper emits when it found a command but no real
-# explanation of it. They carry no more information than an empty column, so
-# they must never be written over a NULL description — the site renders the
-# source link for a missing description, which is more useful and more honest
-# than "Launch option from PCGamingWiki".
-_PLACEHOLDER_DESCRIPTIONS = {
-    'launch option from pcgamingwiki',
-    'launch option from steam community guide',
-    'launch option reported by protondb users',
-    'proton/wine compatibility option',
-}
-
-
-def _is_placeholder_description(text: str) -> bool:
-    return (text or '').strip().rstrip('.').lower() in _PLACEHOLDER_DESCRIPTIONS
-
-
 _SCRAPED_VERIFICATION_METHODS = {
     'PCGamingWiki': 'pcgamingwiki-scrape',
     'ProtonDB': 'protondb-scrape',
     'Steam Community': 'steam-community-scrape',
     'Steam Community Guides': 'steam-community-scrape',
 }
+
+
+def _vetted_description(option: dict) -> Optional[str]:
+    """
+    The description to store for an option, or None to store nothing.
+
+    Runs the shared quality gate (validation/description_quality.py) so that
+    instruction steps, pasted flag lists, circular restatements and the
+    scrapers' own placeholders never reach the database. Storing None here is
+    deliberate: the site renders the source link when a description is
+    missing, which is more honest than text that looks like an answer.
+
+    This gate lives on the write path on purpose. When the same rules existed
+    only in a cleanup script, the next re-scrape put every removed
+    description straight back.
+    """
+    try:
+        from ..validation import clean_option_description, acceptable_description
+    except ImportError:
+        from validation import clean_option_description, acceptable_description
+
+    cleaned = clean_option_description(option.get('description', ''))
+    return acceptable_description(option.get('command', ''), cleaned)
 
 
 def _verification_method_for_source(source: str) -> str:
@@ -623,15 +629,8 @@ def _touch_launch_option_verification(supabase, option_id: int, option: dict, ex
         update_fields["source_url"] = option['source_url']
 
     if not (existing.get('description') or '').strip():
-        try:
-            from ..validation import clean_option_description
-        except ImportError:
-            from validation import clean_option_description
-        fresh_description = clean_option_description(option.get('description', ''))
-        # Only a genuine description heals a blank row. Backfilling the
-        # scraper's own placeholder would turn an honest "we don't know" into
-        # text that looks like an answer without being one.
-        if fresh_description and not _is_placeholder_description(fresh_description):
+        fresh_description = _vetted_description(option)
+        if fresh_description:
             update_fields["description"] = fresh_description
 
     try:
@@ -695,7 +694,7 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
 
     base_fields = {
         "command": command,
-        "description": clean_option_description(option.get('description', '')),
+        "description": _vetted_description(option),
         "source": source,
         "verified": option.get('verified', False)
     }

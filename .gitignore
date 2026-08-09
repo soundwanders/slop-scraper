@@ -43,6 +43,7 @@ backfill_tracking.json
 migrations/
 slop_scraper/backfill*.py
 slop_scraper/cleanup*.py
+description_rollback_*.json
 
 # build
 dist
@@ -115,3 +116,7 @@ jspm_packages/
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# targeted re-heal maintenance run
+slop_scraper/reheal*.py
+reheal_progress.json

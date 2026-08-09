@@ -20,6 +20,12 @@ from .metadata_tagging import (
     PROTON_WINE_DESCRIPTIONS,
     ENV_VAR_BLOCKLIST
 )
+from .description_quality import (
+    is_junk_description,
+    is_placeholder_description,
+    acceptable_description,
+    PLACEHOLDER_DESCRIPTIONS
+)
 
 __all__ = [
     'LaunchOptionsValidator',
@@ -34,5 +40,9 @@ __all__ = [
     'classify_engine_compatibility',
     'classify_option_metadata',
     'PROTON_WINE_DESCRIPTIONS',
-    'ENV_VAR_BLOCKLIST'
+    'ENV_VAR_BLOCKLIST',
+    'is_junk_description',
+    'is_placeholder_description',
+    'acceptable_description',
+    'PLACEHOLDER_DESCRIPTIONS'
 ]
