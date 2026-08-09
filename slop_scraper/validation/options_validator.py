@@ -513,9 +513,15 @@ def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool,
     # Env-var style: NAME=value with an UPPERCASE name (PROTON_NO_ESYNC=1,
     # DXVK_HUD=fps, WINEDLLOVERRIDES=..., MANGOHUD=1)
     if '=' in command and not command.startswith(('-', '+')):
-        name = command.split('=', 1)[0]
+        name, value = command.split('=', 1)
         if not re.match(r'^[A-Z][A-Z0-9_]+$', name):
             return False, "Assignment without a valid env-var name"
+        # A value holding a path or a shell expansion means the whole thing was
+        # lifted out of a terminal command, not a Steam launch option
+        # (WINE=$proton-i/dist/bin/wine). The generic path check above misses
+        # these because they carry no recognisable path prefix.
+        if '/' in value or '$' in value:
+            return False, "Env-var value is a path or shell expansion"
         return True, "Environment variable option"
 
     # Wrapper commands (gamemoderun %command%, mangohud %command%)

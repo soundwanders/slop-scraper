@@ -17,6 +17,7 @@ from .metadata_tagging import (
     classify_categories,
     classify_engine_compatibility,
     classify_option_metadata,
+    describe_env_var,
     PROTON_WINE_DESCRIPTIONS,
     ENV_VAR_BLOCKLIST
 )
@@ -39,6 +40,7 @@ __all__ = [
     'classify_categories',
     'classify_engine_compatibility',
     'classify_option_metadata',
+    'describe_env_var',
     'PROTON_WINE_DESCRIPTIONS',
     'ENV_VAR_BLOCKLIST',
     'is_junk_description',

@@ -40,6 +40,20 @@ PROTON_WINE_DESCRIPTIONS = {
     'WINEFSYNC': 'Toggle futex-based synchronization in Wine',
     'MANGOHUD': 'Enable the MangoHud performance overlay',
     'PULSE_LATENCY_MSEC': 'Set PulseAudio latency in ms (fixes crackling audio)',
+    # Added 2026-08-09 from the variables actually present in production.
+    # Only entries whose behaviour is documented are listed here — several
+    # other variables found in the data (PROTON_NO_GLSL, PROTON_USE_GALLIUM_NINE,
+    # PROTON_DXVK_ASYNC, DXVK_FAKE_DX10/11_SUPPORT) are deliberately absent:
+    # they could not be confirmed against Proton/DXVK documentation, and an
+    # invented description would be worse than none. They keep the generic
+    # fallback until someone verifies them.
+    'PROTON_LOG': 'Write a Proton debug log to $HOME/steam-<appid>.log',
+    'PROTON_OLD_GL_STRING': 'Report a shortened OpenGL extension string for older games that cannot parse long ones',
+    'PROTON_DUMP_DEBUG_COMMANDS': 'Write helper debugging scripts to /tmp/proton_$USER/',
+    'PROTON_USE_WINED3D11': 'Legacy option: use OpenGL-based WineD3D for Direct3D 11 instead of DXVK (superseded by PROTON_USE_WINED3D)',
+    'PROTON_USE_WINED3D10': 'Legacy option: use OpenGL-based WineD3D for Direct3D 10 instead of DXVK (superseded by PROTON_USE_WINED3D)',
+    'PROTON_USE_WINED3D9': 'Legacy option: use OpenGL-based WineD3D for Direct3D 9 instead of DXVK (superseded by PROTON_USE_WINED3D)',
+    'WINEFSYNC_SPINCOUNT': 'How many times fsync spins before sleeping — tuning value for futex-based synchronization',
 }
 
 # Environment variables that are terminal setup commands, never launch options.
@@ -74,6 +88,45 @@ _CAUTION_EXACT = {'-insecure', '+sv_cheats', '-enablefakeip', '+exec'}
 # anti-cheat system by name — these bypass or alter anti-cheat behavior and
 # are exactly the kind of thing the audit called out as needing a warning.
 _ANTICHEAT_KEYWORDS = ('eac_launcher', 'nobattleye', 'noeac')
+
+
+# Values that switch a Proton/Wine variable OFF. The curated descriptions all
+# describe what the variable does when ENABLED, so applying one to a disabling
+# value states the opposite of the truth ("PROTON_NO_D3D11=0" is not
+# "Disable Direct3D 11 support" — it is the default behaviour restored).
+_DISABLING_VALUES = {'0', 'false', 'off', 'no'}
+
+# Explicit wording for the SWITCHED-OFF form of variables whose disabled
+# meaning is unambiguous. Written out rather than derived, because negating a
+# sentence mechanically produces confident nonsense — and several of these
+# variables are themselves negative ("NO_D3D11"), so the off state is a double
+# negative. Any variable absent here simply gets no description when disabled.
+PROTON_WINE_DISABLED_DESCRIPTIONS = {
+    'PROTON_NO_ESYNC': 'Keep eventfd-based synchronization enabled (Proton default)',
+    'PROTON_NO_FSYNC': 'Keep futex-based synchronization enabled (Proton default)',
+    'PROTON_NO_D3D11': 'Keep Direct3D 11 support enabled (Proton default)',
+    'PROTON_NO_D3D10': 'Keep Direct3D 10 support enabled (Proton default)',
+    'PROTON_USE_WINED3D': 'Use Vulkan-based DXVK rather than OpenGL WineD3D (Proton default)',
+    'PROTON_USE_WINED3D11': 'Use Vulkan-based DXVK for Direct3D 11 rather than WineD3D (Proton default)',
+    'PROTON_USE_D9VK': 'Do not translate Direct3D 9 to Vulkan; keep the default path',
+}
+
+
+def describe_env_var(command: str) -> Optional[str]:
+    """
+    Curated description for an environment-variable option, or None.
+
+    The value decides which wording applies: PROTON_WINE_DESCRIPTIONS is
+    phrased for the enabled case throughout, so applying it to a disabling
+    value states the opposite of the truth. Disabled forms come from their own
+    table, and a variable missing from it gets None rather than a guess.
+    """
+    if '=' not in command or command.startswith(('-', '+')):
+        return None
+    name, value = command.split('=', 1)
+    if value.strip().lower() in _DISABLING_VALUES:
+        return PROTON_WINE_DISABLED_DESCRIPTIONS.get(name)
+    return PROTON_WINE_DESCRIPTIONS.get(name)
 
 
 def _base_flag(command: str) -> str:

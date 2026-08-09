@@ -7,14 +7,14 @@ try:
     # Try relative imports first (when run as module)
     from ..utils.security_config import SecureRequestHandler
     from ..validation import LaunchOptionsValidator, ValidationLevel, EngineType
-    from ..validation.metadata_tagging import PROTON_WINE_DESCRIPTIONS, ENV_VAR_BLOCKLIST
+    from ..validation.metadata_tagging import PROTON_WINE_DESCRIPTIONS, ENV_VAR_BLOCKLIST, describe_env_var
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from utils.security_config import SecureRequestHandler
     from validation import LaunchOptionsValidator, ValidationLevel, EngineType
-    from validation.metadata_tagging import PROTON_WINE_DESCRIPTIONS, ENV_VAR_BLOCKLIST
+    from validation.metadata_tagging import PROTON_WINE_DESCRIPTIONS, ENV_VAR_BLOCKLIST, describe_env_var
 
 def fetch_protondb_launch_options(app_id, game_title=None, rate_limit=None, debug=False, 
                                  test_results=None, test_mode=False, rate_limiter=None, 
@@ -303,8 +303,9 @@ def extract_options_from_reports(reports, debug=False):
         elif cmd == 'mangohud':
             desc = 'Enable MangoHud overlay for performance monitoring'
         elif '=' in cmd:
-            var_name = cmd.split('=', 1)[0]
-            desc = PROTON_WINE_DESCRIPTIONS.get(var_name, 'Proton/Wine compatibility option')
+            # describe_env_var declines when the value disables the variable,
+            # since the curated text describes the enabled behaviour.
+            desc = describe_env_var(cmd) or 'Proton/Wine compatibility option'
         else:
             desc = 'Launch option reported by ProtonDB users'
 
