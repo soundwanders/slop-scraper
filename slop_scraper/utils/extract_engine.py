@@ -130,12 +130,15 @@ class EngineDetector:
         if pattern_engine and pattern_engine != 'Unknown':
             return pattern_engine
         
-        # Method 3: Check app ID ranges (heuristic)
-        if app_id:
-            appid_engine = self._detect_engine_by_appid(app_id)
-            if appid_engine and appid_engine != 'Unknown':
-                return appid_engine
-        
+        # Method 3 used to guess from the Steam app ID: anything numbered
+        # 200000-300000 was labelled "Unity Engine (heuristic)", anything under
+        # 1000 "Source Engine (heuristic)". An app ID records when a game was
+        # registered with Steam, not what it was built with, so this invented
+        # an engine for hundreds of unrelated games. Removed — 'Unknown' is the
+        # honest answer. _detect_engine_by_appid is kept below but unused, in
+        # case the ranges are ever wanted as a low-confidence signal that is
+        # clearly separated from real evidence.
+
         # Method 4: External sources (SteamDB, PCGamingWiki)
         if app_id:
             external_engine = self._detect_engine_external(app_id, game_info.get('name', ''))
