@@ -8,89 +8,91 @@ import time
 from typing import Dict, Optional, List
 from bs4 import BeautifulSoup
 
+try:
+    from utils.known_engines import lookup_title_engine
+except ImportError:
+    from .known_engines import lookup_title_engine
+
 class EngineDetector:
     """Engine detection using multiple sources and improved patterns"""
     
     def __init__(self):
         # Comprehensive engine detection patterns
+        # Only two kinds of string belong here:
+        #
+        #   1. names of the engine itself ('cryengine', 'id tech'), and
+        #   2. studios that have shipped their ENTIRE catalogue on one engine.
+        #
+        # FRANCHISE names used to be here too ('counter-strike', 'fallout',
+        # 'battlefield', 'doom', 'unity') and were matched against the game
+        # title at the highest weight. Measured against the live catalogue that
+        # was wrong about 30% of the time — a franchise switches engine between
+        # entries, and unrelated games reuse the words. "Assassin's Creed
+        # Unity" became a Unity game; "Counter-Strike: Condition Zero" (GoldSrc)
+        # became Source; "Doom Rails" became id Tech. Specific games are named
+        # in utils/known_engines.py instead, where each one is verified.
+        #
+        # Two studio entries also had to go:
+        #   'bioware'          — Unreal only from Mass Effect on. Dragon Age,
+        #                        KOTOR, Jade Empire and MDK2 are in-house engines.
+        #   'gearbox software' — would have overwritten Half-Life: Opposing
+        #                        Force and Blue Shift (GoldSrc) with Unreal.
         self.engine_patterns = {
             'Unity Engine': [
-                # Direct indicators
-                'unity', 'unity technologies', 'made with unity', 'unity3d',
-                # Known Unity developers
-                'innersloth', 'team cherry', 'night school studio', 'ori and the',
-                # Unity-specific terms that appear in Steam data
-                'unity player', 'unityengine'
+                'unity technologies', 'made with unity', 'unity3d',
+                'unity player', 'unityengine',
+                'innersloth', 'team cherry', 'night school studio',
             ],
-            
+
             'Unreal Engine': [
-                # Direct indicators  
-                'unreal engine', 'unreal', 'epic games', 'epic megagames',
-                # Known Unreal developers
-                'gearbox software', 'bioware', 'rocksteady studios',
-                # Unreal-specific terms
-                'unrealtournament', 'unrealengine'
+                'unreal engine', 'unrealengine', 'unrealtournament',
+                'epic games', 'epic megagames', 'rocksteady studios',
             ],
-            
+
             'Source Engine': [
-                # Direct indicators
-                'source engine', 'source 2', 'valve corporation', 'valve software',
-                # Source games/franchises
-                'half-life', 'counter-strike', 'portal', 'team fortress', 'left 4 dead',
-                'dota', 'garry', 'black mesa'
+                'source engine', 'source 2',
             ],
-            
+
             'Creation Engine': [
-                # 'bethesda' removed: Bethesda Softworks publishes id Tech
-                # games (Quake, Wolfenstein) and others, so the publisher name
-                # actively mislabels them.
-                'elder scrolls', 'skyrim', 'fallout', 'starfield',
-                'creation engine', 'gamebryo'
+                'creation engine',
             ],
-            
+
+            'Gamebryo': [
+                'gamebryo',
+            ],
+
             'Frostbite Engine': [
-                # Publisher names are NOT engine evidence and were removed:
-                # 'electronic arts' and 'ea games' labelled every EA-published
-                # title Frostbite regardless of engine (PopCap's Chuzzle Deluxe,
-                # Plants vs. Zombies). 'dice' was worse still — it matched any
-                # description mentioning dice.
                 'frostbite',
-                'battlefield', 'fifa', 'need for speed', 'mass effect andromeda'
             ],
-            
+
             'id Tech': [
-                # 'rage' removed: as a bare word it is a common noun, and it
-                # matched game descriptions rather than the RAGE franchise.
-                # 'id software' is a publisher/developer signal, kept because it
-                # is unambiguous, unlike 'electronic arts' which publishes
-                # across many engines.
-                'id software', 'id tech', 'doom', 'quake', 'wolfenstein'
+                'id software', 'id tech',
             ],
-            
+
             'CryEngine': [
-                'crytek', 'cryengine', 'cry engine', 'crysis', 'hunt showdown'
+                'crytek', 'cryengine', 'cry engine',
             ],
-            
+
             'GameMaker Studio': [
-                'gamemaker', 'game maker', 'yoyo games', 'undertale', 'hyper light drifter'
+                'gamemaker', 'yoyo games',
             ],
-            
+
             'Godot Engine': [
-                'godot', 'godot engine'
+                'godot engine',
             ],
-            
+
             'RPG Maker': [
-                'rpg maker', 'rpgmaker', 'enterbrain', 'kadokawa'
+                'rpg maker', 'rpgmaker', 'enterbrain',
             ],
-            
+
             'Construct': [
-                'construct 2', 'construct 3', 'scirra'
+                'construct 2', 'construct 3', 'scirra',
             ],
-            
+
             'Java (Minecraft)': [
-                'minecraft', 'mojang'
+                'mojang',
             ],
-            
+
             'Flash/AIR': [
                 'adobe flash', 'adobe air', 'macromedia flash'
             ]
@@ -120,11 +122,20 @@ class EngineDetector:
             Detected engine name or 'Unknown'
         """
         
+        # Method 0: the curated title table. Hand-verified per game, so it
+        # outranks every inference below — including the deliberate 'Unknown'
+        # entries, which exist to stop a weaker method from guessing an engine
+        # for a game we know does NOT share its franchise's engine (Fallout 1,
+        # Need for Speed: Shift, Minecraft: Story Mode).
+        curated = lookup_title_engine(game_info.get('name', ''))
+        if curated is not None:
+            return curated
+
         # Method 1: Check if engine is directly provided by Steam API
         direct_engine = self._extract_direct_engine(game_info)
         if direct_engine and direct_engine != 'Unknown':
             return direct_engine
-        
+
         # Method 2:  pattern matching on existing Steam data
         pattern_engine = self._detect_engine_by_patterns(game_info)
         if pattern_engine and pattern_engine != 'Unknown':
@@ -393,34 +404,20 @@ class EngineDetector:
         return 'Unknown'
     
     def _detect_engine_heuristic(self, game_info: Dict) -> str:
-        """Advanced heuristic detection based on game characteristics"""
-        
-        # File size heuristics (Unity games often have certain size patterns)
-        # Release date heuristics (certain engines popular in certain eras)
-        # Price point heuristics (indie games more likely to use certain engines)
-        
-        try:
-            release_date = game_info.get('release_date', {})
-            if isinstance(release_date, dict):
-                date_str = release_date.get('date', '')
-                
-                # Extract year
-                year_match = re.search(r'(\d{4})', date_str)
-                if year_match:
-                    year = int(year_match.group(1))
-                    
-                    # Unity became very popular after 2010
-                    if year >= 2010:
-                        # Check for indie indicators
-                        price = game_info.get('price_overview', {}).get('initial', 0)
-                        if price and price < 3000:  # Under $30
-                            categories = game_info.get('categories', [])
-                            if any('indie' in str(cat).lower() for cat in categories):
-                                return 'Unity Engine (heuristic)'
-        
-        except Exception:
-            pass
-        
+        """
+        Retained as a no-op so the call site and its ordering stay intact.
+
+        This used to label any indie game released after 2010 priced under $30
+        as 'Unity Engine (heuristic)'. Release year, price and genre are not
+        evidence of an engine — that inference produced the fabricated
+        "(heuristic)" labels that had to be cleared from the catalogue, and it
+        produced them for games that were never Unity at all.
+
+        Because backfill only refreshes an engine whose value is exactly
+        'Unknown', a fabricated label here was effectively permanent: nothing
+        downstream would ever revisit it. Guessing is therefore strictly worse
+        than declining, and this declines.
+        """
         return 'Unknown'
 
 # Integration function
