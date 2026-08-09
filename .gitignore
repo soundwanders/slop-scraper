@@ -37,6 +37,13 @@ slop-scraper-fixes.md
 vanilla-slops-handoff.md
 backfill_tracking.json
 
+# Internal tooling — DB schema evolution and one-off/maintenance scripts stay
+# local. They're operational history and data-cleanup heuristics, not part
+# of the scraper's public product surface.
+migrations/
+slop_scraper/backfill*.py
+slop_scraper/cleanup*.py
+
 # build
 dist
 */dist
