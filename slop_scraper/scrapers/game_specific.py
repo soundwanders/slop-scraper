@@ -14,6 +14,62 @@ except ImportError:
 """
 Game-Specific Launch Options Scraper
 """
+
+# games.engine values that each block of options actually applies to.
+#
+# These blocks used to be selected by matching franchise names against the
+# game's title, developer, publisher, categories and genres all concatenated
+# together — 'portal', 'dota', 'doom', 'fallout', 'battlefield'. That is the
+# same unbounded-substring mistake that had to be removed from engine
+# detection, except here it decides which flags get ATTACHED TO GAMES:
+#
+#   Portal Knights (Unity)        collected -novid, -console, +fps_max
+#   Doom & Destiny (an indie RPG) collected +set r_customwidth
+#   any game whose blurb said "fallout"  collected -skipintro
+#
+# The engine is now known from a sourced feed (PCGamingWiki), and it is passed
+# into this function, so the flags can be keyed on what the game actually runs
+# rather than on what its name resembles.
+#
+# Membership is deliberately narrow. A family is listed only where the block's
+# flags are documented for it:
+#   - GoldSrc is NOT in the Source group. These are Source-era flags (-novid,
+#     -threads) and GoldSrc's support for them is not established here.
+#   - Gamebryo is NOT in the Creation group, and Kex Engine is NOT in id Tech,
+#     for the same reason.
+# Those games still get options from PCGamingWiki, Steam Community and
+# ProtonDB, which document per-game rather than per-family.
+_ENGINE_OPTION_FAMILIES = {
+    'source':     ('source engine', 'source 2'),
+    'unity':      ('unity engine',),
+    'unreal':     ('unreal engine',),
+    'idtech':     ('id tech',),
+    'creation':   ('creation engine',),
+    'frostbite':  ('frostbite engine',),
+    'minecraft':  ('java (minecraft)',),
+}
+
+
+def _option_family(engine):
+    """
+    games.engine value -> which block of engine-specific options applies.
+
+    Returns None when the engine is unknown or has no documented block, in
+    which case NO engine-specific options are emitted. That is the point: an
+    unknown engine means we do not know which flags are valid, and guessing
+    from the title is exactly what produced the wrong attachments above.
+    """
+    if not engine:
+        return None
+    name = str(engine).strip().lower()
+    if name in ('unknown', 'none', 'null', ''):
+        return None
+    for family, members in _ENGINE_OPTION_FAMILIES.items():
+        if name in members:
+            return family
+    return None
+
+
 def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=None, test_mode=False):
     """
     Fetch game-specific launch options based on engine detection and game patterns
@@ -65,28 +121,15 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
     if isinstance(genres, list):
         genre_text = " ".join([genre.get('description', '') for genre in genres if isinstance(genre, dict)]).lower()
     
-    # Combined text for pattern matching. The pipeline's detected engine is
-    # included so the indicator matching below fires even when the local cache
-    # has no metadata for this game (e.g. games loaded from the database).
-    engine_text = (engine or '').lower()
-    if engine_text in ('unknown', 'none'):
-        engine_text = ''
-    all_text = f"{lower_title} {developer_text} {publisher_text} {category_text} {genre_text} {engine_text}"
-    
-    # ENGINE-SPECIFIC DETECTION AND OPTIONS
-    
-    # 1. SOURCE ENGINE GAMES (Valve games and Source-based)
-    source_engine_indicators = [
-        # Game titles
-        'counter-strike', 'half-life', 'portal', 'team fortress', 'left 4 dead', 
-        'garry', 'dota', 'day of defeat', 'alien swarm', 'black mesa',
-        # Developer/publisher indicators
-        'valve corporation', 'valve software',
-        # Engine indicators
-        'source engine', 'source 2'
-    ]
-    
-    if any(indicator in all_text for indicator in source_engine_indicators):
+    # Kept for the non-engine heuristics further down (the "is this a PC game"
+    # check). It is deliberately NOT used to choose an engine any more.
+    all_text = f"{lower_title} {developer_text} {publisher_text} {category_text} {genre_text}"
+
+    # ENGINE-SPECIFIC OPTIONS, selected by the game's actual engine.
+    engine_family = _option_family(engine)
+
+    # 1. SOURCE ENGINE GAMES
+    if engine_family == 'source':
         options.extend([
             {
                 'command': '-novid',
@@ -136,12 +179,7 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
         ])
     
     # 2. UNITY ENGINE GAMES
-    elif any(indicator in all_text for indicator in [
-        'unity', 'unity technologies', 'made with unity',
-        # Known Unity games
-        'cuphead', 'ori and the', 'hollow knight', 'cities skylines', 'kerbal space',
-        'subnautica', 'hearthstone', 'pillars of eternity'
-    ]):
+    elif engine_family == 'unity':
         options.extend([
             {
                 'command': '-screen-width',
@@ -191,12 +229,7 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
         ])
     
     # 3. UNREAL ENGINE GAMES
-    elif any(indicator in all_text for indicator in [
-        'unreal engine', 'epic games', 'epic games launcher',
-        # Known Unreal games
-        'fortnite', 'rocket league', 'borderlands', 'bioshock infinite', 
-        'gears of war', 'mass effect', 'batman arkham', 'mortal kombat'
-    ]):
+    elif engine_family == 'unreal':
         options.extend([
             # Emitted with a concrete value: Unreal requires -ResX=<number>,
             # and a bare '-ResX=' is rejected by the save gate as ending in
@@ -256,11 +289,8 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
             }
         ])
     
-    # 4. ID TECH ENGINE (id Software games)
-    elif any(indicator in all_text for indicator in [
-        'id software', 'id tech',
-        'doom', 'quake', 'wolfenstein', 'rage'
-    ]):
+    # 4. ID TECH ENGINE
+    elif engine_family == 'idtech':
         options.extend([
             {
                 'command': '+set r_fullscreen',
@@ -292,7 +322,7 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
     # GAME-SPECIFIC PATTERNS (Very targeted)
     
     # Minecraft (Java Edition)
-    elif 'minecraft' in lower_title and 'java' in all_text:
+    elif engine_family == 'minecraft':
         options.extend([
             {
                 'command': '-Xmx4G',
@@ -317,10 +347,7 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
         ])
     
     # Bethesda Creation Engine games
-    elif any(indicator in all_text for indicator in [
-        'creation engine', 'gamebryo',
-        'skyrim', 'fallout', 'elder scrolls', 'starfield'
-    ]):
+    elif engine_family == 'creation':
         options.extend([
             {
                 'command': '-windowed',
@@ -344,9 +371,7 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
     # used to be triggers here, which classified every EA-published game as
     # Frostbite regardless of what it actually runs on — that is how UE3-era
     # titles like Mass Effect (2007) ended up carrying Frostbite options.
-    elif any(indicator in all_text for indicator in [
-        'frostbite', 'battlefield', 'fifa', 'need for speed', 'mass effect andromeda'
-    ]):
+    elif engine_family == 'frostbite':
         options.extend([
             {
                 'command': '-windowed',
