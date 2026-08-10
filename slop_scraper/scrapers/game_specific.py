@@ -2,12 +2,14 @@ import os
 
 try:
     # Try relative imports first (when run as module)
-    from ..validation import LaunchOptionsValidator, ValidationLevel, EngineType
+    from ..validation import (
+        LaunchOptionsValidator, ValidationLevel, EngineType, engine_type_for)
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from validation import LaunchOptionsValidator, ValidationLevel, EngineType
+    from validation import (
+        LaunchOptionsValidator, ValidationLevel, EngineType, engine_type_for)
 
 """
 Game-Specific Launch Options Scraper
@@ -390,15 +392,13 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
 def validate_game_specific_option(command: str, engine_hint: str = None, debug: bool = False) -> bool:
     """Engine-aware validation for game-specific options"""
     
-    # Map engine strings to enum
-    engine_map = {
-        'source engine': EngineType.SOURCE,
-        'unity engine': EngineType.UNITY, 
-        'unreal engine': EngineType.UNREAL
-    }
-    
-    engine_type = engine_map.get(engine_hint.lower() if engine_hint else None, EngineType.UNIVERSAL)
-    
+    # Mapping lives in validation/options_validator.py so there is exactly one
+    # of it. This function used to keep a private dict covering only the three
+    # display names it knew about, which meant the newer engine values —
+    # GoldSrc, Source 2, id Tech, Kex Engine — silently fell through to
+    # UNIVERSAL with nothing to indicate a hint had been dropped.
+    engine_type = engine_type_for(engine_hint)
+
     validator = LaunchOptionsValidator(ValidationLevel.STRICT)
     is_valid, reason = validator.validate_option(command, engine_type)
     

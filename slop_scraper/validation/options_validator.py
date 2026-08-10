@@ -610,28 +610,64 @@ def clean_option_description(description: str, min_length: int = 12) -> Optional
 
 
 # Convenience functions for integration
+def engine_type_for(engine_name: Optional[str]) -> EngineType:
+    """
+    Map a games.engine value onto the EngineType the validator understands.
+
+    This is the single place that translation happens. It used to happen twice:
+    `validate_launch_option` did `EngineType(engine_hint.lower())`, which only
+    accepts the raw enum values 'source'/'unity'/'unreal' and therefore threw a
+    ValueError on every real catalogue value ('Source Engine', 'Unity Engine'),
+    silently falling back to no hint at all; and
+    scrapers/game_specific.py kept its own dict keyed on the lowercased display
+    names. Two mappings meant fixing one did not fix the other — the same
+    duplication that let cleaned-up descriptions be reinstated by the next
+    scrape.
+
+    An engine hint only ever ADDS an acceptance path in _validate_permissive;
+    it can never reject an option that would otherwise pass. So an unrecognised
+    engine costs recall, not correctness, and UNIVERSAL is a safe default.
+
+    Valve's three generations share console-command syntax closely enough that
+    GoldSrc, Source and Source 2 all map to SOURCE. Everything outside the
+    three families the validator has patterns for stays UNIVERSAL rather than
+    being forced into an approximate bucket — id Tech's `+set name value` looks
+    Source-like, but claiming that similarity here would loosen validation for
+    a family whose flags nobody has actually checked against these patterns.
+    """
+    if not engine_name:
+        return EngineType.UNIVERSAL
+
+    name = str(engine_name).strip().lower()
+
+    if name in ('source engine', 'source', 'source 2', 'goldsrc'):
+        return EngineType.SOURCE
+    if name in ('unity engine', 'unity'):
+        return EngineType.UNITY
+    if name in ('unreal engine', 'unreal'):
+        return EngineType.UNREAL
+
+    return EngineType.UNIVERSAL
+
+
 def validate_launch_option(option: str, engine_hint: str = None, strict: bool = False) -> bool:
     """
     Simple function to validate a single launch option
     
     Args:
         option: Launch option to validate
-        engine_hint: Engine type hint ('source', 'unity', 'unreal', etc.)
+        engine_hint: A games.engine value ('Source Engine', 'Unity Engine',
+            'GoldSrc', ...) or a bare enum value ('source'). Unrecognised
+            names fall back to UNIVERSAL rather than raising.
         strict: Use strict validation mode
-        
+
     Returns:
         True if valid, False otherwise
     """
-    
+
     level = ValidationLevel.STRICT if strict else ValidationLevel.PERMISSIVE
-    engine = None
-    
-    if engine_hint:
-        try:
-            engine = EngineType(engine_hint.lower())
-        except ValueError:
-            pass
-    
+    engine = engine_type_for(engine_hint)
+
     validator = LaunchOptionsValidator(level)
     is_valid, _ = validator.validate_option(option, engine)
     
