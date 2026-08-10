@@ -102,8 +102,12 @@ KNOWN_TITLE_ENGINES = {
     'counter-strike 2': 'Source 2',
     'half-life: alyx': 'Source 2',
 
-    # Valve-adjacent but NOT Source: Underlords is a Unity title.
-    'dota underlords': 'Unity Engine',
+    # Source 2, and notable for it: Underlords is the only Source 2 game
+    # released on mobile. Valve extended Source 2 to iOS/Android rather than
+    # porting to another engine, and the shipped files reportedly contain no
+    # Unity code. This entry previously said 'Unity Engine' — asserted from
+    # memory, contradicted by both PCGamingWiki and Wikipedia, and wrong.
+    'dota underlords': 'Source 2',
 
     # --- Bethesda: Gamebryo vs Creation -----------------------------------
     # The split is Skyrim. Everything before it is Gamebryo/NetImmerse; the
@@ -137,8 +141,13 @@ KNOWN_TITLE_ENGINES = {
     'doom ii': 'id Tech',
     'doom 3': 'id Tech',
     'doom eternal': 'id Tech',
-    'quake': 'id Tech',
-    'quake ii': 'id Tech',
+    # 'quake' and 'quake ii' are deliberately absent. Their Steam app IDs now
+    # deliver the Nightdive Enhanced Editions, which run Kex Engine (the
+    # original 1997 executables ship alongside but are not what launches).
+    # That distinction is load-bearing here: the Enhanced Editions accept a
+    # different console command set, so labelling them id Tech would hand
+    # users flags that silently do nothing. PCGamingWiki tracks the shipping
+    # build, so it answers these two.
     'quake iii arena': 'id Tech',
     'quake 4': 'id Tech',
     'quake live': 'id Tech',

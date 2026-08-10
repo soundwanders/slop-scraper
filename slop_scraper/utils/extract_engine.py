@@ -6,12 +6,13 @@ import re
 import requests
 import time
 from typing import Dict, Optional, List
-from bs4 import BeautifulSoup
 
 try:
     from utils.known_engines import lookup_title_engine
+    from utils.pcgw_engines import lookup_engine
 except ImportError:
     from .known_engines import lookup_title_engine
+    from .pcgw_engines import lookup_engine
 
 class EngineDetector:
     """Engine detection using multiple sources and improved patterns"""
@@ -122,45 +123,67 @@ class EngineDetector:
             Detected engine name or 'Unknown'
         """
         
-        # Method 0: the curated title table. Hand-verified per game, so it
-        # outranks every inference below — including the deliberate 'Unknown'
-        # entries, which exist to stop a weaker method from guessing an engine
-        # for a game we know does NOT share its franchise's engine (Fallout 1,
-        # Need for Speed: Shift, Minecraft: Story Mode).
-        curated = lookup_title_engine(game_info.get('name', ''))
-        if curated is not None:
-            return curated
-
-        # Method 1: Check if engine is directly provided by Steam API
-        direct_engine = self._extract_direct_engine(game_info)
-        if direct_engine and direct_engine != 'Unknown':
-            return direct_engine
-
-        # Method 2:  pattern matching on existing Steam data
-        pattern_engine = self._detect_engine_by_patterns(game_info)
-        if pattern_engine and pattern_engine != 'Unknown':
-            return pattern_engine
-        
-        # Method 3 used to guess from the Steam app ID: anything numbered
-        # 200000-300000 was labelled "Unity Engine (heuristic)", anything under
-        # 1000 "Source Engine (heuristic)". An app ID records when a game was
-        # registered with Steam, not what it was built with, so this invented
-        # an engine for hundreds of unrelated games. Removed — 'Unknown' is the
-        # honest answer. _detect_engine_by_appid is kept below but unused, in
-        # case the ranges are ever wanted as a low-confidence signal that is
-        # clearly separated from real evidence.
-
-        # Method 4: External sources (SteamDB, PCGamingWiki)
+        # Method 0: PCGamingWiki's infobox via its Cargo API — sourced,
+        # version-specific, keyed by Steam App ID, and independently
+        # maintained. This is the highest authority available.
+        #
+        # It outranks the curated table below, which is the reverse of the
+        # original ordering. The curated table is a hand-written compilation,
+        # and where the two disagreed the wiki was right and the table wrong
+        # every time it was checked:
+        #
+        #   Dota Underlords  table said Unity;   it is Source 2
+        #   Quake / Quake II table said id Tech; Steam ships Kex Engine
+        #
+        # The table's failure mode is systematic rather than random — it is
+        # least reliable on exactly the obscure titles a fallback exists to
+        # cover — so it is demoted to filling gaps the wiki does not reach.
         if app_id:
             external_engine = self._detect_engine_external(app_id, game_info.get('name', ''))
             if external_engine and external_engine != 'Unknown':
                 return external_engine
-        
-        # Method 5: Advanced heuristics (file analysis, etc.)
+
+        # Method 1: the curated title table, for games PCGamingWiki has no row
+        # for (about 7 in the current catalogue).
+        curated = lookup_title_engine(game_info.get('name', ''))
+        if curated is not None and curated != 'Unknown':
+            return curated
+
+        # Method 2: Check if engine is directly provided by Steam API.
+        # Steam's appdetails carries no engine field in practice, so this is
+        # effectively dead weight kept for other callers that pass richer data.
+        direct_engine = self._extract_direct_engine(game_info)
+        if direct_engine and direct_engine != 'Unknown':
+            return direct_engine
+
+        # A curated entry of 'Unknown' is a deliberate decline: we know this
+        # game does NOT share its franchise's engine (Fallout 1, Need for
+        # Speed: Shift, Minecraft: Story Mode). It exists to stop the GUESSING
+        # below, so it is honoured only after the sourced lookups above have
+        # had their chance.
+        if curated == 'Unknown':
+            return 'Unknown'
+
+        # Method 3: pattern matching on existing Steam data
+        pattern_engine = self._detect_engine_by_patterns(game_info)
+        if pattern_engine and pattern_engine != 'Unknown':
+            return pattern_engine
+
+        # A further method used to guess from the Steam app ID: anything
+        # numbered 200000-300000 was labelled "Unity Engine (heuristic)",
+        # anything under 1000 "Source Engine (heuristic)". An app ID records
+        # when a game was registered with Steam, not what it was built with,
+        # so this invented an engine for hundreds of unrelated games. Removed —
+        # 'Unknown' is the honest answer. _detect_engine_by_appid is kept below
+        # but unused, in case the ranges are ever wanted as a low-confidence
+        # signal that is clearly separated from real evidence.
+
+        # Method 4: retained for call-site compatibility; now a no-op that
+        # always declines. See _detect_engine_heuristic for why.
         heuristic_engine = self._detect_engine_heuristic(game_info)
         if heuristic_engine and heuristic_engine != 'Unknown':
             return heuristic_engine
-        
+
         return 'Unknown'
     
     # Patterns that actually name an engine. Only these may be matched against
@@ -312,97 +335,53 @@ class EngineDetector:
         return 'Unknown'
     
     def _detect_engine_external(self, app_id: int, game_title: str) -> str:
-        """Detect engine using external sources"""
-        
-        # Check cache first
-        cache_key = f"{app_id}_{game_title}"
+        """
+        Engine from PCGamingWiki's structured infobox data, by Steam App ID.
+
+        This replaces two lookups that could not work:
+
+          * SteamDB — scraped steamdb.info HTML, which is Cloudflare-protected
+            and disallows scraping. It never returned a result, and it matched
+            engine patterns against the whole page, so a result would have
+            been unreliable anyway. Removed rather than repaired.
+          * PCGamingWiki via prop=extracts&exintro — that returns the
+            article's intro PROSE, while engines live in the infobox. Right
+            site, wrong endpoint.
+
+        Between them they cost about 2.4 seconds per game and answered nothing.
+        The Cargo API answers properly and in bulk: one fetch covers ~26,800
+        app IDs, cached for a week, so this call is an in-memory dict lookup.
+
+        `game_title` is unused now — matching is by app ID, which is exact,
+        rather than by title string, which is not. It stays in the signature
+        for the existing call site.
+        """
+        if not app_id:
+            return 'Unknown'
+
+        cache_key = f"pcgw_{app_id}"
         if cache_key in self.external_cache:
             return self.external_cache[cache_key]
-        
-        engine = 'Unknown'
-        
-        # Try SteamDB
-        steamdb_engine = self._check_steamdb(app_id)
-        if steamdb_engine != 'Unknown':
-            engine = steamdb_engine
-        
-        # Try PCGamingWiki if SteamDB didn't work
-        if engine == 'Unknown':
-            pcgw_engine = self._check_pcgamingwiki(game_title)
-            if pcgw_engine != 'Unknown':
-                engine = pcgw_engine
-        
-        # Cache the result
+
+        family, _detail = lookup_engine(app_id)
+        engine = family or 'Unknown'
+
         self.external_cache[cache_key] = engine
-        
         return engine
     
-    def _check_steamdb(self, app_id: int) -> str:
-        """Check SteamDB for engine information"""
-        try:
-            url = f"https://steamdb.info/app/{app_id}/"
-            
-            # Rate limiting
-            time.sleep(1)
-            
-            response = requests.get(url, timeout=10, headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            })
-            
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # Look for engine information in various places
-                page_text = soup.get_text().lower()
-                
-                for engine, patterns in self.engine_patterns.items():
-                    if any(pattern in page_text for pattern in patterns):
-                        return f"{engine} (SteamDB)"
-            
-        except Exception as e:
-            print(f"SteamDB lookup failed for {app_id}: {e}")
-        
-        return 'Unknown'
-    
-    def _check_pcgamingwiki(self, game_title: str) -> str:
-        """Check PCGamingWiki for engine information"""
-        try:
-            # Format title for PCGamingWiki
-            formatted_title = game_title.replace(' ', '_').replace(':', '')
-            
-            # PCGamingWiki API
-            api_url = "https://www.pcgamingwiki.com/w/api.php"
-            params = {
-                "action": "query",
-                "format": "json", 
-                "titles": formatted_title,
-                "prop": "extracts",
-                "exintro": True,
-                "explaintext": True
-            }
-            
-            # Rate limiting
-            time.sleep(1)
-            
-            response = requests.get(api_url, params=params, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if 'query' in data and 'pages' in data['query']:
-                    for page_id, page_data in data['query']['pages'].items():
-                        if 'extract' in page_data:
-                            extract_text = page_data['extract'].lower()
-                            
-                            for engine, patterns in self.engine_patterns.items():
-                                if any(pattern in extract_text for pattern in patterns):
-                                    return f"{engine} (PCGamingWiki)"
-            
-        except Exception as e:
-            print(f"PCGamingWiki lookup failed for {game_title}: {e}")
-        
-        return 'Unknown'
-    
+    # _check_steamdb and _check_pcgamingwiki were removed here.
+    #
+    # SteamDB scraped steamdb.info HTML, which is Cloudflare-protected and
+    # disallows scraping; it never returned a result. PCGamingWiki queried
+    # prop=extracts&exintro, the article intro prose, while engine data lives
+    # in the infobox — so it could not return one either. Both then
+    # substring-matched engine patterns against a whole page, which would have
+    # been unreliable even had they worked.
+    #
+    # utils/pcgw_engines.py queries the same wiki through its Cargo API, which
+    # exposes the infobox as structured data keyed by Steam App ID. See
+    # _detect_engine_external above.
+
     def _detect_engine_heuristic(self, game_info: Dict) -> str:
         """
         Retained as a no-op so the call site and its ordering stay intact.
