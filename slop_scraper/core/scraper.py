@@ -46,21 +46,26 @@ except ImportError:
     from utils.results_utils import save_test_results, save_game_results
     from validation import LaunchOptionsValidator, ValidationLevel, EngineType
 
-# Anchored to the project root (parent of the package) so the same progress
-# file is used no matter which directory the scraper is launched from.
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Runtime state lives under _local/state/, anchored to the repository root so
+# the same file is used no matter which directory the scraper is launched
+# from. See utils/paths.py — legacy copies in the repo root are migrated on
+# first access so an in-flight rescan keeps its progress.
+try:
+    from utils.paths import state_path, cache_path, PROJECT_ROOT as _PROJECT_ROOT
+except ImportError:
+    from ..utils.paths import state_path, cache_path, PROJECT_ROOT as _PROJECT_ROOT
 
-RESCAN_PROGRESS_FILE = os.path.join(_PROJECT_ROOT, 'rescan_progress.json')
+RESCAN_PROGRESS_FILE = state_path('rescan_progress.json')
 
 # Games saved while PCGamingWiki returned an inconclusive empty result (site
 # outage/circuit breaker, not a confirmed "no options on wiki"). skip_existing
 # and the rescan progress file would otherwise never revisit these games, so
 # their PCGamingWiki data would be silently lost for good once the site
 # recovers. Tracked separately so `--pcgw-recheck` can target exactly these.
-PCGW_RECHECK_FILE = os.path.join(_PROJECT_ROOT, 'pcgw_recheck_needed.json')
+PCGW_RECHECK_FILE = state_path('pcgw_recheck_needed.json')
 
 class SlopScraper:
-    def __init__(self, test_mode=False, cache_file='appdetails_cache.json',
+    def __init__(self, test_mode=False, cache_file=None,
                  rate_limit=None, force_refresh=False, max_games=100,
                  output_dir="./test-output", debug=False, skip_existing=True,
                  rescan=False, pcgw_recheck=False):
@@ -80,7 +85,10 @@ class SlopScraper:
         self.test_mode = test_mode
         self.force_refresh = force_refresh
         self.rate_limit = SecurityConfig.validate_rate_limit(rate_limit or 2.0)
-        self.cache_file = cache_file
+        # A bare relative default meant the cache landed in whatever
+        # directory the scraper happened to be launched from, silently
+        # starting a second empty cache. Always resolve to _local/cache/.
+        self.cache_file = cache_file or cache_path('appdetails_cache.json')
         self.max_games = SecurityConfig.validate_games_limit(max_games)
         self.output_dir = SecurityConfig.validate_output_path(output_dir)
         self.failed_cache = set()

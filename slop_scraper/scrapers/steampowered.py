@@ -266,10 +266,12 @@ def _fetch_applist_istoreservice(rate_limiter, session_monitor, debug):
 STEAMSPY_MAX_PAGE = 86
 STEAMSPY_PAGES_PER_RUN = 3  # ~3000 apps/run is plenty of new-candidate headroom
 
-STEAMSPY_CURSOR_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    'steamspy_page_cursor.json'
-)
+try:
+    from utils.paths import state_path as _state_path
+except ImportError:
+    from ..utils.paths import state_path as _state_path
+
+STEAMSPY_CURSOR_FILE = _state_path('steamspy_page_cursor.json')
 
 
 def _load_steamspy_cursor():

@@ -11,27 +11,11 @@ package-lock.json
 node_modules
 changelog.md
 SecurityAudit.MD
-appdetails_cache.json
-*/appdetails_cache.json
-*/appdetails_cache
-/appdetails_cache
 test-output
 */test-output/
 */old_scraper
 old_scraper
 .vscode
-
-# rescan log
-rescan_progress.json
-*/rescan_progress.json
-
-# steamspy discovery page cursor
-steamspy_page_cursor.json
-*/steamspy_page_cursor.json
-
-# pcgamingwiki outage recheck tracking
-pcgw_recheck_needed.json
-*/pcgw_recheck_needed.json
 
 slop-scraper-fixes.md
 vanilla-slops-handoff.md
@@ -119,12 +103,15 @@ jspm_packages/
 
 # targeted re-heal maintenance run
 slop_scraper/reheal*.py
-reheal_progress.json
 curated_desc_rollback_*.json
 flag_dictionary_draft.md
 flag_dict_rollback_*.json
 link_rollback_*.json
 engine_rollback_*.json
 
-# local-only working data (rollbacks, scratch)
+# All local-only working data: runtime state (resume cursors, progress logs),
+# the Steam metadata cache, and rollback snapshots. These used to be ignored
+# file-by-file in the repo root, so every new state file needed a new rule and
+# a missed one would commit operational state to a public repo. utils/paths.py
+# puts them all under here instead, so one rule covers the lot.
 _local/
