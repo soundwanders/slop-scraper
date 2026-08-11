@@ -19,7 +19,7 @@ try:
     from ..scrapers.steampowered import get_steam_game_list
     from ..scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options, pcgamingwiki_needs_recheck
     from ..scrapers.steamcommunity import fetch_steam_community_launch_options
-    from ..scrapers.game_specific import fetch_game_specific_options
+    from ..scrapers.game_specific import fetch_game_specific_options, _option_family
     from ..scrapers.protondb import fetch_protondb_launch_options
     from ..utils.results_utils import save_test_results, save_game_results
     from ..validation import LaunchOptionsValidator, ValidationLevel, EngineType
@@ -41,7 +41,7 @@ except ImportError:
     from scrapers.steampowered import get_steam_game_list
     from scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options, pcgamingwiki_needs_recheck
     from scrapers.steamcommunity import fetch_steam_community_launch_options
-    from scrapers.game_specific import fetch_game_specific_options
+    from scrapers.game_specific import fetch_game_specific_options, _option_family
     from scrapers.protondb import fetch_protondb_launch_options
     from utils.results_utils import save_test_results, save_game_results
     from validation import LaunchOptionsValidator, ValidationLevel, EngineType
@@ -68,7 +68,7 @@ class SlopScraper:
     def __init__(self, test_mode=False, cache_file=None,
                  rate_limit=None, force_refresh=False, max_games=100,
                  output_dir="./test-output", debug=False, skip_existing=True,
-                 rescan=False, pcgw_recheck=False):
+                 rescan=False, rescan_engines=False, pcgw_recheck=False):
         
         # Add validation statistics tracking
         self.validation_stats = {
@@ -97,6 +97,9 @@ class SlopScraper:
         self.skip_existing = skip_existing  # Store skip_existing setting
         self.db_client = None  # Database client wrapper
         self.rescan = rescan  # Re-scan games already in the database
+        # Narrow the rescan to games whose engine maps to a block of
+        # engine-specific options. See _get_rescan_games.
+        self.rescan_engines = rescan_engines
         self.pcgw_recheck = pcgw_recheck  # Re-scan only games flagged for a PCGamingWiki recheck
 
         # Security monitoring and rate limiting
@@ -231,7 +234,7 @@ class SlopScraper:
 
     def _get_rescan_games(self):
         """
-        Pull ALL games already in the database for re-scanning, thinnest first.
+        Pull games already in the database for re-scanning, thinnest first.
 
         Every stored game is a candidate — including games with zero options,
         which may simply have been scraped while the scrapers were broken.
@@ -239,6 +242,19 @@ class SlopScraper:
         benefit most. Already-rescanned games (tracked locally in
         rescan_progress.json) are excluded so the campaign can be run in
         --limit sized chunks across many sessions.
+
+        With rescan_engines set, the candidate pool is narrowed to games whose
+        engine maps to a block of engine-specific options. The two orderings
+        pull in opposite directions and the reason is worth stating: engine
+        blocks are keyed on games.engine, so a game with no engine — or an
+        engine with no documented flags, which is most of the long tail — can
+        never gain anything from an engine re-run. Those are also exactly the
+        games that sort FIRST under thinnest-first, because having no options
+        is why they are thin. A blind rescan therefore spends most of its
+        runtime on the games it cannot help. Measured against the live
+        catalogue: 684 of 2,402 games can receive engine-specific options, and
+        680 of those already have options, so they sit at the very back of the
+        default queue.
         """
         if not self.supabase:
             print("❌ Rescan requires a database connection")
@@ -268,6 +284,12 @@ class SlopScraper:
             print(f"⚠️ Rescan query failed: {e}")
             return []
 
+        if self.rescan_engines:
+            eligible = [r for r in rows if _option_family(r.get('engine'))]
+            print(f"🔧 Engine-targeted rescan: {len(eligible)} of {len(rows)} games "
+                  f"have an engine with documented launch options")
+            rows = eligible
+
         total_candidates = len(rows)
 
         games = []
@@ -285,9 +307,14 @@ class SlopScraper:
             if len(games) >= self.max_games:
                 break
 
-        remaining = total_candidates - len(done)
+        # Counted against the candidate pool rather than as
+        # total_candidates - len(done): the progress file is shared across
+        # rescan modes, so under --rescan-engines it holds app_ids that are not
+        # in this pool at all and subtracting its length would under-report.
+        already_done = sum(1 for r in rows if r['app_id'] in done)
+        remaining = total_candidates - already_done
         print(f"🔁 Rescan: {total_candidates} games in DB, "
-              f"{len(done)} already re-scanned, {max(0, remaining)} remaining")
+              f"{already_done} already re-scanned, {max(0, remaining)} remaining")
         if not games and total_candidates:
             print(f"✅ Rescan campaign complete — delete {RESCAN_PROGRESS_FILE} to start a new one")
 

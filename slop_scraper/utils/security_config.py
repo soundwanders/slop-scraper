@@ -1,7 +1,7 @@
 import os
 import time
 from typing import Optional
-from pathlib import Path
+from pathlib import Path, PurePath
 
 class SecurityConfig:
     """Security configuration and validation for slop_scraper"""
@@ -67,13 +67,21 @@ class SecurityConfig:
                     print(f"⚠️ Output path outside working directory. Using default.")
                     return "./test-output"
                 
-                # Check against allowed directory patterns
+                # Check against allowed directory patterns.
+                #
+                # relative_to() yields a bare relative path ('test-output'),
+                # while ALLOWED_OUTPUT_DIRS is written './'-prefixed. Comparing
+                # the two directly meant even the DEFAULT output directory
+                # failed validation and warned on every single run — which
+                # trains the operator to ignore a security warning. Both sides
+                # are normalised to a bare first path component before
+                # comparison.
                 path_str = str(resolved_path.relative_to(cwd))
-                if not any(path_str.startswith(allowed) for allowed in cls.ALLOWED_OUTPUT_DIRS):
-                    # Allow if it's a subdirectory of an allowed directory
-                    if not any(allowed in path_str for allowed in cls.ALLOWED_OUTPUT_DIRS):
-                        print(f"⚠️ Output path not in allowed directories. Using default.")
-                        return "./test-output"
+                top_level = PurePath(path_str).parts[0] if path_str not in ('', '.') else ''
+                allowed_names = {PurePath(d).parts[-1] for d in cls.ALLOWED_OUTPUT_DIRS}
+                if top_level not in allowed_names:
+                    print(f"⚠️ Output path not in allowed directories. Using default.")
+                    return "./test-output"
             
             # Additional safety checks
             path_str = str(resolved_path)

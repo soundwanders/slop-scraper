@@ -29,8 +29,8 @@ def setup_argument_parser():
     """Set up and return the argument parser for CLI arguments"""
     parser = argparse.ArgumentParser(description='Steam Launch Options Scraper')
     parser.add_argument('--test', action='store_true', help='Run in test mode')
-    parser.add_argument('--limit', type=int, default=5, 
-                       help=f'Maximum number of games to process (max: {SecurityConfig.MAX_GAMES_LIMIT})')
+    parser.add_argument('--limit', type=int, default=50,
+                       help=f'Maximum number of games to process (default: 50, max: {SecurityConfig.MAX_GAMES_LIMIT})')
     parser.add_argument('--rate', type=float, default=2.0, 
                        help=f'Rate limit in seconds between requests (min: {SecurityConfig.MIN_RATE_LIMIT})')
     parser.add_argument('--output', type=str, default='./test-output', 
@@ -52,6 +52,11 @@ def setup_argument_parser():
     parser.add_argument('--rescan', action='store_true',
                        help='Re-scan games already in the database (thinnest option counts first); '
                             'new options are added, existing data is never overwritten')
+    parser.add_argument('--rescan-engines', action='store_true',
+                       help='Narrow --rescan to games whose engine has documented launch options '
+                            '(Source, Unity, Unreal, id Tech, Creation, Frostbite). Use after an '
+                            'engine-metadata change, when a full rescan would spend most of its '
+                            'runtime on games no engine block applies to')
     parser.add_argument('--rescan-reset', action='store_true',
                        help='Clear rescan progress tracking and start the rescan campaign over')
     parser.add_argument('--pcgw-recheck', action='store_true',
@@ -320,11 +325,19 @@ def main():
         if not args.rescan:
             sys.exit(0)
 
+    if args.rescan_engines and not args.rescan:
+        print("❌ --rescan-engines narrows --rescan; pass --rescan as well")
+        sys.exit(1)
+
     if args.rescan:
         if args.test:
             print("❌ --rescan requires production mode (it re-processes database games); drop --test")
             sys.exit(1)
-        print("🔁 Rescan mode: re-processing existing database games, thinnest option counts first")
+        if args.rescan_engines:
+            print("🔁 Rescan mode: engine-targeted — only games whose engine has "
+                  "documented launch options, thinnest option counts first")
+        else:
+            print("🔁 Rescan mode: re-processing existing database games, thinnest option counts first")
 
     if args.pcgw_recheck:
         if args.test:
@@ -355,6 +368,7 @@ def main():
         debug=slops_debug,  # Pass debug flag
         skip_existing=args.skip_existing,  # Pass skip_existing flag
         rescan=args.rescan,  # Re-scan existing database games
+        rescan_engines=args.rescan_engines,  # ...narrowed to engines with documented options
         pcgw_recheck=args.pcgw_recheck  # Re-scan only PCGamingWiki-outage-flagged games
     )
     
