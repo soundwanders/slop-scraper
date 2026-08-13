@@ -808,8 +808,43 @@ def save_to_database(game, options, supabase):
             "developer": game.get('developer', ''),
             "publisher": game.get('publisher', ''),
             "release_date": normalize_release_date(game.get('release_date', '')),
-            "engine": game.get('engine', 'Unknown')
         }
+
+        # The engine is written only when it can account for itself.
+        #
+        # This column previously wrote game['engine'] unconditionally and
+        # never wrote engine_source at all, so ordinary scraper runs added
+        # games carrying an engine with no provenance — 18 of them, all after
+        # the backfill that was supposed to have made the column 100% sourced.
+        # The rule lived only in the backfill script; the live path did not
+        # know about it.
+        #
+        # Four cases, and the distinctions matter:
+        engine = game.get('engine') or 'Unknown'
+        engine_source = game.get('engine_source')
+
+        if engine_source:
+            # Fresh detection that named its method. Store all three.
+            game_data["engine"] = engine
+            game_data["engine_detail"] = game.get('engine_detail')
+            game_data["engine_source"] = engine_source
+        elif engine == 'Unknown':
+            # A decline needs no provenance — "we do not know" is always
+            # honest, and recording it stops a later pass from re-guessing.
+            game_data["engine"] = 'Unknown'
+        elif 'engine_source' not in game:
+            # A rescan echo: this dict was built from the stored row and
+            # carries no provenance key at all. Write the engine straight back
+            # and say nothing about engine_source, so the upsert leaves the
+            # existing value intact instead of nulling 1,468 of them.
+            game_data["engine"] = engine
+        else:
+            # Detection ran, produced a real-looking engine, and could not say
+            # what established it — the keyword fallback in
+            # extract_engine_safely. Omit the column entirely: a label nothing
+            # backs is not written, and an existing good label is not
+            # clobbered by this save either.
+            pass
 
         res = supabase.table("games").upsert(
             game_data,

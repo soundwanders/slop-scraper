@@ -114,15 +114,39 @@ class EngineDetector:
     def detect_engine_comprehensive(self, game_info: Dict, app_id: int = None) -> str:
         """
         Comprehensive engine detection using multiple methods
-        
-        Args:
-            game_info: Steam API game information
-            app_id: Steam app ID
-            
-        Returns:
-            Detected engine name or 'Unknown'
+
+        Returns the engine family only. Callers that persist the result should
+        use detect_engine_with_provenance instead — storing an engine without
+        recording what established it is what left 18 games carrying a label
+        nothing could account for.
         """
-        
+        engine, _detail, _source = self.detect_engine_with_provenance(game_info, app_id)
+        return engine
+
+    def detect_engine_with_provenance(self, game_info: Dict, app_id: int = None):
+        """
+        Engine detection that also reports WHERE the answer came from.
+
+        Returns (engine, detail, source):
+
+            engine  stable family name, or 'Unknown'
+            detail  the source's own precise wording ('Unreal Engine 4'), or
+                    None when the method has no finer wording to offer
+            source  'pcgamingwiki' | 'curated' | 'steam-field' |
+                    'steam-description' | None when engine is 'Unknown'
+
+        The detection order below is unchanged; the only new behaviour is that
+        the deciding method is named rather than discarded.
+
+        This exists because detect_engine_comprehensive returned a bare string,
+        so every caller that saved an engine had no provenance to save with it.
+        The backfill script recorded engine_source, but the live write path
+        could not — the same rule living in two places, with only one of them
+        enforcing it. Games added by ordinary scraper runs therefore arrived
+        with an engine and no way to justify it, which is exactly the state a
+        cleanup had already been run to eliminate.
+        """
+
         # Method 0: PCGamingWiki's infobox via its Cargo API — sourced,
         # version-specific, keyed by Steam App ID, and independently
         # maintained. This is the highest authority available.
@@ -139,22 +163,26 @@ class EngineDetector:
         # least reliable on exactly the obscure titles a fallback exists to
         # cover — so it is demoted to filling gaps the wiki does not reach.
         if app_id:
-            external_engine = self._detect_engine_external(app_id, game_info.get('name', ''))
+            external_engine, external_detail = self._detect_engine_external(
+                app_id, game_info.get('name', ''))
             if external_engine and external_engine != 'Unknown':
-                return external_engine
+                return external_engine, external_detail, 'pcgamingwiki'
 
         # Method 1: the curated title table, for games PCGamingWiki has no row
         # for (about 7 in the current catalogue).
         curated = lookup_title_engine(game_info.get('name', ''))
         if curated is not None and curated != 'Unknown':
-            return curated
+            # The table stores one family name and no finer wording, so there
+            # is no detail to report — None rather than echoing the family,
+            # which would imply a precision the table does not have.
+            return curated, None, 'curated'
 
         # Method 2: Check if engine is directly provided by Steam API.
         # Steam's appdetails carries no engine field in practice, so this is
         # effectively dead weight kept for other callers that pass richer data.
         direct_engine = self._extract_direct_engine(game_info)
         if direct_engine and direct_engine != 'Unknown':
-            return direct_engine
+            return direct_engine, None, 'steam-field'
 
         # A curated entry of 'Unknown' is a deliberate decline: we know this
         # game does NOT share its franchise's engine (Fallout 1, Need for
@@ -162,12 +190,15 @@ class EngineDetector:
         # below, so it is honoured only after the sourced lookups above have
         # had their chance.
         if curated == 'Unknown':
-            return 'Unknown'
+            return 'Unknown', None, None
 
-        # Method 3: pattern matching on existing Steam data
+        # Method 3: pattern matching on existing Steam data. Only unambiguous
+        # engine names are matched (see _ENGINE_NAME_PATTERNS), so a hit means
+        # the store page itself said "made with Unity" — real evidence, but
+        # weaker and more restatable than the wiki, hence its own source name.
         pattern_engine = self._detect_engine_by_patterns(game_info)
         if pattern_engine and pattern_engine != 'Unknown':
-            return pattern_engine
+            return pattern_engine, None, 'steam-description'
 
         # A further method used to guess from the Steam app ID: anything
         # numbered 200000-300000 was labelled "Unity Engine (heuristic)",
@@ -182,9 +213,9 @@ class EngineDetector:
         # always declines. See _detect_engine_heuristic for why.
         heuristic_engine = self._detect_engine_heuristic(game_info)
         if heuristic_engine and heuristic_engine != 'Unknown':
-            return heuristic_engine
+            return heuristic_engine, None, 'heuristic'
 
-        return 'Unknown'
+        return 'Unknown', None, None
     
     # Patterns that actually name an engine. Only these may be matched against
     # free-form store prose; a franchise or studio name appearing in a
@@ -334,9 +365,14 @@ class EngineDetector:
         
         return 'Unknown'
     
-    def _detect_engine_external(self, app_id: int, game_title: str) -> str:
+    def _detect_engine_external(self, app_id: int, game_title: str):
         """
         Engine from PCGamingWiki's structured infobox data, by Steam App ID.
+
+        Returns (family, detail) — e.g. ('Unreal Engine', 'Unreal Engine 4').
+        The wiki's precise wording used to be fetched and then thrown away
+        here, which meant engine_detail could only ever be populated by the
+        one-off backfill and never by a live scrape.
 
         This replaces two lookups that could not work:
 
@@ -357,17 +393,17 @@ class EngineDetector:
         for the existing call site.
         """
         if not app_id:
-            return 'Unknown'
+            return 'Unknown', None
 
         cache_key = f"pcgw_{app_id}"
         if cache_key in self.external_cache:
             return self.external_cache[cache_key]
 
-        family, _detail = lookup_engine(app_id)
-        engine = family or 'Unknown'
+        family, detail = lookup_engine(app_id)
+        result = (family or 'Unknown', detail)
 
-        self.external_cache[cache_key] = engine
-        return engine
+        self.external_cache[cache_key] = result
+        return result
     
     # _check_steamdb and _check_pcgamingwiki were removed here.
     #
@@ -403,6 +439,17 @@ class EngineDetector:
 def extract_engine(game_info: Dict, app_id: int = None) -> str:
     detector = EngineDetector()
     return detector.detect_engine_comprehensive(game_info, app_id)
+
+
+def extract_engine_with_provenance(game_info: Dict, app_id: int = None):
+    """
+    (engine, detail, source) for a game — the form to use when SAVING.
+
+    extract_engine() above returns the family alone and is kept for callers
+    that only need to display or compare it.
+    """
+    detector = EngineDetector()
+    return detector.detect_engine_with_provenance(game_info, app_id)
 
 # Batch processing function for updating existing database
 def update_unknown_engines_batch(supabase_client, limit: int = 100):

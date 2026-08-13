@@ -10,13 +10,13 @@ import unicodedata
 from tqdm import tqdm
 
 try:
-    from ..utils.extract_engine import extract_engine
+    from ..utils.extract_engine import extract_engine, extract_engine_with_provenance
     from ..utils.dates import normalize_release_date
 except ImportError:
     import sys
     import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from utils.extract_engine import extract_engine
+    from utils.extract_engine import extract_engine, extract_engine_with_provenance
     from utils.dates import normalize_release_date
 
 def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=False, 
@@ -509,14 +509,20 @@ def fetch_game_metadata(app_id, name, cache, debug, rate_limiter, session_monito
             print(f"⚠️ Rejecting non-Latin-script title: {official_name!r} ({app_id})")
         return None
 
-    # Extract complete metadata
+    # Extract complete metadata. The engine is carried with the method that
+    # established it — an engine saved without its provenance cannot later be
+    # told apart from a guess, and the catalogue's rule is that it must be.
+    engine, engine_detail, engine_source = extract_engine_safely(store_data, app_id)
+
     enriched_game = {
         "appid": app_id,
         "name": official_name,
         "developer": extract_developer_safely(store_data),
         "publisher": extract_publisher_safely(store_data),
         "release_date": normalize_release_date(extract_release_date_safely(store_data)),
-        "engine": extract_engine_safely(store_data, app_id)
+        "engine": engine,
+        "engine_detail": engine_detail,
+        "engine_source": engine_source,
     }
 
     return enriched_game
@@ -587,12 +593,19 @@ def extract_release_date_safely(game_info):
         return ''
 
 def extract_engine_safely(game_info, app_id=None):
-    """Extract game engine using enhanced detection"""
+    """
+    (engine, detail, source) for a game, never raising.
+
+    The fallback returns source=None deliberately. basic_engine_detection is a
+    keyword guess over the title and developer, so labelling its output with a
+    source would assert an authority behind it that does not exist. A None
+    source is what the save path uses to decide the value is not worth
+    persisting.
+    """
     try:
-        return extract_engine(game_info, app_id)
+        return extract_engine_with_provenance(game_info, app_id)
     except Exception:
-        # Fallback to basic detection
-        return basic_engine_detection(game_info)
+        return basic_engine_detection(game_info), None, None
 
 def basic_engine_detection(game_info):
     """Basic engine detection fallback"""
