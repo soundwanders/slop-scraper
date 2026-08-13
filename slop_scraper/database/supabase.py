@@ -600,15 +600,16 @@ def _vetted_description(option: dict) -> Optional[str]:
 def _verification_method_for_source(source: str) -> str:
     """
     How last_verified_at was established. Live-scraped sources get their own
-    tag; manual_curation is 'manual'; everything else (game_specific.py's
-    engine-block lists, documentation-derived sources) is re-emitted from a
-    static list each run rather than freshly fetched, so 'curated' rather
-    than implying a live re-check happened.
+    tag; everything else (game_specific.py's engine-block lists, 'Universal',
+    documentation-derived sources) is re-emitted from a static list each run
+    rather than freshly fetched, so 'curated' rather than implying a live
+    re-check happened.
+
+    The legacy 'manual_curation' source, which mapped to 'manual' here, was
+    retired by migrations/004 — no scraper ever emitted it.
     """
     if source in _SCRAPED_VERIFICATION_METHODS:
         return _SCRAPED_VERIFICATION_METHODS[source]
-    if source == 'manual_curation':
-        return 'manual'
     return 'curated'
 
 
