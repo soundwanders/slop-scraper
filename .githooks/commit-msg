@@ -1,8 +1,69 @@
 #!/bin/sh
-# Strip AI co-author trailers before a commit is recorded.
+# Keep AI attribution out of every commit message.
 #
-# This repository's history was rewritten once to remove them; PR refs that
-# GitHub retains permanently still carry the old ones, so the only thing we
-# control is that no NEW commit reintroduces the attribution.
-grep -viE '^[[:space:]]*co-authored-by:.*(claude|anthropic)' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+# GitHub counts Co-Authored-By trailers toward a repository's contributor list,
+# so an attribution line is not cosmetic — it changes who this project appears
+# to have been written by. This repository's history was rewritten once to
+# remove them; PR refs that GitHub retains permanently still carry the old
+# ones, so the only thing we control is that no NEW commit reintroduces it.
+#
+# Two stages, because stripping alone is not enough — it removes only the exact
+# forms it knows about and silently passes everything else:
+#
+#   1. Strip the known attribution lines, so ordinary commits just succeed.
+#   2. Refuse the commit if any Claude/Anthropic mention survives stage 1. An
+#      unrecognised form should stop and be looked at, not slip through.
+#
+# Deliberate override, when a message genuinely needs to name one of these:
+# git commit --no-verify.
+#
+# The commit-message file path is passed as $1.
+
+msg="$1"
+tmp="$msg.attrib"
+
+# Stage 1 — drop the attribution lines we know by shape:
+#   Co-Authored-By: … Claude / Anthropic
+#   any line carrying the Anthropic noreply address
+#   "Generated with [Claude Code]", with or without its 🤖 prefix
+#
+# grep exits non-zero when it filters out every line, which would leave the
+# message untouched and a stray temp file behind, so the branch is on grep's
+# status rather than chaining the mv onto it.
+if grep -viE \
+        -e '^[[:space:]]*co-authored-by:[[:space:]]*.*(claude|anthropic)' \
+        -e 'noreply@anthropic\.com' \
+        -e 'generated with[[:space:]]*\[?claude' \
+        "$msg" > "$tmp"; then
+    mv "$tmp" "$msg"
+else
+    # Nothing survived the filter (or grep failed). Leave the message alone and
+    # let stage 2 refuse it, rather than handing git an empty file.
+    rm -f "$tmp"
+fi
+
+# Any blank line left dangling by the strip is git's problem, not ours — the
+# default --cleanup=strip drops leading/trailing blanks and collapses runs.
+
+# Stage 2 — refuse anything that still names Claude or Anthropic.
+#
+# Only the real message is scanned. `git commit -v` appends the full diff below
+# a scissors line, and comment lines carry git's own help text; git discards
+# both before writing the commit, and the diff can legitimately contain these
+# words — this hook's own source does. Scanning them would make this file
+# uncommittable.
+residual=$(sed '/^#.*>8/,$d' "$msg" | grep -v '^#' | grep -iE 'claude|anthropic')
+
+if [ -n "$residual" ]; then
+    echo "" >&2
+    echo "✖ Commit blocked: Claude/Anthropic attribution in the commit message." >&2
+    echo "" >&2
+    echo "$residual" | sed 's/^/    /' >&2
+    echo "" >&2
+    echo "  This repo credits its maintainer only. Remove the line(s) above and" >&2
+    echo "  recommit, or use --no-verify if the mention is deliberate." >&2
+    echo "" >&2
+    exit 1
+fi
+
 exit 0
