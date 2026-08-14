@@ -24,10 +24,21 @@ backfill_tracking.json
 # Internal tooling — DB schema evolution and one-off/maintenance scripts stay
 # local. They're operational history and data-cleanup heuristics, not part
 # of the scraper's public product surface.
+#
+# One directory rule rather than per-filename patterns. The old
+# slop_scraper/backfill*.py and slop_scraper/cleanup*.py globs were keyed on
+# where the scripts happened to sit, so relocating them would have silently
+# made every one of them tracked — the same failure the _local/ rule was
+# introduced to end.
 migrations/
+slop_scraper/maintenance/
+description_rollback_*.json
+
+# Kept so the old locations stay ignored if a script is ever restored there.
 slop_scraper/backfill*.py
 slop_scraper/cleanup*.py
-description_rollback_*.json
+slop_scraper/fix_dates.py
+slop_scraper/reheal*.py
 
 # build
 dist
