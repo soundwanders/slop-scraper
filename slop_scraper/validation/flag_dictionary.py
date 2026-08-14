@@ -122,6 +122,169 @@ FLAG_DICTIONARY = {
         'authority': 'per-game conventions; not a Source or Unity standard',
         'scope': 'game-specific spelling',
     },
+
+    # ---- Unity standalone player ------------------------------------------
+    # All verified against the Unity Manual, "Standalone Player command line
+    # arguments". Platform limits below are Unity's own, not inferences.
+    #
+    # Note what is NOT here: -force-opengl, on 803 games. Unity documents
+    # -force-glcore; -force-opengl does not appear in the manual, and the row
+    # claiming 'Unity Documentation' as its source actually links to
+    # PCGamingWiki. Undocumented, so no entry.
+    '-popupwindow': {
+        'description': 'Run in a borderless window',
+        'effect': 'Creates the window as a dialog with no frame. Not supported on macOS.',
+        'usage_example': '-popupwindow',
+        'authority': 'Unity Manual — Standalone Player command line arguments',
+        'scope': 'Unity games',
+    },
+    '-force-d3d11': {
+        'description': 'Force the Direct3D 11 renderer',
+        'effect': 'Windows only.',
+        'usage_example': '-force-d3d11',
+        'authority': 'Unity Manual — Standalone Player command line arguments',
+        'scope': 'Unity games',
+    },
+    '-force-d3d12': {
+        'description': 'Force the Direct3D 12 renderer',
+        'effect': 'Windows only.',
+        'usage_example': '-force-d3d12',
+        'authority': 'Unity Manual — Standalone Player command line arguments',
+        'scope': 'Unity games',
+    },
+    '-force-vulkan': {
+        'description': 'Force the Vulkan renderer',
+        'effect': 'Useful where the default backend crashes or performs badly; ignored '
+                  'if the build has no Vulkan path.',
+        'usage_example': '-force-vulkan',
+        'authority': 'Unity Manual — Standalone Player command line arguments',
+        'scope': 'Unity games',
+    },
+    '-force-low-power-device': {
+        'description': 'Use the low-power GPU',
+        'effect': 'macOS only. Picks the integrated GPU over the discrete one, trading '
+                  'performance for battery life.',
+        'usage_example': '-force-low-power-device',
+        'authority': 'Unity Manual — Standalone Player command line arguments',
+        'scope': 'Unity games, macOS',
+    },
+    '-window-mode': {
+        'description': 'Override fullscreen windowed mode',
+        'effect': 'Takes exclusive or borderless. Windows only. The flag alone does '
+                  'nothing — the value is required.',
+        'usage_example': '-window-mode borderless',
+        'authority': 'Unity Manual — Standalone Player command line arguments',
+        'scope': 'Unity games, Windows',
+    },
+    '-screen-width': {
+        'description': 'Override the screen width',
+        'effect': 'Must be an integer from a resolution the game supports. Pair with '
+                  '-screen-height; alone it can leave a mismatched aspect ratio.',
+        'usage_example': '-screen-width 1920 -screen-height 1080',
+        'authority': 'Unity Manual — Standalone Player command line arguments',
+        'scope': 'Unity games',
+    },
+    '-screen-height': {
+        'description': 'Override the screen height',
+        'effect': 'Must be an integer from a resolution the game supports. Pair with '
+                  '-screen-width.',
+        'usage_example': '-screen-width 1920 -screen-height 1080',
+        'authority': 'Unity Manual — Standalone Player command line arguments',
+        'scope': 'Unity games',
+    },
+
+    # ---- Unreal Engine ----------------------------------------------------
+    # Verified against Epic's "Unreal Engine Command-Line Arguments Reference".
+    # Quoted definitions there are terse ("Use all available cores."), so the
+    # effect text below adds only what the reference itself states.
+    #
+    # NOT here, and both high-reach: -sm4 (234 games) and -malloc=system (233).
+    # Neither appears in Epic's reference. -sm4's stored description also
+    # asserts "Significant performance improvement in UE games", which is a
+    # performance claim with nothing behind it.
+    '-USEALLAVAILABLECORES': {
+        'description': 'Use all available CPU cores',
+        'effect': 'Lifts a core-count limit the engine would otherwise apply. Epic '
+                  'documents it as "Use all available cores."',
+        'usage_example': '-USEALLAVAILABLECORES',
+        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
+        'scope': 'Unreal Engine games',
+    },
+    '-dx11': {
+        'description': 'Use the DirectX 11 renderer',
+        'effect': 'Selects DX11 as the RHI. Ignored by builds without a DX11 path.',
+        'usage_example': '-dx11',
+        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
+        'scope': 'Unreal Engine games',
+    },
+    '-dx12': {
+        'description': 'Use the DirectX 12 renderer',
+        'effect': 'Selects DX12 as the RHI. Ignored by builds without a DX12 path.',
+        'usage_example': '-dx12',
+        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
+        'scope': 'Unreal Engine games',
+    },
+    '-windowed': {
+        'description': 'Run in windowed mode',
+        'effect': 'Epic documents pairing it with an explicit resolution.',
+        'usage_example': '-windowed -ResX=1920 -ResY=1080',
+        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
+        'scope': 'Unreal Engine games',
+    },
+    '-fullscreen': {
+        'description': 'Run in fullscreen mode',
+        'effect': 'Overrides a saved windowed preference.',
+        'usage_example': '-fullscreen',
+        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
+        'scope': 'Unreal Engine games',
+    },
+    '-ResX': {
+        'description': 'Set the window width in pixels',
+        'effect': 'Takes its value with = and no space. Epic pairs it with -ResY and '
+                  '-windowed.',
+        'usage_example': '-windowed -ResX=1920 -ResY=1080',
+        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
+        'scope': 'Unreal Engine games',
+    },
+    '-ResY': {
+        'description': 'Set the window height in pixels',
+        'effect': 'Takes its value with = and no space. Epic pairs it with -ResX and '
+                  '-windowed.',
+        'usage_example': '-windowed -ResX=1920 -ResY=1080',
+        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
+        'scope': 'Unreal Engine games',
+    },
+
+    # ---- Linux wrapper tools ----------------------------------------------
+    # These two are the highest-reach rows in the catalogue (2,038 and 2,013
+    # games) and BOTH are stored in a form that does nothing if pasted.
+    #
+    # Steam substitutes %command% with the game's own executable, so these
+    # tools have to wrap it. The bare tool name is not a launch option at all:
+    # Feral's README documents "gamemoderun %command%" and MangoHud's
+    # documents "mangohud %command%". No stored command in the catalogue
+    # contains %command%.
+    #
+    # The usage_example carries the working form, which is exactly the field
+    # for it. The stored command itself still wants renaming — a separate fix,
+    # since it changes a UNIQUE key on 4,051 game-option pairs.
+    'gamemode': {
+        'description': 'Run the game under Feral GameMode',
+        'effect': 'Applies temporary host optimisations (CPU governor, I/O and process '
+                  'priority) for the game\'s lifetime. The bare word does nothing — '
+                  'Steam needs the wrapper form.',
+        'usage_example': 'gamemoderun %command%',
+        'authority': 'FeralInteractive/gamemode README',
+        'scope': 'Linux',
+    },
+    'mangohud': {
+        'description': 'Show the MangoHud performance overlay',
+        'effect': 'Draws FPS, frame timing and CPU/GPU load over Vulkan and OpenGL '
+                  'games. The bare word does nothing — Steam needs the wrapper form.',
+        'usage_example': 'mangohud %command%',
+        'authority': 'flightlessmango/MangoHud README',
+        'scope': 'Linux',
+    },
 }
 
 
@@ -131,6 +294,12 @@ def _dictionary_key(command: str) -> Optional[str]:
 
     Commands are stored with their values ("-w 1920", "+set r_customwidth"), so
     an exact match is tried first and then the flag without its trailing value.
+
+    Values attach two ways. Source-style flags separate with a space ("-w 1920")
+    and Unreal-style ones with '=' ("-ResX=1920"), so both are stripped. Without
+    the '=' case, -ResX=1920 — on 226 games — could never reach an entry keyed
+    on -ResX, and the two most-attached Unreal flags in the catalogue would stay
+    undocumented no matter what was written here.
     """
     if not command:
         return None
@@ -144,6 +313,13 @@ def _dictionary_key(command: str) -> Optional[str]:
         candidate = ' '.join(parts[:take])
         if candidate in FLAG_DICTIONARY:
             return candidate
+
+    # "-ResX=1920" -> "-ResX";  "-malloc=system" -> "-malloc"
+    if '=' in command:
+        candidate = command.split('=', 1)[0]
+        if candidate in FLAG_DICTIONARY:
+            return candidate
+
     return None
 
 
