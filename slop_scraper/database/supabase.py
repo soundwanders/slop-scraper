@@ -1,4 +1,5 @@
 import os
+import re
 import json
 from supabase import create_client
 from typing import Set, Optional, List, Dict
@@ -555,6 +556,13 @@ def _passes_save_gate(option: dict) -> bool:
         print(f"🚫 Save gate rejected '{option.get('command', '')}': {reason}")
     return is_valid
 
+# Commands where letter case carries meaning, so two spellings are two
+# different flags rather than one flag written twice. JVM options are the
+# whole of it: -Xmx4G sets a heap size, -xmx4g is not a flag at all.
+# Deliberately does NOT match -D3D12, which is a DirectX renderer switch that
+# merely looks like a Java -Dproperty=value.
+_CASE_SENSITIVE_COMMAND = re.compile(r'^-(Xm[sx]|XX:|D[a-z]+\.)', re.ASCII)
+
 _SCRAPED_VERIFICATION_METHODS = {
     'PCGamingWiki': 'pcgamingwiki-scrape',
     'ProtonDB': 'protondb-scrape',
@@ -658,16 +666,45 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     We never overwrite an existing description — the first version wins.
     This prevents auto-generated fallback descriptions (e.g. "Launch option
     from PCGamingWiki") from silently replacing a previously curated one.
+
+    The existence check is CASE-INSENSITIVE. `command` is UNIQUE, but Postgres
+    compares it case-sensitively, so an exact-match lookup let '-nosplash',
+    '-NoSplash' and '-noSplash' coexist as three rows for one flag — Unreal and
+    Source both parse switches case-insensitively. The damage is not the extra
+    row, it is that everything attached to the flag gets split across the
+    variants: '-USEALLAVAILABLECORES' held 234 games with the correct Unreal
+    description while '-useallavailablecores' held 1 with a wrong L4D one.
+
+    JVM-style options are exempted, because case genuinely carries meaning
+    there: -Xmx4G is a heap size and -xmx4g is not a flag at all. -D3D12 is
+    deliberately not treated as one — it is DirectX, not a Java property.
     """
     command = option['command']
 
+    # A scrape reporting a new casing binds to the row that already exists
+    # rather than creating a rival; the stored spelling is left alone, since it
+    # is the one the merge script chose on evidence.
+    #
+    # 'ilike' treats _ and % as wildcards, and _ is common in cvars
+    # (+jobs_numThreads, +cl_forcepreload). Rather than exempt those — which
+    # would leave exactly the collisions the merge script just cleaned up free
+    # to come back — the query is allowed to over-match and the results are
+    # filtered to a true case-insensitive equality in Python.
+    case_insensitive = not _CASE_SENSITIVE_COMMAND.match(command.strip())
+    target = command.strip().lower()
+
+    def _find(select_columns):
+        query = supabase.table("launch_options").select(select_columns)
+        if not case_insensitive:
+            return query.eq("command", command).limit(1).execute()
+        result = query.ilike("command", command).limit(20).execute()
+        result.data = [row for row in (result.data or [])
+                       if str(row.get('command', '')).strip().lower() == target]
+        return result
+
     # 1. Try to find an existing record first
     try:
-        existing = supabase.table("launch_options") \
-            .select("id, source_url, description") \
-            .eq("command", command) \
-            .limit(1) \
-            .execute()
+        existing = _find("id, command, source_url, description")
 
         if existing.data:
             option_id = existing.data[0]['id']
@@ -677,11 +714,7 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
         # source_url column may not exist yet (migration 002 not run) — retry
         # the lookup without it so re-encountering an option never breaks.
         try:
-            existing = supabase.table("launch_options") \
-                .select("id") \
-                .eq("command", command) \
-                .limit(1) \
-                .execute()
+            existing = _find("id, command")
             if existing.data:
                 return existing.data[0]['id']
         except Exception:
