@@ -154,6 +154,58 @@ FLAG_DICTIONARY = {
         'scope': 'game-specific spelling',
     },
 
+    # ---- Source engine, from the Valve Developer Community reference ------
+    # The VDC wiki is behind a proof-of-work bot challenge, so these were
+    # transcribed from the page by the maintainer rather than fetched. Each
+    # description below tracks the wiki's own wording; where it is terse the
+    # effect adds only what the same page states elsewhere.
+    '-novid': {
+        'description': 'Skip the intro video',
+        'effect': 'The startup video does not play. Saves several seconds on every '
+                  'launch and is the most common Source launch option.',
+        'usage_example': '-novid',
+        'authority': 'Valve Developer Community — Command line options: "When loading '
+                     'a game with this parameter, the intro video will not play."',
+        'scope': 'Source engine games',
+    },
+    '-high': {
+        'description': 'Run the game at High process priority',
+        'effect': 'Raises the OS scheduling priority of the game process. It does not '
+                  'add CPU capacity, so it helps only where something else is '
+                  'competing for the processor.',
+        'usage_example': '-high',
+        'authority': 'Valve Developer Community — Command line options: '
+                     '"Sets the game\'s priority to High."',
+        'scope': 'Source engine games',
+    },
+    '-threads': {
+        'description': 'Set the size of the engine thread pool',
+        'effect': 'Takes a thread count; the default is 3. Setting it above the number '
+                  'of cores available does not help.',
+        'usage_example': '-threads 4',
+        'authority': 'Valve Developer Community — Command line options: "Number of '
+                     'threads to allocate for the thread pool, default is 3"',
+        'scope': 'Source engine games',
+    },
+    '-freq': {
+        'description': 'Force a specific refresh rate',
+        'effect': 'An alias for -refresh; the wiki lists the two as the same option. '
+                  'Takes a rate in Hz.',
+        'usage_example': '-freq 144',
+        'authority': 'Valve Developer Community — Command line options: '
+                     '"-freq <rate> — Same as -refresh"',
+        'scope': 'Source engine games',
+    },
+    '-nojoy': {
+        'description': 'Disable joystick support',
+        'effect': 'Skips joystick initialisation, which can shorten startup. The wiki '
+                  'notes it does NOT apply to Left 4 Dead 2.',
+        'usage_example': '-nojoy',
+        'authority': 'Valve Developer Community — Command line options: '
+                     '"Disables joystick support." (not in Left 4 Dead 2)',
+        'scope': 'Source engine games, except Left 4 Dead 2',
+    },
+
     # ---- Unity standalone player ------------------------------------------
     # All verified against the Unity Manual, "Standalone Player command line
     # arguments". Platform limits below are Unity's own, not inferences.
@@ -255,19 +307,28 @@ FLAG_DICTIONARY = {
         'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
         'scope': 'Unreal Engine games',
     },
+    # -windowed and -fullscreen are NOT Unreal-only, which is how they were
+    # first scoped here. Both engines document them independently, and the
+    # catalogue attaches -windowed to 465 games of which fewer than half are
+    # Unreal. A scope narrower than the truth is its own kind of wrong answer:
+    # it tells a Source player the flag will not work for them.
     '-windowed': {
         'description': 'Run in windowed mode',
-        'effect': 'Epic documents pairing it with an explicit resolution.',
+        'effect': 'Unreal documents pairing it with an explicit resolution. In Source '
+                  '-window, -sw and -startwindowed are the same option.',
         'usage_example': '-windowed -ResX=1920 -ResY=1080',
-        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
-        'scope': 'Unreal Engine games',
+        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic); Valve '
+                     'Developer Community — "Forces the engine to start in Windowed mode."',
+        'scope': 'Unreal Engine and Source games',
     },
     '-fullscreen': {
         'description': 'Run in fullscreen mode',
-        'effect': 'Overrides a saved windowed preference.',
+        'effect': 'Overrides a saved windowed preference. -full is the same option in '
+                  'Source.',
         'usage_example': '-fullscreen',
-        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
-        'scope': 'Unreal Engine games',
+        'authority': 'Unreal Engine Command-Line Arguments Reference (Epic); Valve '
+                     'Developer Community — "Forces the engine to start in fullscreen mode."',
+        'scope': 'Unreal Engine and Source games',
     },
     '-ResX': {
         'description': 'Set the window width in pixels',
