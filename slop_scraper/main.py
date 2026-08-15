@@ -49,6 +49,9 @@ def setup_argument_parser():
                        help='Process all games, including those already in database')
     parser.add_argument('--db-stats', action='store_true',
                        help='Show database statistics and exit')
+    parser.add_argument('--check-duplicates', action='store_true',
+                       help='Report catalogue games that PCGamingWiki lists as one game '
+                            'under several Steam App IDs (read-only; never writes)')
     parser.add_argument('--rescan', action='store_true',
                        help='Re-scan games already in the database (thinnest option counts first); '
                             'new options are added, existing data is never overwritten')
@@ -73,6 +76,140 @@ def setup_argument_parser():
                        help='Test scrapers on a single game by name (debug mode)')
     
     return parser
+
+
+def show_duplicate_games():
+    """
+    Report catalogue rows that are the same game under different App IDs.
+
+    READ-ONLY. It never merges or deletes, and that restraint is the design,
+    not an unfinished half. Merging two games means choosing which App ID
+    survives, moving the loser's option links onto it, and deleting a row the
+    website may already link to — irreversible from a report.
+
+    The grouping comes from PCGamingWiki, which lists every App ID a page
+    covers. Steam cannot answer this: asked about apps 80 and 100 it returns
+    type='game' for both, no `fullgame` parent, and the same name. Matching on
+    title instead would merge on a coincidence of naming — app 52003 is titled
+    "Portal" and PCGamingWiki does not place it with app 400, so a title rule
+    would destroy a row nothing has identified.
+    """
+    try:
+        from database.supabase import setup_supabase_connection
+        from utils.pcgw_appid_groups import fetch_appid_groups
+    except ImportError:
+        from .database.supabase import setup_supabase_connection
+        from .utils.pcgw_appid_groups import fetch_appid_groups
+
+    from collections import defaultdict
+
+    supabase = setup_supabase_connection()
+    if not supabase:
+        print("❌ Failed to connect to database")
+        return False
+
+    games, start = [], 0
+    while True:
+        batch = (supabase.table('games')
+                 .select('app_id, title, total_options_count')
+                 .range(start, start + 999).execute().data) or []
+        games.extend(batch)
+        if len(batch) < 1000:
+            break
+        start += 1000
+
+    links, start = [], 0
+    while True:
+        batch = (supabase.table('game_launch_options')
+                 .select('game_app_id, launch_option_id')
+                 .range(start, start + 999).execute().data) or []
+        links.extend(batch)
+        if len(batch) < 1000:
+            break
+        start += 1000
+
+    options_for = defaultdict(set)
+    for link in links:
+        options_for[link['game_app_id']].add(link['launch_option_id'])
+
+    try:
+        groups = fetch_appid_groups()
+    except Exception as e:
+        print(f"❌ Could not fetch PCGamingWiki App ID groups: {e}")
+        return False
+
+    in_catalogue = {g['app_id']: g for g in games}
+
+    clusters = {}
+    for app_id in in_catalogue:
+        entry = groups.get(app_id)
+        if not entry:
+            continue
+        page, ids = entry
+        present = tuple(sorted(i for i in ids if i in in_catalogue))
+        if len(present) > 1:
+            clusters[present] = page
+
+    # A PCGamingWiki page covers a game AND its add-ons, so a shared page means
+    # "documented together", which is broader than "the same product". Doom
+    # Eternal shares a page with The Ancient Gods; Penumbra: Black Plague with
+    # Penumbra: Requiem, which is a different game outright.
+    #
+    # Matching titles inside a cluster is what separates the two. It is not
+    # proof — it is the difference between a row worth examining and a row that
+    # is plainly an expansion — so both lists are printed and neither is acted
+    # on automatically.
+    def normalise(title):
+        text = ''.join(c for c in str(title) if c not in '™®©').lower()
+        return ' '.join(text.split())
+
+    same_title, add_ons = {}, {}
+    for present, page in clusters.items():
+        titles = {normalise(in_catalogue[i]['title']) for i in present}
+        (same_title if len(titles) == 1 else add_ons)[present] = page
+
+    print(f"\n{'=' * 66}")
+    print("📊 CATALOGUE ROWS SHARING A PCGAMINGWIKI PAGE")
+    print(f"{'=' * 66}")
+    print(f"   {len(in_catalogue)} games in catalogue")
+    print(f"   {len(clusters)} clusters — {len(same_title)} identical-title, "
+          f"{len(add_ons)} with differing titles\n")
+
+    if not clusters:
+        print("✅ Nothing PCGamingWiki groups together.")
+        return True
+
+    def render(bucket, heading, note):
+        if not bucket:
+            return
+        print(f"   {heading}")
+        print(f"   {note}\n")
+        for present, page in sorted(bucket.items(), key=lambda kv: -len(kv[0])):
+            shared = set.intersection(*(options_for[i] for i in present))
+            union = set().union(*(options_for[i] for i in present))
+            print(f"      {page}")
+            for app_id in present:
+                unique = len(options_for[app_id] - shared)
+                print(f"         {app_id:>8}  {str(in_catalogue[app_id]['title'])[:36]:38} "
+                      f"{len(options_for[app_id]):>3} opts"
+                      f"{f'  ({unique} not shared)' if unique else ''}")
+            print(f"         → {len(union)} distinct, {len(shared)} common to all\n")
+
+    render(same_title,
+           "── LIKELY DUPLICATES — same title, same wiki page " + "─" * 14,
+           "Worth examining. Still not proof: a multiplayer component often\n"
+           "   carries the base game's exact name.")
+    render(add_ons,
+           "── LIKELY ADD-ONS — titles differ " + "─" * 30,
+           "Probably DLC, expansions or standalone sequels documented on one\n"
+           "   page. Merging these would destroy distinct games.")
+
+    print("   Read-only, and merging is deliberately not automated: it means")
+    print("   choosing a surviving App ID and deleting a row the site may link")
+    print("   to. Options that differ inside a cluster are the signal worth")
+    print("   reading — they can mean genuinely different builds.")
+    return True
+
 
 def show_database_statistics():
     """Show comprehensive database statistics and exit"""
@@ -283,6 +420,10 @@ def main():
     # Handle database statistics request
     if args.db_stats:
         success = show_database_statistics()
+        sys.exit(0 if success else 1)
+
+    if args.check_duplicates:
+        success = show_duplicate_games()
         sys.exit(0 if success else 1)
     
     # Apply security validation to all parameters
