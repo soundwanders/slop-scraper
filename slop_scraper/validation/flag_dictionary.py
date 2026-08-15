@@ -22,19 +22,50 @@ from typing import Optional
 # command -> curated documentation
 FLAG_DICTIONARY = {
     # ---- id Tech ----------------------------------------------------------
+    # Verified against id Software's own Doom 3 source release, which declares
+    # each cvar with its help string:
+    #
+    #   idCVar r_customWidth( "r_customWidth", "720", ...,
+    #                         "custom screen width. set r_mode to -1 to activate" );
+    #   idCVar r_fullscreen(  "r_fullscreen",  "1",   ...,
+    #                         "0 = windowed, 1 = full screen" );
+    #
+    # That is a stronger authority than a wiki: it is the shipping code. The
+    # r_mode -1 dependency below was previously cited to a secondary reference
+    # and is now confirmed from the declaration itself.
     '+set r_customwidth': {
         'description': 'Set a custom horizontal resolution',
         'effect': 'Overrides the width used when r_mode is -1. Without r_mode -1 the '
                   'engine uses a preset mode and this value is ignored.',
         'usage_example': '+set r_mode -1 +set r_customwidth 1920 +set r_customheight 1080',
-        'authority': 'id Tech 4 console variable reference (Doom 3 / Quake 4 lineage)',
+        'authority': 'Doom 3 source (id Software), renderer/RenderSystem_init.cpp — '
+                     'idCVar r_customWidth: "custom screen width. set r_mode to -1 to activate"',
     },
     '+set r_customheight': {
         'description': 'Set a custom vertical resolution',
         'effect': 'Overrides the height used when r_mode is -1. Without r_mode -1 the '
                   'engine uses a preset mode and this value is ignored.',
         'usage_example': '+set r_mode -1 +set r_customwidth 1920 +set r_customheight 1080',
-        'authority': 'id Tech 4 console variable reference (Doom 3 / Quake 4 lineage)',
+        'authority': 'Doom 3 source (id Software), renderer/RenderSystem_init.cpp — '
+                     'idCVar r_customHeight: "custom screen height. set r_mode to -1 to activate"',
+    },
+    '+set r_fullscreen': {
+        'description': 'Start fullscreen or windowed',
+        'effect': 'Takes 0 for windowed or 1 for full screen. Declared CVAR_ARCHIVE, so '
+                  'the value persists into later launches.',
+        'usage_example': '+set r_fullscreen 0',
+        'authority': 'Doom 3 source (id Software), renderer/RenderSystem_init.cpp — '
+                     'idCVar r_fullscreen: "0 = windowed, 1 = full screen"',
+        'scope': 'id Tech games',
+    },
+    '+set r_swapInterval': {
+        'description': 'Control vertical sync',
+        'effect': 'Sets the OpenGL buffer-swap interval: 0 leaves VSync off, 1 syncs to '
+                  'the display refresh. Declared CVAR_ARCHIVE, so it persists.',
+        'usage_example': '+set r_swapInterval 1',
+        'authority': 'Doom 3 source (id Software), renderer/RenderSystem_init.cpp — '
+                     'idCVar r_swapInterval, integer, wraps wglSwapInterval',
+        'scope': 'id Tech games',
     },
 
     # ---- Source engine ----------------------------------------------------
