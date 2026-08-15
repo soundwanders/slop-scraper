@@ -235,6 +235,41 @@ FLAG_DICTIONARY = {
         'authority': 'Unity Manual — Standalone Player command line arguments',
         'scope': 'Unity games',
     },
+    # -force-opengl and -force-glcore are DIFFERENT backends, not two spellings
+    # of one flag. Unity 5.6 documents both; the current manual keeps only
+    # -force-glcore on the standalone-player page, which is what makes
+    # -force-opengl look like a typo. It is not.
+    #
+    # Note the asymmetry in Unity's own wording: -force-opengl forces "the
+    # game", -force-glcore forces "the Editor". The description below follows
+    # that rather than smoothing it over.
+    #
+    # A caveat that belongs with the flag: game_specific.py emits this to every
+    # game detected as Unity, and the catalogue cannot tell which Unity version
+    # a build shipped with. On a modern build with no legacy GL backend it does
+    # nothing. That is stated in the effect rather than hidden, because a user
+    # pasting it and seeing no change deserves to know which case they are in.
+    '-force-opengl': {
+        'description': 'Force the legacy OpenGL renderer',
+        'effect': 'Windows only. Selects Unity\'s LEGACY OpenGL backend, not the core '
+                  'profile — use -force-glcore for that. Builds made with newer Unity '
+                  'versions may not carry the legacy backend at all, in which case this '
+                  'has no effect.',
+        'usage_example': '-force-opengl',
+        'authority': 'Unity 5.6 Manual — command line arguments: "Force the game to use '
+                     'OpenGL for rendering, even if Direct3D is available."',
+        'scope': 'Unity games, legacy builds',
+    },
+    '-force-glcore': {
+        'description': 'Force the OpenGL core profile renderer',
+        'effect': 'Windows only. The modern counterpart to -force-opengl. Unity\'s 5.6 '
+                  'wording scopes it to the Editor; the current manual lists it for the '
+                  'standalone player.',
+        'usage_example': '-force-glcore',
+        'authority': 'Unity Manual — Standalone Player command line arguments; Unity 5.6 '
+                     'Manual: "Force the Editor to use OpenGL core profile for rendering."',
+        'scope': 'Unity games',
+    },
     '-force-vulkan': {
         'description': 'Force the Vulkan renderer',
         'effect': 'Useful where the default backend crashes or performs badly; ignored '
