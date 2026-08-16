@@ -757,13 +757,18 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     # no extra scraping (see migrations/001_add_launch_option_metadata.sql
     # and validation/metadata_tagging.py).
     try:
-        from ..validation import clean_option_description, classify_option_metadata
+        from ..validation import (clean_option_description, classify_option_metadata,
+                                  honest_source)
     except ImportError:
-        from validation import clean_option_description, classify_option_metadata
+        from validation import (clean_option_description, classify_option_metadata,
+                                honest_source)
 
     import datetime
 
-    source = option.get('source', 'Unknown')
+    # A source naming a vendor is a claim about the citation. Demote it if the
+    # URL points somewhere else, so no row can present a Steam guide under
+    # Valve's name (see validation/source_attribution.py).
+    source = honest_source(option.get('source', 'Unknown'), option.get('source_url'))
     metadata = classify_option_metadata(command, source=source)
 
     base_fields = {
