@@ -522,6 +522,15 @@ def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool,
         # these because they carry no recognisable path prefix.
         if '/' in value or '$' in value:
             return False, "Env-var value is a path or shell expansion"
+        # A digit run running straight into letters is the value welded to the
+        # next word on the page — PROTON_FORCE_LARGE_ADDRESS_AWARE=1configuration
+        # came from a heading that followed the value with no whitespace. It
+        # reads as a plausible setting, which is why it survived every other
+        # check here and was published. Real values are numeric (1, 0), a word
+        # (fps, win32) or a channel string (+timestamp); none begin with digits
+        # and continue into letters.
+        if re.match(r'^\d+[A-Za-z]', value):
+            return False, "Env-var value ran into the next word (scrape artefact)"
         # Variables we cannot document accurately — see UNVERIFIED_ENV_VARS.
         try:
             from .metadata_tagging import UNVERIFIED_ENV_VARS
