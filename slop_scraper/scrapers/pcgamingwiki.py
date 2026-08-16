@@ -256,6 +256,17 @@ def validate_pcgw_option(command: str, debug: bool = False) -> bool:
     
     return is_valid
 
+# HTML elements that actually appear in wikitext. Anything else inside angle
+# brackets is left alone — see the note in clean_wiki_description.
+_HTML_TAG = re.compile(
+    r'</?\s*(?:br|ref|references|b|i|s|u|em|strong|small|big|sub|sup|code|pre|'
+    r'tt|nowiki|noinclude|includeonly|span|div|p|hr|font|center|blockquote|'
+    r'ul|ol|li|table|tr|td|th|thead|tbody|caption|abbr|kbd|samp|var|del|ins)'
+    r'(?:\s[^>]*)?/?>',
+    re.IGNORECASE
+)
+
+
 def clean_wiki_description(description, debug=False):
     """
     Clean wiki description text to remove markup and artifacts
@@ -266,8 +277,20 @@ def clean_wiki_description(description, debug=False):
     # Strip wiki list markers (#, *, :) left over from numbered instructions
     description = re.sub(r'^[\s#*:;]+', '', description)
 
-    # Remove HTML/XML tags
-    description = re.sub(r'<[^>]+>', '', description)
+    # Remove HTML/XML tags — but only ones that are actually tags.
+    #
+    # This used to be re.sub(r'<[^>]+>', ...), which treats anything in angle
+    # brackets as markup. Documentation writes PLACEHOLDERS the same way, so it
+    # quietly destroyed them:
+    #
+    #   "Write a Proton debug log to $HOME/steam-<appid>.log"
+    #     -> "Write a Proton debug log to $HOME/steam-.log"
+    #
+    # The result still reads as a sentence, which is what makes it dangerous —
+    # it looks repaired rather than damaged. Only recognised HTML element names
+    # are stripped now; <appid>, <rate>, <width> and friends survive as the
+    # placeholders they are.
+    description = _HTML_TAG.sub('', description)
     
     # Remove wiki markup
     description = re.sub(r'\{\{[^}]*\}\}', '', description)  # Templates

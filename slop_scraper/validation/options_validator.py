@@ -593,8 +593,20 @@ def clean_option_description(description: str, min_length: int = 12) -> Optional
             cut_at = min(cut_at, idx)
     text = text[:cut_at]
 
-    # Remove any leftover markup characters and collapse whitespace
-    text = re.sub(r'[<>{}|]', ' ', text)
+    # Remove leftover markup characters and collapse whitespace.
+    #
+    # Angle brackets are NOT stripped when they wrap a single bare word, which
+    # is how documentation writes a placeholder:
+    #
+    #   "Write a Proton debug log to $HOME/steam-<appid>.log"
+    #
+    # Blanking those produced "$HOME/steam-.log" — still a plausible-looking
+    # sentence, which is what made it dangerous: it reads as repaired rather
+    # than damaged. Real leftover markup at this point is unbalanced or
+    # contains punctuation, and is still removed.
+    text = re.sub(r'<(?![A-Za-z][A-Za-z0-9_]*>)', ' ', text)
+    text = re.sub(r'(?<![<][A-Za-z])(?<![A-Za-z0-9_])>', ' ', text)
+    text = re.sub(r'[{}|]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
 
     # Trim trailing punctuation and dangling function words ("Use the -x by")
