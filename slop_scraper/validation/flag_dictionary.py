@@ -159,6 +159,27 @@ FLAG_DICTIONARY = {
     # transcribed from the page by the maintainer rather than fetched. Each
     # description below tracks the wiki's own wording; where it is terse the
     # effect adds only what the same page states elsewhere.
+    # +fps_max is a ConVar rather than a command-line parameter, which is why
+    # it is absent from the Valve command-line page the other Source entries
+    # come from. Its own cvar page documents it for GoldSrc, Source and
+    # Source 2 alike.
+    #
+    # The value 0 is the reason this entry earns its keep. It removes the cap
+    # in Source and Source 2 — and in GoldSrc it pins the game to 1 FPS. The
+    # catalogue attaches this flag to both families, so the difference is live
+    # for our own users, and no scraped description mentioned it.
+    '+fps_max': {
+        'description': 'Cap the frame rate',
+        'effect': 'Default 300 (400 in CS:GO and the TF2 branch). Match your refresh '
+                  'rate, or a little above it. Do NOT use 0 on GoldSrc — it uncaps '
+                  'Source and Source 2 but runs GoldSrc at 1 FPS. Above ~1000 (100 on '
+                  'GoldSrc) the engine develops timing bugs.',
+        'usage_example': '+fps_max 144',
+        'authority': 'Valve Developer Community — fps_max: "This is a ConVar where you '
+                     'can define your frame rate limit", available in all GoldSrc, '
+                     'Source and Source 2 games',
+        'scope': 'GoldSrc, Source and Source 2 games',
+    },
     '-novid': {
         'description': 'Skip the intro video',
         'effect': 'The startup video does not play. Saves several seconds on every '
