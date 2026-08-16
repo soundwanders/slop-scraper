@@ -25,7 +25,8 @@ from .metadata_tagging import (
 from .flag_dictionary import (
     FLAG_DICTIONARY,
     lookup_flag,
-    curated_description
+    curated_description,
+    authority_url
 )
 from .description_quality import (
     is_junk_description,
@@ -56,5 +57,6 @@ __all__ = [
     'PLACEHOLDER_DESCRIPTIONS',
     'FLAG_DICTIONARY',
     'lookup_flag',
-    'curated_description'
+    'curated_description',
+    'authority_url'
 ]

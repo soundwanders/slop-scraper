@@ -577,6 +577,70 @@ FLAG_DICTIONARY = {
 }
 
 
+# Where each authority can actually be read. Matched by prefix against the
+# `authority` text of an entry, longest first.
+#
+# This exists because of a real credibility failure. source_url follows a
+# "first GOOD value wins, never overwrite" rule, which is correct for
+# descriptions — it stops a poor scrape clobbering better text — and wrong for
+# provenance, because whichever page the scraper happened to reach first became
+# the permanent public citation.
+#
+# The result: 4,354 game-option pairs cited an individual's Steam guide while
+# this table held a Valve, Epic or Unity reference for the same flag. `-high`
+# on 109 games pointed at a guide titled "Boost Your Fps ... For Low end PC
+# like mine xD", rated "Not enough ratings", which also recommends -tickrate
+# 128 for a game where Valve disabled tickrate in code.
+#
+# A Steam guide is legitimate PROVENANCE — it is genuinely where a flag was
+# found. It is not the best available AUTHORITY when the vendor documents the
+# same flag. Where an entry here has a readable source, that is what should be
+# published.
+_AUTHORITY_URLS = (
+    ('Unity 5.6 Manual',
+     'https://docs.unity3d.com/560/Documentation/Manual/CommandLineArguments.html'),
+    ('Unity Manual',
+     'https://docs.unity3d.com/Manual/PlayerCommandLineArguments.html'),
+    ('Unreal Engine Command-Line Arguments Reference',
+     'https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-command-line-arguments-reference'),
+    ('Valve Developer Community — fps_max',
+     'https://developer.valvesoftware.com/wiki/Fps_max'),
+    ('Valve Developer Community',
+     'https://developer.valvesoftware.com/wiki/Command_Line_Options'),
+    ('DOOM 3 BFG source (id Software)',
+     'https://github.com/id-Software/DOOM-3-BFG'),
+    ('Doom 3 source (id Software)',
+     'https://github.com/id-Software/DOOM-3'),
+    ('ValveSoftware/Proton README at tag proton_5.0',
+     'https://github.com/ValveSoftware/Proton/blob/proton_5.0/README.md'),
+    ('ValveSoftware/Proton README',
+     'https://github.com/ValveSoftware/Proton'),
+    ('FeralInteractive/gamemode README',
+     'https://github.com/FeralInteractive/gamemode'),
+    ('flightlessmango/MangoHud README',
+     'https://github.com/flightlessmango/MangoHud'),
+)
+
+
+def authority_url(command: str) -> Optional[str]:
+    """
+    A readable primary source for a documented command, or None.
+
+    None is returned deliberately for entries whose authority is a description
+    of provenance rather than a citation — 'per-game conventions', 'PCGamingWiki
+    per-game pages'. Those name no single page, so inventing a link would assert
+    more than the entry supports, and the existing scraped source_url stays.
+    """
+    entry = lookup_flag(command)
+    if not entry:
+        return None
+    text = entry.get('authority') or ''
+    for prefix, url in sorted(_AUTHORITY_URLS, key=lambda p: -len(p[0])):
+        if text.startswith(prefix):
+            return url
+    return None
+
+
 def _dictionary_key(command: str) -> Optional[str]:
     """
     Match a stored command to a dictionary entry.
