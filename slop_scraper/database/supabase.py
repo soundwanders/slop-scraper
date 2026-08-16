@@ -758,17 +758,34 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     # and validation/metadata_tagging.py).
     try:
         from ..validation import (clean_option_description, classify_option_metadata,
-                                  honest_source)
+                                  honest_source, promoted_source,
+                                  authority_url, authority_source)
     except ImportError:
         from validation import (clean_option_description, classify_option_metadata,
-                                honest_source)
+                                honest_source, promoted_source,
+                                authority_url, authority_source)
 
     import datetime
 
-    # A source naming a vendor is a claim about the citation. Demote it if the
-    # URL points somewhere else, so no row can present a Steam guide under
-    # Valve's name (see validation/source_attribution.py).
-    source = honest_source(option.get('source', 'Unknown'), option.get('source_url'))
+    # The citation and the label are decided together, never separately.
+    #
+    # Where the curated dictionary documents this flag, both come from it: that
+    # entry was checked against a page someone read, which outranks whichever
+    # page a scraper happened to reach first. Where it does not, the scraper's
+    # own values are used — with a vendor label DEMOTED if the URL points
+    # somewhere else, so no row can present a Steam guide under Valve's name.
+    #
+    # Splitting these is what produced the defect this guards against: an
+    # earlier pass promoted source_url alone and left 30 rows citing a vendor
+    # while still labelled "ProtonDB". Promotion only ever comes from curation,
+    # never from inspecting a URL's host — see validation/source_attribution.py.
+    curated_url = authority_url(command)
+    if curated_url:
+        source = promoted_source(option.get('source', 'Unknown'), authority_source(command))
+        source_url = curated_url
+    else:
+        source_url = option.get('source_url')
+        source = honest_source(option.get('source', 'Unknown'), source_url)
     metadata = classify_option_metadata(command, source=source)
 
     base_fields = {
@@ -783,7 +800,7 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
         "engine_compatibility": metadata['engine_compatibility']
     }
     verification_fields = {
-        "source_url": option.get('source_url'),
+        "source_url": source_url,
         "last_verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "verification_method": _verification_method_for_source(source),
     }

@@ -27,9 +27,10 @@ from .flag_dictionary import (
     lookup_flag,
     curated_description,
     curated_usage_example,
-    authority_url
+    authority_url,
+    authority_source
 )
-from .source_attribution import honest_source, misattributed
+from .source_attribution import honest_source, misattributed, promoted_source
 from .description_quality import (
     is_junk_description,
     is_placeholder_description,
@@ -63,5 +64,7 @@ __all__ = [
     'curated_usage_example',
     'honest_source',
     'misattributed',
-    'authority_url'
+    'promoted_source',
+    'authority_url',
+    'authority_source'
 ]

@@ -638,32 +638,71 @@ FLAG_DICTIONARY = {
 # found. It is not the best available AUTHORITY when the vendor documents the
 # same flag. Where an entry here has a readable source, that is what should be
 # published.
-_AUTHORITY_URLS = (
+_AUTHORITY_SOURCES = (
+    # (authority prefix, citation URL, `source` label)
+    #
+    # The third column is what stops the citation and the label disagreeing.
+    # Promoting source_url without it left 30 rows — 5,173 game-option pairs,
+    # a third of the catalogue by reach — reading "ProtonDB" while linking to
+    # Feral's own README. The improvement was real and completely invisible,
+    # because the site renders `source` as the label.
+    #
+    # Both columns come from the same row here on purpose. A label is only ever
+    # promoted from hand-verified curation, never inferred from a URL's host —
+    # inferring it is exactly what validation/source_attribution.py refuses to
+    # do in the other direction.
     ('Unity 5.6 Manual',
-     'https://docs.unity3d.com/560/Documentation/Manual/CommandLineArguments.html'),
+     'https://docs.unity3d.com/560/Documentation/Manual/CommandLineArguments.html',
+     'Unity Documentation'),
     ('Unity Manual',
-     'https://docs.unity3d.com/Manual/PlayerCommandLineArguments.html'),
+     'https://docs.unity3d.com/Manual/PlayerCommandLineArguments.html',
+     'Unity Documentation'),
     ('Unreal Engine Command-Line Arguments Reference',
-     'https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-command-line-arguments-reference'),
+     'https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-command-line-arguments-reference',
+     'Epic Games Documentation'),
     ('Unreal Engine Supported Rendering Features',
-     'https://dev.epicgames.com/documentation/en-us/unreal-engine/supported-rendering-features?application_version=4.27'),
+     'https://dev.epicgames.com/documentation/en-us/unreal-engine/supported-rendering-features?application_version=4.27',
+     'Epic Games Documentation'),
     ('Valve Developer Community — fps_max',
-     'https://developer.valvesoftware.com/wiki/Fps_max'),
+     'https://developer.valvesoftware.com/wiki/Fps_max',
+     'Valve Developer Community'),
     ('Valve Developer Community',
-     'https://developer.valvesoftware.com/wiki/Command_Line_Options'),
+     'https://developer.valvesoftware.com/wiki/Command_Line_Options',
+     'Valve Developer Community'),
     ('DOOM 3 BFG source (id Software)',
-     'https://github.com/id-Software/DOOM-3-BFG'),
+     'https://github.com/id-Software/DOOM-3-BFG',
+     'id Tech'),
     ('Doom 3 source (id Software)',
-     'https://github.com/id-Software/DOOM-3'),
+     'https://github.com/id-Software/DOOM-3',
+     'id Tech'),
+    # Three labels that did not exist before. 'Valve Proton' is deliberately
+    # NOT 'Proton' — the catalogue already carries 'ProtonDB', a community
+    # site, and the two would sit next to each other in a facet list.
     ('ValveSoftware/Proton README at tag proton_5.0',
-     'https://github.com/ValveSoftware/Proton/blob/proton_5.0/README.md'),
+     'https://github.com/ValveSoftware/Proton/blob/proton_5.0/README.md',
+     'Valve Proton'),
     ('ValveSoftware/Proton README',
-     'https://github.com/ValveSoftware/Proton'),
+     'https://github.com/ValveSoftware/Proton',
+     'Valve Proton'),
     ('FeralInteractive/gamemode README',
-     'https://github.com/FeralInteractive/gamemode'),
+     'https://github.com/FeralInteractive/gamemode',
+     'Feral GameMode'),
     ('flightlessmango/MangoHud README',
-     'https://github.com/flightlessmango/MangoHud'),
+     'https://github.com/flightlessmango/MangoHud',
+     'MangoHud'),
 )
+
+
+def _authority_match(command: str):
+    """The (url, source label) pair a command's authority resolves to, or None."""
+    entry = lookup_flag(command)
+    if not entry:
+        return None
+    text = entry.get('authority') or ''
+    for prefix, url, label in sorted(_AUTHORITY_SOURCES, key=lambda p: -len(p[0])):
+        if text.startswith(prefix):
+            return url, label
+    return None
 
 
 def authority_url(command: str) -> Optional[str]:
@@ -675,14 +714,20 @@ def authority_url(command: str) -> Optional[str]:
     per-game pages'. Those name no single page, so inventing a link would assert
     more than the entry supports, and the existing scraped source_url stays.
     """
-    entry = lookup_flag(command)
-    if not entry:
-        return None
-    text = entry.get('authority') or ''
-    for prefix, url in sorted(_AUTHORITY_URLS, key=lambda p: -len(p[0])):
-        if text.startswith(prefix):
-            return url
-    return None
+    match = _authority_match(command)
+    return match[0] if match else None
+
+
+def authority_source(command: str) -> Optional[str]:
+    """
+    The `source` label that goes WITH authority_url, or None.
+
+    Always used together with authority_url. A row citing Valve's Proton README
+    should say so; leaving it labelled 'ProtonDB' understates what it can prove,
+    and is the mirror image of the overstatement source_attribution.py removes.
+    """
+    match = _authority_match(command)
+    return match[1] if match else None
 
 
 def _dictionary_key(command: str) -> Optional[str]:

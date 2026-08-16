@@ -87,3 +87,44 @@ def honest_source(source: Optional[str], source_url: Optional[str]) -> Optional[
 def misattributed(source: Optional[str], source_url: Optional[str]) -> bool:
     """True when the label claims a vendor the citation does not support."""
     return honest_source(source, source_url) != source
+
+
+# Labels naming where a SCRAPER found something, as opposed to who documented
+# it. Only these are eligible for promotion when the curated dictionary
+# supplies a vendor citation.
+COMMUNITY_SOURCES = {
+    'PCGamingWiki',
+    'Steam Community',
+    'Steam Community Guides',
+    'ProtonDB',
+}
+
+
+def promoted_source(source: Optional[str], authority_label: Optional[str]) -> Optional[str]:
+    """
+    The label to publish when the dictionary supplies a vendor citation.
+
+    Deliberately narrow. Only a community label is replaced, because only a
+    community label *understates* — "ProtonDB" on a row citing Feral's own
+    README says less than the row can prove.
+
+    Everything else is left exactly as it is, and the two cases that look like
+    they want fixing are the reasons why:
+
+      'Universal'      means the flag works across many games regardless of
+                       engine. That is a statement about SCOPE, not about who
+                       documented it. Overwriting it with 'Epic Games
+                       Documentation' would trade real information for tidiness
+                       — both facts are true and they are not the same fact.
+
+      'Unity Engine',  are engine names rather than citation names. Redundant
+      'Source Engine', beside 'Unity Documentation', but not false, and
+      'Unreal Engine'  collapsing them removes values the site may filter on
+                       for no correctness gain.
+
+    So `source` is carrying two ideas at once — who says so, and how broadly it
+    applies — and this function refuses to flatten the second into the first.
+    """
+    if not authority_label:
+        return source
+    return authority_label if (source or '').strip() in COMMUNITY_SOURCES else source
