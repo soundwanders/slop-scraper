@@ -272,11 +272,22 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
             # UE3-vs-UE4 signal here, so it is omitted rather than guessed;
             # PCGamingWiki and Steam Community still surface it per-game where
             # a source actually documents it.
-            {
-                'command': '-sm4',
-                'description': 'Force Shader Model 4.0',
-                'source': 'Unreal Engine'
-            },
+            # '-sm4' was listed here, on 238 games. SM4 is a real Unreal
+            # feature level — Epic's ERHIFeatureLevel enum defines it as "the
+            # capabilities of DX10 Shader Model 4" — but Epic REMOVED it in
+            # 4.23: "SM4 DirectX10 and GL 3.3+ have been removed for in 4.23".
+            # The enum entry is literally named SM4_REMOVED.
+            #
+            # Blanket-emitting it to every Unreal-family game put it on 91
+            # UE3-or-older titles (some UE1, from 1998) that predate the UE4
+            # RHI entirely, 26 UE5+ titles, and 64 UE4 titles released after
+            # 4.23 shipped. Around 78% of the attachments could not work.
+            #
+            # Scoping it by release year was rejected: that infers an engine
+            # point-release from adjacent metadata, which is the guess that
+            # produced the Frostbite-Peggle label. Left to the per-game
+            # scrapers, which attach it only where a page documents it.
+            # Same reasoning as '-vulkan' above.
             {
                 'command': '-USEALLAVAILABLECORES',
                 'description': 'Utilize all available CPU cores',

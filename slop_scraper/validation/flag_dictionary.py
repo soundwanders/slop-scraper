@@ -405,6 +405,29 @@ FLAG_DICTIONARY = {
         'authority': 'Unreal Engine Command-Line Arguments Reference (Epic)',
         'scope': 'Unreal Engine games',
     },
+    # Documented here specifically so the obsolescence travels with it. The
+    # scraped description said "Significant performance improvement in UE
+    # games", which is unsupported and, on most of the games it was attached
+    # to, impossible — SM4 has not existed in Unreal since 4.23. Same handling
+    # as PROTON_USE_D9VK: the vendor's own removal note is the most useful
+    # true thing there is to say about the flag.
+    #
+    # Not cited to the command-line arguments reference, which does not list
+    # -sm4 at all (it documents -sm5 and -sm6). The two pages below are what
+    # was actually fetched and read.
+    '-sm4': {
+        'description': 'Force the SM4 (DirectX 10) feature level — removed from Unreal in 4.23',
+        'effect': 'Selected the DX10-era feature set instead of SM5, giving up tessellation, '
+                  'compute shaders and other DX11-level features. Epic removed SM4 in Unreal '
+                  '4.23, so on any build from 4.23 onward it does nothing at all, and it never '
+                  'existed in Unreal Engine 3 or earlier.',
+        'usage_example': '-sm4',
+        'authority': 'Unreal Engine Supported Rendering Features (Epic): "SM4 DirectX10 and '
+                     'GL 3.3+ have been removed for in 4.23"; ERHIFeatureLevel::Type declares '
+                     'the value as SM4_REMOVED — "Feature level defined by the capabilities '
+                     'of DX10 Shader Model 4"',
+        'scope': 'Unreal Engine 4 before 4.23 only',
+    },
     '-dx11': {
         'description': 'Use the DirectX 11 renderer',
         'effect': 'Selects DX11 as the RHI. Ignored by builds without a DX11 path.',
@@ -622,6 +645,8 @@ _AUTHORITY_URLS = (
      'https://docs.unity3d.com/Manual/PlayerCommandLineArguments.html'),
     ('Unreal Engine Command-Line Arguments Reference',
      'https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-command-line-arguments-reference'),
+    ('Unreal Engine Supported Rendering Features',
+     'https://dev.epicgames.com/documentation/en-us/unreal-engine/supported-rendering-features?application_version=4.27'),
     ('Valve Developer Community — fps_max',
      'https://developer.valvesoftware.com/wiki/Fps_max'),
     ('Valve Developer Community',
