@@ -338,6 +338,74 @@ def _fetch_games_for_option_counts(supabase, columns: str) -> List[Dict]:
         start += 1000
     return rows
 
+# Source labels emitted by game_specific.py's static per-engine blocks. A row
+# carrying one of these was attached because of the game's ENGINE, not because
+# any page documented it for that game.
+_ENGINE_BLOCK_SOURCES = {
+    'Source Engine', 'Unity Engine', 'Unreal Engine', 'id Tech',
+    'Creation Engine', 'Frostbite Engine', 'Minecraft Java', 'Universal',
+}
+
+
+def _blanket_attached_options(supabase, min_games: int = 10) -> Dict:
+    """
+    Options attached to many games in bulk with nothing documenting them.
+
+    This replaces a check that named three commands literally — '-fps_max',
+    '-nojoy', '-nosplash' — from the era when those were emitted to every game
+    regardless of engine. Two of them have since become curated flags sitting
+    correctly on the games that take them, so the old check reported perfectly
+    good data as "HIGH PRIORITY for cleanup". A diagnostic that cries wolf
+    trains you to ignore it, which is worse than not having one.
+
+    What actually goes wrong is the SHAPE, not the name: a flag emitted from a
+    static per-engine block, attached to a large number of games, with no entry
+    in the curated dictionary explaining it. `-malloc=system` (237 games, not
+    even valid Unreal syntax) and `-sm4` (238 games, removed from Unreal in
+    4.23) were both exactly this, and both would have shown up here.
+
+    A curated entry clears the flag because the dictionary is where a claim
+    gets checked against primary documentation — that is the difference between
+    a flag attached by rule and a flag attached by evidence.
+    """
+    try:
+        from ..validation import lookup_flag
+    except ImportError:
+        from validation import lookup_flag
+
+    def _all(table, columns):
+        rows, start = [], 0
+        while True:
+            batch = (supabase.table(table).select(columns)
+                     .range(start, start + 999).execute().data) or []
+            rows.extend(batch)
+            if len(batch) < 1000:
+                break
+            start += 1000
+        return rows
+
+    # Paginated on purpose: an unbounded select() silently caps at 1000 rows,
+    # and there are far more junction rows than that.
+    options = _all("launch_options", "id, command, source, source_url")
+    counts = {}
+    for link in _all("game_launch_options", "launch_option_id"):
+        counts[link['launch_option_id']] = counts.get(link['launch_option_id'], 0) + 1
+
+    flagged = {}
+    for opt in options:
+        games = counts.get(opt['id'], 0)
+        if (games >= min_games
+                and opt.get('source') in _ENGINE_BLOCK_SOURCES
+                and not lookup_flag(opt['command'])):
+            flagged[opt['command']] = {
+                'exists': True,
+                'source': opt.get('source'),
+                'source_url': opt.get('source_url'),
+                'games_count': games,
+            }
+    return flagged
+
+
 def get_database_stats(supabase) -> Dict:
     """
     Get comprehensive statistics about the database contents
@@ -375,32 +443,8 @@ def get_database_stats(supabase) -> Dict:
                 source = row.get("source", "Unknown")
                 source_counts[source] = source_counts.get(source, 0) + 1
         
-        # Analyze problematic options for generic options issue
-        problematic_commands = ['-fps_max', '-nojoy', '-nosplash']
-        problematic_stats = {}
-        
-        for cmd in problematic_commands:
-            cmd_response = supabase.table("launch_options")\
-                .select("id, source", count="exact")\
-                .eq("command", cmd)\
-                .execute()
-            
-            if cmd_response.data:
-                # Count how many games use this option
-                option_id = cmd_response.data[0]['id']
-                usage_response = supabase.table("game_launch_options")\
-                    .select("game_app_id", count="exact")\
-                    .eq("launch_option_id", option_id)\
-                    .execute()
-                
-                problematic_stats[cmd] = {
-                    'exists': True,
-                    'source': cmd_response.data[0]['source'],
-                    'games_count': usage_response.count or 0
-                }
-            else:
-                problematic_stats[cmd] = {'exists': False, 'games_count': 0}
-        
+        problematic_stats = _blanket_attached_options(supabase)
+
         return {
             "total_games": total_games,
             "total_option_relationships": total_option_relationships,

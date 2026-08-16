@@ -226,17 +226,20 @@ def show_database_statistics():
         for source, count in stats.get('options_by_source', {}).items():
             print(f"     {source}: {count}")
         
-        # Show problematic options analysis
+        # Options attached in bulk by engine, with nothing documenting them.
+        # Not necessarily wrong — but this is the shape -malloc=system and
+        # -sm4 had, so each one is worth a look rather than a cleanup.
         problematic_stats = stats.get('problematic_options', {})
         if problematic_stats:
-            print("\n🚨 Problematic Options Analysis:")
-            for cmd, info in problematic_stats.items():
-                if info.get('exists', False):
-                    games_count = info.get('games_count', 0)
-                    source = info.get('source', 'Unknown')
-                    print(f"   {cmd}: {games_count} games (source: {source})")
-                    if games_count > 10:
-                        print(f"     ⚠️ HIGH PRIORITY for cleanup!")
+            print("\n🔎 Attached by engine rule, not yet documented:")
+            for cmd, info in sorted(problematic_stats.items(),
+                                    key=lambda kv: -kv[1].get('games_count', 0)):
+                games_count = info.get('games_count', 0)
+                source = info.get('source', 'Unknown')
+                cited = 'cited' if info.get('source_url') else 'NO source_url'
+                print(f"   {cmd}: {games_count} games (source: {source}, {cited})")
+            print("   Each is either worth a curated entry or worth withdrawing —")
+            print("   check whether the flag is real AND applies to every game listed.")
         
         # Additional helpful statistics
         from database.supabase import get_games_with_few_options
