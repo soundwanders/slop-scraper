@@ -787,14 +787,14 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     # tell a user how to actually apply a flag, so a scraped guess would defeat
     # the purpose. Absent for anything not yet documented.
     try:
-        from ..validation import lookup_flag
+        from ..validation import lookup_flag, curated_usage_example
     except ImportError:
-        from validation import lookup_flag
+        from validation import lookup_flag, curated_usage_example
     curated_entry = lookup_flag(command) or {}
     if curated_entry:
         verification_fields.update({
             "effect": curated_entry.get('effect'),
-            "usage_example": curated_entry.get('usage_example'),
+            "usage_example": curated_usage_example(command),
         })
 
     # Tiered fallback: newest columns first, dropping back a tier whenever a

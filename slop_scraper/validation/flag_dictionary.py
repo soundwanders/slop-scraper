@@ -17,6 +17,7 @@ the description shown to users, so nobody pastes an Unreal flag into a Source
 game and wonders why nothing happened.
 """
 
+import re
 from typing import Optional
 
 # command -> curated documentation
@@ -482,6 +483,18 @@ FLAG_DICTIONARY = {
     # Keyed on the bare variable name — _dictionary_key strips the =value, so
     # PROTON_LOG=1 and PROTON_LOG=+timestamp both resolve here.
     #
+    # 'documented_values' is what stops that stripping going too far. For a
+    # boolean variable the value IS the meaning: PROTON_NO_ESYNC=1 disables
+    # esync and PROTON_NO_ESYNC=0 does not, so an entry that describes the
+    # variable describes only one of them. Without the gate, seven rows
+    # (=0, =2, =true, =1configuration) inherited documentation for a setting
+    # they do not apply, and published a usage example that contradicted the
+    # command printed directly above it. Valve's README documents these as =1;
+    # any other value is undocumented and gets no curated text.
+    #
+    # PROTON_LOG deliberately has no gate — Valve documents 1 *and* an
+    # arbitrary WINEDEBUG channel string, so its value is genuinely open.
+    #
     # Two high-reach variables are deliberately absent: PROTON_USE_WINED3D11
     # (55 games) and PROTON_USE_D9VK (52). Neither appears in the current
     # Proton README — they are legacy spellings from before D9VK merged into
@@ -491,6 +504,7 @@ FLAG_DICTIONARY = {
         'effect': 'Turns off in-process esync primitives. Worth trying for games that '
                   'hang or crash under Proton.',
         'usage_example': 'PROTON_NO_ESYNC=1 %command%',
+        'documented_values': ('1',),
         'authority': 'ValveSoftware/Proton README: "Do not use eventfd-based '
                      'in-process synchronization primitives."',
         'scope': 'Linux, Proton',
@@ -500,6 +514,7 @@ FLAG_DICTIONARY = {
         'effect': 'Routes d3d11, d3d10 and d3d9 through OpenGL-based wined3d rather '
                   'than Vulkan-based DXVK. Usually slower; a fallback where DXVK fails.',
         'usage_example': 'PROTON_USE_WINED3D=1 %command%',
+        'documented_values': ('1',),
         'authority': 'ValveSoftware/Proton README: "Use OpenGL-based wined3d instead '
                      'of Vulkan-based DXVK for d3d11, d3d10, and d3d9."',
         'scope': 'Linux, Proton',
@@ -508,6 +523,7 @@ FLAG_DICTIONARY = {
         'description': 'Disable d3d11.dll',
         'effect': 'For d3d11 games that can fall back to d3d9 and run better that way.',
         'usage_example': 'PROTON_NO_D3D11=1 %command%',
+        'documented_values': ('1',),
         'authority': 'ValveSoftware/Proton README: "Disable d3d11.dll, for d3d11 games '
                      'which can fall back to and run better with d3d9."',
         'scope': 'Linux, Proton',
@@ -517,6 +533,7 @@ FLAG_DICTIONARY = {
         'effect': 'Lets 32-bit executables address more than 2 GB. Valve documents it '
                   'as enabled by default, so setting it explicitly is usually a no-op.',
         'usage_example': 'PROTON_FORCE_LARGE_ADDRESS_AWARE=1 %command%',
+        'documented_values': ('1',),
         'authority': 'ValveSoftware/Proton README: "Force Wine to enable the '
                      'LARGE_ADDRESS_AWARE flag for all executables. Enabled by default."',
         'scope': 'Linux, Proton',
@@ -541,6 +558,7 @@ FLAG_DICTIONARY = {
                   'for d3d9, so on any current Proton this does nothing. In older '
                   'versions it selected Vulkan-based DXVK over OpenGL-based wined3d.',
         'usage_example': 'PROTON_USE_D9VK=1 %command%',
+        'documented_values': ('1',),
         'authority': 'ValveSoftware/Proton README at tag proton_5.0: "Note: Obsoleted '
                      'in Proton 5.0. In older versions, use Vulkan-based DXVK instead '
                      'of OpenGL-based wined3d for d3d9."',
@@ -551,6 +569,7 @@ FLAG_DICTIONARY = {
         'effect': 'Limits the reported OpenGL extension string length, for old games '
                   'that crash when it is very long.',
         'usage_example': 'PROTON_OLD_GL_STRING=1 %command%',
+        'documented_values': ('1',),
         'authority': 'ValveSoftware/Proton README: "Set some driver overrides to limit '
                      'the length of the GL extension string, for old games that crash '
                      'on very long extension strings."',
@@ -668,10 +687,18 @@ def _dictionary_key(command: str) -> Optional[str]:
             return candidate
 
     # "-ResX=1920" -> "-ResX";  "-malloc=system" -> "-malloc"
+    #
+    # Stripping is refused where the entry declares 'documented_values' and the
+    # stored value is not one of them. For -ResX any integer means the same
+    # kind of thing, but for a boolean the value carries the whole meaning, and
+    # an entry describing PROTON_NO_ESYNC=1 says nothing true about =0.
     if '=' in command:
-        candidate = command.split('=', 1)[0]
-        if candidate in FLAG_DICTIONARY:
-            return candidate
+        candidate, value = command.split('=', 1)
+        entry = FLAG_DICTIONARY.get(candidate)
+        if entry is not None:
+            allowed = entry.get('documented_values')
+            if allowed is None or value in allowed:
+                return candidate
 
     return None
 
@@ -695,3 +722,31 @@ def curated_description(command: str) -> Optional[str]:
     description = entry['description']
     scope = entry.get('scope')
     return f"{description} ({scope})" if scope else description
+
+
+def curated_usage_example(command: str) -> Optional[str]:
+    """
+    The usage example to publish, carrying this row's own value.
+
+    An entry's example shows one representative value ('-ResX=1920'), but the
+    row it lands on may store another ('-ResX=2560'). The website prints the
+    command and the example together, and offers the example as the thing to
+    copy where it wraps %command% — so an example naming a different value than
+    the command above it is a contradiction the reader has to resolve.
+
+    Only open-valued flags reach this substitution. Where the value carries the
+    meaning, 'documented_values' has already refused the match upstream and
+    there is no entry to rewrite.
+    """
+    entry = lookup_flag(command)
+    if not entry:
+        return None
+    example = entry.get('usage_example')
+    key = _dictionary_key(command)
+    if not example or not key:
+        return example
+
+    stored = command.strip()
+    if stored != key and stored.split('=', 1)[0] == key:
+        return re.sub(re.escape(key) + r'=\S*', stored, example, count=1)
+    return example

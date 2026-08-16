@@ -26,6 +26,7 @@ from .flag_dictionary import (
     FLAG_DICTIONARY,
     lookup_flag,
     curated_description,
+    curated_usage_example,
     authority_url
 )
 from .description_quality import (
@@ -58,5 +59,6 @@ __all__ = [
     'FLAG_DICTIONARY',
     'lookup_flag',
     'curated_description',
+    'curated_usage_example',
     'authority_url'
 ]
