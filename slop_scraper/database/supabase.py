@@ -280,34 +280,63 @@ def get_game_option_count(supabase, app_id: int) -> int:
 
 def get_games_with_few_options(supabase, max_options: int = 3) -> List[Dict]:
     """
-    Get games that have few launch options (candidates for re-scraping)
+    Games with few launch options — candidates for re-scraping.
+
+    Reads games.total_options_count directly. That column is maintained by a
+    database trigger and was verified exact against a full recount of
+    game_launch_options: 2,452 games, zero disagreements.
+
+    This previously called an RPC, get_games_with_option_count, that has never
+    existed in this database. PostgREST answers a missing function with a
+    PGRST202 error rather than an empty result, so the call RAISED and the
+    `else:` fallback below it was unreachable — every invocation landed in the
+    except and returned []. `--db-stats` has therefore been reporting
+    "Games with <=2 options: 0" for its whole life, which reads as good news
+    and is actually the diagnostic failing.
+
+    The unreachable fallback is gone too, and would have been worth removing
+    even if it had run: it issued one count query PER GAME — 2,452 round trips
+    — and read `games` unpaginated, so it could only ever have seen the first
+    1,000 rows.
+
+    Hidden duplicate rows are excluded. They are the same game as their
+    canonical row, so re-scraping one gains nothing; the canonical row is the
+    candidate. Falls back to including them if migration 008 has not been
+    applied.
     """
+    columns = "app_id, title, total_options_count, duplicate_of"
     try:
-        # This is a more complex query - we need to count options per game
-        response = supabase.rpc('get_games_with_option_count').execute()
-        
-        if response.data:
-            return [game for game in response.data if game.get('option_count', 0) <= max_options]
-        else:
-            # Fallback method if RPC doesn't exist
-            print("ℹ️ Using fallback method for games with few options")
-            all_games = supabase.table("games").select("app_id, title").execute()
-            candidates = []
-            
-            for game in all_games.data:
-                option_count = get_game_option_count(supabase, game['app_id'])
-                if option_count <= max_options:
-                    candidates.append({
-                        'app_id': game['app_id'],
-                        'title': game['title'],
-                        'option_count': option_count
-                    })
-            
-            return candidates
-            
-    except Exception as e:
-        print(f"⚠️ Error getting games with few options: {e}")
-        return []
+        rows = _fetch_games_for_option_counts(supabase, columns)
+    except Exception:
+        # migration 008 not applied — duplicate_of does not exist yet
+        try:
+            rows = _fetch_games_for_option_counts(
+                supabase, "app_id, title, total_options_count")
+        except Exception as e:
+            print(f"⚠️ Error getting games with few options: {e}")
+            return []
+
+    return [
+        {'app_id': row['app_id'],
+         'title': row.get('title'),
+         'option_count': row.get('total_options_count') or 0}
+        for row in rows
+        if (row.get('total_options_count') or 0) <= max_options
+        and not row.get('duplicate_of')
+    ]
+
+
+def _fetch_games_for_option_counts(supabase, columns: str) -> List[Dict]:
+    """Every games row, paginated — a bare select() stops at 1,000."""
+    rows, start = [], 0
+    while True:
+        batch = (supabase.table("games").select(columns)
+                 .range(start, start + 999).execute().data) or []
+        rows.extend(batch)
+        if len(batch) < 1000:
+            break
+        start += 1000
+    return rows
 
 def get_database_stats(supabase) -> Dict:
     """
@@ -929,8 +958,19 @@ def save_to_database(game, options, supabase):
 # ========================================
 
 # Run this SQL in your Supabase SQL editor for better performance:
+#
+# NOTE: the first function below is NO LONGER NEEDED and is kept only so the
+# history of this bug stays readable. get_games_with_few_options() in this
+# module used to call an RPC named get_games_with_option_count — a DIFFERENT
+# name from the function defined here, which is why neither has ever existed
+# in the database. The Python side now reads games.total_options_count, a
+# trigger-maintained column verified exact against a full recount, so no
+# database function is required at all.
+#
+# Do not apply it expecting --db-stats to improve; it will not be called.
 HELPFUL_SQL_FUNCTIONS = """
 -- Function to get games with few options (for better performance)
+-- SUPERSEDED: the Python path reads games.total_options_count instead.
 CREATE OR REPLACE FUNCTION get_games_with_few_options(max_option_count INTEGER DEFAULT 3)
 RETURNS TABLE(app_id INTEGER, title TEXT, option_count BIGINT, has_problematic BOOLEAN) AS $$
 BEGIN
