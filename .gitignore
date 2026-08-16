@@ -126,3 +126,8 @@ engine_rollback_*.json
 # a missed one would commit operational state to a public repo. utils/paths.py
 # puts them all under here instead, so one rule covers the lot.
 _local/
+
+# nohup fallback output. Lands in the repo root the moment a nohup command's
+# redirect is mistyped, which is exactly how operational files have reached
+# this public repo before. Logs belong under _local/.
+nohup.out
