@@ -474,6 +474,36 @@ _DANGLING_WORDS = {
 }
 
 
+# Commands that are not launch options at all — parser artefacts, bare console
+# prefixes, and placeholder text scraped as a value. Nothing can be pasted into
+# Steam's launch-options box from this list and have any effect.
+#
+# THIS LIST IS THE WRITE-PATH GATE, and it exists here rather than only in the
+# cleanup script for a reason that has now bitten twice. Deleting these rows
+# without gating them meant the next scrape simply put them back: '+set' was
+# deleted, and a rescan recreated it the same day from a PCGamingWiki page for
+# Thirty Flights of Loving. The cleanup is the second half of the fix; this is
+# the first half.
+#
+# Compared against command.strip().lower(), so casing variants are covered.
+# An explicit literal set, never a pattern — a pattern over `command` would be
+# the unbounded-matching mistake this codebase has had to undo twice, and here
+# it would silently reject real flags.
+MALFORMED_COMMANDS = frozenset({
+    '+set',                      # id Tech console prefix; inert without a cvar and value
+    '-set',                      # same
+    '-resx',                     # Unreal fragment, value dropped
+    '-resy',
+    '-resx=',                    # same, '=' kept — also caught by the punctuation rule
+    '-resy=',
+    '-unskippable-',             # wikitext prose, not a flag
+    '-resx=desiredwidth',        # Epic's syntax placeholder taken literally
+    '-resy=desiredheight',
+    '-malloc=system',            # not Unreal syntax; Unreal uses bare -ansimalloc etc.
+    'proton_force_large_address_aware=1configuration',   # value welded to the next word
+})
+
+
 def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool, str]:
     """
     Final gate for a scraped launch option COMMAND before database save.
@@ -489,6 +519,10 @@ def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool,
 
     if len(command) < 2:
         return False, "Too short"
+
+    # Known non-options. Checked early so nothing downstream can rescue one.
+    if command.lower() in MALFORMED_COMMANDS:
+        return False, "Known parser artefact, not a launch option"
 
     # Terminal setup commands, never Steam launch options
     if command.startswith('WINEPREFIX='):
