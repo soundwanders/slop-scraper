@@ -49,6 +49,42 @@ FLAG_DICTIONARY = {
         'authority': 'Doom 3 source (id Software), renderer/RenderSystem_init.cpp — '
                      'idCVar r_customHeight: "custom screen height. set r_mode to -1 to activate"',
     },
+    # Intro-skip cvar. id Software's DOOM 3 BFG source declares it PLURAL:
+    #
+    #   idCVar com_skipIntroVideos( "com_skipIntroVideos", "0", CVAR_BOOL,
+    #                               "skips intro videos" );
+    #
+    # PCGamingWiki records the SINGULAR spelling for RAGE and DOOM (2016), and
+    # both entries here point at the same documentation rather than declaring
+    # one a typo — that mistake was nearly made with -force-opengl, where two
+    # spellings turned out to be two real flags.
+    #
+    # The caveat in the effect text is the load-bearing part. game_specific.py
+    # emits this to every id Tech game, including Quake III Arena (1999),
+    # Wolfenstein 3D (1992) and DOOM + DOOM II — all of which predate the cvar
+    # by a decade or more and ignore it entirely.
+    '+set com_skipIntroVideo': {
+        'description': 'Skip the intro videos',
+        'effect': 'Suppresses the startup videos on id Tech 5 and later (RAGE, DOOM '
+                  '2016, DOOM 3 BFG). It does NOT exist in the earlier engines — on '
+                  'Quake III Arena, Wolfenstein 3D or the original DOOM it is simply '
+                  'ignored. id\'s own source spells it com_skipIntroVideos, plural.',
+        'usage_example': '+set com_skipIntroVideos 1',
+        'authority': 'DOOM 3 BFG source (id Software), framework/Common.cpp — '
+                     'idCVar com_skipIntroVideos: "skips intro videos"',
+        'scope': 'id Tech 5 and later',
+    },
+    '+com_skipIntroVideo': {
+        'description': 'Skip the intro videos',
+        'effect': 'Suppresses the startup videos on id Tech 5 and later. Ignored by '
+                  'the pre-BFG engines, which have no such cvar.',
+        'usage_example': '+com_skipIntroVideos 1',
+        'authority': 'DOOM 3 BFG source (id Software), framework/Common.cpp — '
+                     'idCVar com_skipIntroVideos: "skips intro videos"; PCGamingWiki '
+                     'records the singular spelling for RAGE and DOOM (2016)',
+        'scope': 'id Tech 5 and later',
+    },
+
     '+set r_fullscreen': {
         'description': 'Start fullscreen or windowed',
         'effect': 'Takes 0 for windowed or 1 for full screen. Declared CVAR_ARCHIVE, so '
@@ -474,6 +510,22 @@ FLAG_DICTIONARY = {
         'authority': 'ValveSoftware/Proton README: "Convenience method for dumping a '
                      'useful debug log to $PROTON_LOG_DIR/steam-$APPID.log."',
         'scope': 'Linux, Proton',
+    },
+    # Recovered from Valve's README at the proton_5.0 tag rather than HEAD.
+    # Documentation has versions, and a variable dropped from the current file
+    # was documented by the same vendor earlier — reading the archive is not a
+    # workaround, it is where the answer lives. The obsolescence note is
+    # Valve's own and is the most useful thing we can tell a user about it.
+    'PROTON_USE_D9VK': {
+        'description': 'Use DXVK for Direct3D 9 (obsolete)',
+        'effect': 'Valve marks it obsoleted as of Proton 5.0 — DXVK became the default '
+                  'for d3d9, so on any current Proton this does nothing. In older '
+                  'versions it selected Vulkan-based DXVK over OpenGL-based wined3d.',
+        'usage_example': 'PROTON_USE_D9VK=1 %command%',
+        'authority': 'ValveSoftware/Proton README at tag proton_5.0: "Note: Obsoleted '
+                     'in Proton 5.0. In older versions, use Vulkan-based DXVK instead '
+                     'of OpenGL-based wined3d for d3d9."',
+        'scope': 'Linux, Proton 4.x and earlier',
     },
     'PROTON_OLD_GL_STRING': {
         'description': 'Shorten the GL extension string',
