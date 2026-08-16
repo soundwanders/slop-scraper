@@ -1,0 +1,57 @@
+Copyright (c) 2026 soundwanders
+
+All rights reserved.
+
+This source code is published so that it can be read, studied and referred to.
+It is not published for reuse.
+
+
+WHAT YOU MAY DO
+
+You may view, read and study this source code, and you may quote short
+excerpts of it for the purpose of discussion, review, teaching or criticism,
+with attribution.
+
+
+WHAT YOU MAY NOT DO WITHOUT WRITTEN PERMISSION
+
+You may not copy, run, modify, adapt, translate, publish, distribute,
+sublicense, sell, or create derivative works from this software or any part of
+it, whether or not for commercial purposes.
+
+Viewing the code does not grant a licence to operate it.
+
+
+WHY IT IS RESTRICTED
+
+This project sends automated requests to third-party services, including
+PCGamingWiki, ProtonDB and Steam. It is written to be a considerate client: it
+rate-limits itself, caches aggressively, prefers bulk APIs over per-page
+requests, identifies itself honestly in its User-Agent, and does not attempt to
+circumvent access controls it encounters.
+
+Those properties are easy to remove and expensive for the operators of those
+services if someone does. The restriction exists to discourage a modified copy
+being pointed at them, not to hoard anything clever — there is nothing here a
+competent developer could not write themselves.
+
+If you want to use any of this, ask. The answer is likely yes for anything that
+is not "run it at volume against someone else's website".
+
+
+NO WARRANTY AND NO LIABILITY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+This includes, without limitation, any use of this software or of anything
+derived from it to send requests to a third-party service. Anyone who operates
+this code, modified or unmodified, does so on their own responsibility and is
+solely responsible for complying with the terms of service, robots directives
+and rate limits of every service they contact.
