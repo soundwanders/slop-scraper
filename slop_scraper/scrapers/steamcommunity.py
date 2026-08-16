@@ -476,7 +476,13 @@ def extract_validated_steam_options(text, guide_title, debug=False):
         r'(?:^|\s)(-threads\s+[1-8])(?:\s|$)',
         r'(?:^|\s)(-(?:screen-width|screen-height)\s+\d{3,5})(?:\s|$)',
         r'(?:^|\s)(-(?:ResX|ResY)=\d{3,5})(?:\s|$)',
-        r'(?:^|\s)(-malloc=\w+)(?:\s|$)',
+        # '-malloc=\w+' was harvested here. No engine in this catalogue takes a
+        # '-malloc=' switch: Unreal selects an allocator with a bare
+        # -ansimalloc / -tbbmalloc / -binnedmalloc, and Epic's command-line
+        # reference documents no malloc switch at all. The pattern only ever
+        # produced -malloc=system, which was deleted as inert — and left in
+        # place it would have recreated that row from the first guide that
+        # repeated the folklore, which is precisely how a cleanup gets undone.
         r'(?:^|\s)(\+(?:fps_max|mat_queue_mode|cl_updaterate|rate)\s+\d+)(?:\s|$)',
     ]
     for pat in parameterized_patterns:
