@@ -253,6 +253,25 @@ FLAG_DICTIONARY = {
                      '"-freq <rate> — Same as -refresh"',
         'scope': 'Source engine games',
     },
+    # -noborder needs windowed mode to do anything, which is the whole point of
+    # documenting it: on its own it looks broken. Not to be confused with
+    # -borderless, which is a different flag on the Bethesda engines and is
+    # deliberately absent — nothing authoritative documents it (Skyrim and
+    # Fallout expose borderless through an INI setting, not a launch flag), and
+    # game_specific.py emits it from the Creation Engine block on no evidence.
+    '-noborder': {
+        'description': 'Remove the window border',
+        'effect': 'Requires windowed mode — pair it with -windowed or it does nothing. '
+                  'Gives borderless-window behaviour, so alt-tabbing avoids the '
+                  'two-to-three second delay exclusive fullscreen costs. Source 2007 '
+                  'and later only.',
+        'usage_example': '-windowed -noborder',
+        'authority': 'Valve Developer Community — Command line options: "When used '
+                     'with the game set to windowed mode, will make the game act as if '
+                     'in fullscreen mode (no window border)... only supported in '
+                     'Source 2007 and above."',
+        'scope': 'Source 2007 and later',
+    },
     '-nojoy': {
         'description': 'Disable joystick support',
         'effect': 'Skips joystick initialisation, which can shorten startup. The wiki '
