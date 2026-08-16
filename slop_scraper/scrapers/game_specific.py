@@ -282,11 +282,19 @@ def fetch_game_specific_options(app_id, title, cache, engine=None, test_results=
                 'description': 'Utilize all available CPU cores',
                 'source': 'Unreal Engine'
             },
-            {
-                'command': '-malloc=system',
-                'description': 'Use system memory allocator for better performance',
-                'source': 'Unreal Engine'
-            }
+            # '-malloc=system' was listed here, on 237 games. It is not Unreal
+            # syntax. Unreal selects an allocator with a bare switch —
+            # -ansimalloc, -tbbmalloc, -binnedmalloc — and -ansimalloc is the
+            # one that uses the system allocator this entry was reaching for.
+            # There is no '-malloc=' switch to take a value; Epic's
+            # command-line reference documents no malloc switch at all.
+            #
+            # So it was inert when pasted, exactly like the bare 'gamemode'
+            # form, and the description promised "better performance" from a
+            # string that does nothing. Removed rather than corrected to
+            # -ansimalloc: nothing establishes that these 237 games want a
+            # non-default allocator, and swapping one unsourced claim for
+            # another is not a fix. Same reasoning as '-vulkan' above.
         ])
     
     # 4. ID TECH ENGINE

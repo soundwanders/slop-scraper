@@ -287,10 +287,10 @@ FLAG_DICTIONARY = {
     # All verified against the Unity Manual, "Standalone Player command line
     # arguments". Platform limits below are Unity's own, not inferences.
     #
-    # Note what is NOT here: -force-opengl, on 803 games. Unity documents
-    # -force-glcore; -force-opengl does not appear in the manual, and the row
-    # claiming 'Unity Documentation' as its source actually links to
-    # PCGamingWiki. Undocumented, so no entry.
+    # -force-opengl was once excluded here on the reasoning that Unity
+    # documents only -force-glcore. That was wrong: the 5.6 manual documents
+    # -force-opengl too, as a DIFFERENT backend, and both now have entries
+    # citing the version of the manual that describes each.
     '-popupwindow': {
         'description': 'Run in a borderless window',
         'effect': 'Creates the window as a dialog with no frame. Not supported on macOS.',
