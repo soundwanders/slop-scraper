@@ -395,6 +395,76 @@ FLAG_DICTIONARY = {
     # The usage_example carries the working form, which is exactly the field
     # for it. The stored command itself still wants renaming — a separate fix,
     # since it changes a UNIQUE key on 4,051 game-option pairs.
+    # ---- Proton environment variables -------------------------------------
+    # Same defect as gamemode/mangohud, found by the frontend session: 37
+    # published rows are bare NAME=VALUE assignments across 402 links, and
+    # every one is inert as stored. Steam's launch-options field passes a bare
+    # assignment as an ARGUMENT to the game rather than setting it in the
+    # environment; it only becomes an env var when it precedes %command%.
+    # Valve's own README shows the form: "PROTON_USE_WINED3D=1 %command%".
+    #
+    # Keyed on the bare variable name — _dictionary_key strips the =value, so
+    # PROTON_LOG=1 and PROTON_LOG=+timestamp both resolve here.
+    #
+    # Two high-reach variables are deliberately absent: PROTON_USE_WINED3D11
+    # (55 games) and PROTON_USE_D9VK (52). Neither appears in the current
+    # Proton README — they are legacy spellings from before D9VK merged into
+    # DXVK — so nothing authoritative says what they do today.
+    'PROTON_NO_ESYNC': {
+        'description': 'Disable eventfd-based synchronisation',
+        'effect': 'Turns off in-process esync primitives. Worth trying for games that '
+                  'hang or crash under Proton.',
+        'usage_example': 'PROTON_NO_ESYNC=1 %command%',
+        'authority': 'ValveSoftware/Proton README: "Do not use eventfd-based '
+                     'in-process synchronization primitives."',
+        'scope': 'Linux, Proton',
+    },
+    'PROTON_USE_WINED3D': {
+        'description': 'Use wined3d (OpenGL) instead of DXVK',
+        'effect': 'Routes d3d11, d3d10 and d3d9 through OpenGL-based wined3d rather '
+                  'than Vulkan-based DXVK. Usually slower; a fallback where DXVK fails.',
+        'usage_example': 'PROTON_USE_WINED3D=1 %command%',
+        'authority': 'ValveSoftware/Proton README: "Use OpenGL-based wined3d instead '
+                     'of Vulkan-based DXVK for d3d11, d3d10, and d3d9."',
+        'scope': 'Linux, Proton',
+    },
+    'PROTON_NO_D3D11': {
+        'description': 'Disable d3d11.dll',
+        'effect': 'For d3d11 games that can fall back to d3d9 and run better that way.',
+        'usage_example': 'PROTON_NO_D3D11=1 %command%',
+        'authority': 'ValveSoftware/Proton README: "Disable d3d11.dll, for d3d11 games '
+                     'which can fall back to and run better with d3d9."',
+        'scope': 'Linux, Proton',
+    },
+    'PROTON_FORCE_LARGE_ADDRESS_AWARE': {
+        'description': 'Force the LARGE_ADDRESS_AWARE flag',
+        'effect': 'Lets 32-bit executables address more than 2 GB. Valve documents it '
+                  'as enabled by default, so setting it explicitly is usually a no-op.',
+        'usage_example': 'PROTON_FORCE_LARGE_ADDRESS_AWARE=1 %command%',
+        'authority': 'ValveSoftware/Proton README: "Force Wine to enable the '
+                     'LARGE_ADDRESS_AWARE flag for all executables. Enabled by default."',
+        'scope': 'Linux, Proton',
+    },
+    'PROTON_LOG': {
+        'description': 'Write a Proton debug log',
+        'effect': 'Dumps a log to $PROTON_LOG_DIR/steam-$APPID.log. Set to 1 for the '
+                  'default channels, or to a string appended to the WINEDEBUG channels.',
+        'usage_example': 'PROTON_LOG=1 %command%',
+        'authority': 'ValveSoftware/Proton README: "Convenience method for dumping a '
+                     'useful debug log to $PROTON_LOG_DIR/steam-$APPID.log."',
+        'scope': 'Linux, Proton',
+    },
+    'PROTON_OLD_GL_STRING': {
+        'description': 'Shorten the GL extension string',
+        'effect': 'Limits the reported OpenGL extension string length, for old games '
+                  'that crash when it is very long.',
+        'usage_example': 'PROTON_OLD_GL_STRING=1 %command%',
+        'authority': 'ValveSoftware/Proton README: "Set some driver overrides to limit '
+                     'the length of the GL extension string, for old games that crash '
+                     'on very long extension strings."',
+        'scope': 'Linux, Proton',
+    },
+
     'gamemode': {
         'description': 'Run the game under Feral GameMode',
         'effect': 'Applies temporary host optimisations (CPU governor, I/O and process '
