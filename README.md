@@ -8,7 +8,7 @@ It is the write side of a two-part system. The read side is
 serves the catalogue.
 
 > **Source-available, not open source.** You are welcome to read this. Please do
-> not run it. See [LICENSE](LICENSE) — the short version is that this thing
+> not run it. See [LICENSE](LICENSE). The short version is that this thing
 > talks to other people's websites, and I would rather a modified copy of it did
 > not.
 
@@ -17,7 +17,7 @@ serves the catalogue.
 ## The idea
 
 Steam lets you pass launch options to a game, and the good ones are genuinely
-useful — skip a two-minute intro, force a renderer that stops a game crashing,
+useful: skip a two-minute intro, force a renderer that stops a game crashing,
 cap a frame rate that is cooking your GPU for nothing. The problem is that the
 advice is scattered across wikis, forum posts and eight-year-old Reddit threads,
 and a lot of it is wrong.
@@ -28,7 +28,7 @@ So the governing rule here is narrow:
 > `NULL` is a deliberate signal, not a gap to fill.
 
 That sounds obvious and is annoyingly expensive in practice. Several rounds of
-work on this project have consisted of *deleting* data — engine labels that
+work on this project have consisted of *deleting* data: engine labels that
 nothing could confirm, flags attached to games they do nothing in, descriptions
 that were confidently wrong. Coverage went down on purpose each time.
 
@@ -38,10 +38,10 @@ If the answer is not a URL or a named reference, it does not ship.
 ## How that works in practice
 
 **Every published row must name its source.** A database view sits in front of
-the table and hides anything that cannot — an option nothing links to, or an
-option with no provenance. Roughly a fifth of stored rows are hidden at any
-time. They are not deleted; if a later pass confirms one, it reappears on its
-own.
+the table and hides anything that cannot, whether that is an option nothing
+links to or an option with no provenance. Roughly a fifth of stored rows are
+hidden at any time. They are not deleted; if a later pass confirms one, it
+reappears on its own.
 
 **Documentation comes from primary sources or not at all.** Where a flag has a
 usage example, that example was verified against the vendor: Unity's manual,
@@ -52,7 +52,7 @@ what a flag does is the one failure mode this project cannot afford, because a
 plausible wrong answer is worse than a blank.
 
 **Fixes go on the write path, not into a cleanup script.** Cleaning the database
-alone gets undone the next time the scraper runs — that has happened here more
+alone gets undone the next time the scraper runs, which has happened here more
 than once. A cleanup is the second half of a fix; the parser or validator change
 is the first.
 
@@ -77,7 +77,7 @@ as possible:
   coverage here, and it is the correct trade.
 
 If you are reading this because you maintain one of the sites it talks to and
-something looks wrong, please open an issue — I would rather hear it directly.
+something looks wrong, please open an issue. I would rather hear it directly.
 
 ## Architecture
 
@@ -104,20 +104,20 @@ repository publishes.
 ## Status
 
 Personal project, run on demand. There is no scheduler and no service behind
-it — it runs when I run it. Numbers move, and anything quoted here would be
+it. It runs when I run it. Numbers move, and anything quoted here would be
 stale by the time you read it.
 
 ## Acknowledgments
 
-- [PCGamingWiki](https://www.pcgamingwiki.com/) — the primary source for both
+- [PCGamingWiki](https://www.pcgamingwiki.com/): the primary source for both
   launch options and engine data, and the reason the engine column is worth
   anything.
-- [ProtonDB](https://www.protondb.com) — community reports for Linux and Proton.
-- [Steam Community](https://steamcommunity.com/) — user-written guides.
+- [ProtonDB](https://www.protondb.com): community reports for Linux and Proton.
+- [Steam Community](https://steamcommunity.com/): user-written guides.
 - Valve, Epic and id Software, whose published documentation and released engine
   source made accurate flag descriptions possible.
-- [Supabase](https://supabase.com/) — database and hosting.
+- [Supabase](https://supabase.com/): database and hosting.
 
 ## License
 
-All rights reserved. Readable, not reusable — see [LICENSE](LICENSE).
+All rights reserved. Readable, not reusable; see [LICENSE](LICENSE).
