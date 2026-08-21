@@ -19,6 +19,49 @@ except ImportError:
     from utils.extract_engine import extract_engine, extract_engine_with_provenance
     from utils.dates import normalize_release_date
 
+def _prefer_documented(candidate_apps, debug=False):
+    """
+    Put games PCGamingWiki actually documents at the front of the queue.
+
+    SteamSpy's pages are ordered by owner count and the cursor walks through
+    them, so a run deep in the catalogue is scraping games ranked ~21,000th by
+    players. Those games are real, but almost nothing documents them: a
+    25-game sample produced one real launch option and 19 games whose only
+    result was the two Linux wrapper tools ProtonDB reports on everything.
+
+    PCGamingWiki's App ID table is the honest signal for "someone has written
+    about this game", and it is already on disk — the same week-cached Cargo
+    projection used for duplicate detection, 21,543 App IDs. No extra request
+    is made for this.
+
+    Ordering, not filtering. Undocumented games still get scraped, just after
+    the documented ones, so a `--limit` spends itself where options actually
+    exist. If the cache is missing or unreadable the original order is
+    returned unchanged; a better queue is not worth a crash.
+    """
+    try:
+        try:
+            from ..utils.pcgw_appid_groups import fetch_appid_groups
+        except ImportError:
+            from utils.pcgw_appid_groups import fetch_appid_groups
+        documented = fetch_appid_groups(verbose=False)
+    except Exception as e:
+        if debug:
+            print(f"⚠️ PCGamingWiki App ID cache unavailable ({e}) — keeping SteamSpy order")
+        return candidate_apps
+
+    if not documented:
+        return candidate_apps
+
+    known = [a for a in candidate_apps if a['appid'] in documented]
+    rest = [a for a in candidate_apps if a['appid'] not in documented]
+
+    print(f"📚 {len(known)} of {len(candidate_apps)} candidates have a PCGamingWiki page "
+          f"— scraping those first")
+
+    return known + rest
+
+
 def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=False, 
                        debug=False, cache_file=None, rate_limiter=None, 
                        session_monitor=None, db_client=None, skip_existing=True, 
@@ -86,6 +129,8 @@ def get_steam_game_list(limit=100, force_refresh=False, cache=None, test_mode=Fa
     candidate_apps = [app for app in all_apps if app['appid'] not in skip_app_ids]
 
     print(f"✅ Found {len(candidate_apps)} NEW games to potentially process")
+
+    candidate_apps = _prefer_documented(candidate_apps, debug=debug)
 
     if not candidate_apps:
         print("⚠️ No new games found to process")
