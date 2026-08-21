@@ -89,20 +89,39 @@ def test_database_connection(test_mode=False, supabase=None):
 # FUNCTIONS FOR GENERIC OPTIONS ISSUE
 # ========================================
 
+def fetch_all_rows(supabase, table: str, columns: str, filters=None) -> List[Dict]:
+    """
+    Every matching row, paginated.
+
+    PostgREST answers a select() with at most 1,000 rows and says nothing about
+    the ones it left behind — no error, no flag, just a short list that looks
+    complete. Any query expected to return more than a thousand rows has to
+    page through explicitly, so every such read in this file goes through here
+    rather than open-coding the loop and getting it right most of the time.
+
+    `filters` is applied to each page's query builder, e.g.
+        fetch_all_rows(sb, "games", "app_id", lambda q: q.gt("total_options_count", 0))
+    """
+    rows, start = [], 0
+    while True:
+        query = supabase.table(table).select(columns)
+        if filters:
+            query = filters(query)
+        batch = query.range(start, start + 999).execute().data or []
+        rows.extend(batch)
+        if len(batch) < 1000:
+            break
+        start += 1000
+    return rows
+
+
 def get_existing_app_ids(supabase) -> Set[int]:
     """
     Get all app_ids that already exist in the database
     Returns a set of app_ids for fast lookup
     """
     try:
-        response = supabase.table("games").select("app_id").execute()
-        
-        if response.data:
-            # Extract unique app_ids
-            app_ids = {row["app_id"] for row in response.data}
-            return app_ids
-        else:
-            return set()
+        return {row["app_id"] for row in fetch_all_rows(supabase, "games", "app_id")}
             
     except Exception as e:
         print(f"⚠️ Error fetching existing app_ids: {e}")
@@ -244,15 +263,16 @@ def get_smart_existing_games(supabase, skip_existing: bool = True, force_reproce
         return set()
 
     try:
-        response = (
-            supabase.table("games")
-            .select("app_id")
-            .gt("total_options_count", 0)
-            .execute()
-        )
+        # Paginated, and not optional: this select used to run unbounded and so
+        # returned exactly 1,000 app_ids no matter how large the catalogue got.
+        # Everything past the cap looked new, and the scraper spent its request
+        # budget re-fetching games it already had — against other people's
+        # wikis. A skip list that silently stops skipping is worse than none.
+        rows = fetch_all_rows(supabase, "games", "app_id",
+                              lambda q: q.gt("total_options_count", 0))
 
-        if response.data:
-            covered = {row['app_id'] for row in response.data}
+        if rows:
+            covered = {row['app_id'] for row in rows}
             print(f"📊 Skipping {len(covered)} games that already have launch options")
             return covered
 
@@ -328,15 +348,7 @@ def get_games_with_few_options(supabase, max_options: int = 3) -> List[Dict]:
 
 def _fetch_games_for_option_counts(supabase, columns: str) -> List[Dict]:
     """Every games row, paginated — a bare select() stops at 1,000."""
-    rows, start = [], 0
-    while True:
-        batch = (supabase.table("games").select(columns)
-                 .range(start, start + 999).execute().data) or []
-        rows.extend(batch)
-        if len(batch) < 1000:
-            break
-        start += 1000
-    return rows
+    return fetch_all_rows(supabase, "games", columns)
 
 # Source labels emitted by game_specific.py's static per-engine blocks. A row
 # carrying one of these was attached because of the game's ENGINE, not because
@@ -373,22 +385,11 @@ def _blanket_attached_options(supabase, min_games: int = 10) -> Dict:
     except ImportError:
         from validation import lookup_flag
 
-    def _all(table, columns):
-        rows, start = [], 0
-        while True:
-            batch = (supabase.table(table).select(columns)
-                     .range(start, start + 999).execute().data) or []
-            rows.extend(batch)
-            if len(batch) < 1000:
-                break
-            start += 1000
-        return rows
-
     # Paginated on purpose: an unbounded select() silently caps at 1000 rows,
     # and there are far more junction rows than that.
-    options = _all("launch_options", "id, command, source, source_url")
+    options = fetch_all_rows(supabase, "launch_options", "id, command, source, source_url")
     counts = {}
-    for link in _all("game_launch_options", "launch_option_id"):
+    for link in fetch_all_rows(supabase, "game_launch_options", "launch_option_id"):
         counts[link['launch_option_id']] = counts.get(link['launch_option_id'], 0) + 1
 
     flagged = {}
@@ -432,16 +433,13 @@ def get_database_stats(supabase) -> Dict:
         
         unique_options = unique_options_response.count or 0
         
-        # Options by source (get source distribution)
-        sources_response = supabase.table("launch_options")\
-            .select("source")\
-            .execute()
-        
+        # Options by source. Paginated because the source breakdown is meant to
+        # sum to unique_options above, which is a count="exact" and therefore
+        # not subject to the 1,000-row cap this select would otherwise hit.
         source_counts = {}
-        if sources_response.data:
-            for row in sources_response.data:
-                source = row.get("source", "Unknown")
-                source_counts[source] = source_counts.get(source, 0) + 1
+        for row in fetch_all_rows(supabase, "launch_options", "source"):
+            source = row.get("source", "Unknown")
+            source_counts[source] = source_counts.get(source, 0) + 1
         
         problematic_stats = _blanket_attached_options(supabase)
 
