@@ -49,10 +49,51 @@ def _record_network_success():
 # one at a time, sequentially, in the scraper's main loop.
 _last_call_needs_recheck = False
 
+# Engines recorded on the page that was VERIFIED to be the game just looked up.
+#
+# The page's wikitext is already in memory — it was downloaded to read launch
+# options out of — and the infobox states the engine right there. Until now the
+# engine came only from a bulk Cargo table cached for a week, through the same
+# endpoint that has since closed, so a game's engine could not be learned at
+# scrape time at all.
+#
+# Only ever set from a page that passed the App ID check, for the same reason
+# the options are: an engine read off the wrong game's page is worse than no
+# engine, because games.engine decides which block of engine-specific flags
+# gets attached. Same module-state caveat as above — one game at a time.
+_last_page_engines = []
+
 
 def pcgamingwiki_needs_recheck():
     """True if the last call's empty/partial result may be an outage artifact."""
     return _last_call_needs_recheck
+
+
+def pcgamingwiki_page_engines():
+    """
+    Engines the last verified page recorded, in order of appearance.
+
+    Empty when the lookup failed, the page was never verified, or the wiki
+    records no engine for it. More than one entry means the page genuinely
+    lists several (Terraria records XNA and FNA) — the caller is expected to
+    decline rather than pick, since nothing here establishes which applies.
+    """
+    return list(_last_page_engines)
+
+
+def _record_page_engines(wikitext, debug=False):
+    """Remember the engines named on a page already proven to be this game."""
+    global _last_page_engines
+    try:
+        try:
+            from ..utils.pcgw_wikitext import parse_page_engines
+        except ImportError:
+            from utils.pcgw_wikitext import parse_page_engines
+        _last_page_engines = parse_page_engines(wikitext)
+        if debug and _last_page_engines:
+            print(f"🔍 PCGamingWiki API: Page records engine(s): {_last_page_engines}")
+    except Exception:
+        _last_page_engines = []
 
 
 def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, debug=False,
@@ -67,8 +108,9 @@ def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, 
       3. Full-text search over title variations (including the original title)
     """
 
-    global _last_call_needs_recheck
+    global _last_call_needs_recheck, _last_page_engines
     _last_call_needs_recheck = False
+    _last_page_engines = []
 
     # Security validation
     if not game_title or len(game_title) > 200:
@@ -471,6 +513,7 @@ def get_launch_options_from_page_api(page_id, debug=False, expect_app_id=None):
                             print(f"🔍 PCGamingWiki API: Page {page_id} does not cover "
                                   f"app {expect_app_id} — rejecting")
                         return None
+                    _record_page_engines(wikitext, debug=debug)
 
                 # Parse wikitext for launch options with strict validation
                 parsed_options = parse_wikitext_for_launch_options_strict(wikitext, debug=debug)
@@ -823,6 +866,7 @@ def try_alternative_search(game_title, debug=False, app_id=None):
                         # game has no documented options, which is a real
                         # finding. Reading on past it would only find another
                         # game's page.
+                        _record_page_engines(wikitext, debug=debug)
                         alt_options = _options_from_wikitext(wikitext, page_id, debug=debug)
                         options.extend(alt_options)
                         if debug:
