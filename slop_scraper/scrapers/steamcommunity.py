@@ -347,35 +347,44 @@ def extract_launch_options_clean_and_validated(guide_soup, guide_title, debug=Fa
                 if debug and extracted_options:
                     print(f"🔍 Steam Community: Found {len(extracted_options)} clean options in code block")
 
-        # Method 2: Extract from paragraphs with explicit launch option context
-        if len(options) < 5:  # Process more if we haven't found many
-            # A child element only counts if it actually carries text. Every
-            # modern guide section ends with <div style="clear: both"></div>,
-            # an empty spacer, and that one element made this list length-1 and
-            # truthy — so the fallback below never fired, the spacer was the
-            # only thing scanned, and the section's real content (direct text
-            # nodes separated by <br>) was never looked at. Guides were being
-            # fetched, scanned and silently discarded: 0 options from pages
-            # that are nothing but launch options.
-            paragraphs = [p for p in guide_content.find_all(['p', 'div', 'li', 'td'])
-                          if p.get_text(strip=True)]
-            # The section itself is often a leaf div with direct text
-            if not paragraphs:
-                paragraphs = [guide_content]
+        # Method 2: Extract from paragraphs with explicit launch option context.
+        #
+        # Every section gets read. This used to stop once five options had been
+        # collected, which meant a guide's later sections were dropped for no
+        # reason but their position — a flag documented in section six was
+        # invisible while the same flag in section one was not. The real bounds
+        # are the 30-paragraph cap below, the 20-option cap in
+        # final_validation_and_dedup, and corroboration. Reading further costs
+        # nothing anyone else pays for: the page is already downloaded, so this
+        # is local parsing, not another request.
 
-            for para in paragraphs[:30]:
-                clean_text = get_clean_text_from_element(para)
+        # A child element only counts if it actually carries text. Every
+        # modern guide section ends with <div style="clear: both"></div>,
+        # an empty spacer, and that one element made this list length-1 and
+        # truthy — so the fallback below never fired, the spacer was the
+        # only thing scanned, and the section's real content (direct text
+        # nodes separated by <br>) was never looked at. Guides were being
+        # fetched, scanned and silently discarded: 0 options from pages
+        # that are nothing but launch options.
+        paragraphs = [p for p in guide_content.find_all(['p', 'div', 'li', 'td'])
+                      if p.get_text(strip=True)]
+        # The section itself is often a leaf div with direct text
+        if not paragraphs:
+            paragraphs = [guide_content]
 
-                if not clean_text or len(clean_text) > 3000:
-                    continue
+        for para in paragraphs[:30]:
+            clean_text = get_clean_text_from_element(para)
 
-                # Only process text that explicitly mentions launch options
-                if has_explicit_launch_option_context(clean_text):
-                    extracted_options = extract_validated_steam_options(clean_text, guide_title, debug)
-                    options.extend(extracted_options)
+            if not clean_text or len(clean_text) > 3000:
+                continue
 
-                    if debug and extracted_options:
-                        print(f"🔍 Steam Community: Found {len(extracted_options)} options in paragraph")
+            # Only process text that explicitly mentions launch options
+            if has_explicit_launch_option_context(clean_text):
+                extracted_options = extract_validated_steam_options(clean_text, guide_title, debug)
+                options.extend(extracted_options)
+
+                if debug and extracted_options:
+                    print(f"🔍 Steam Community: Found {len(extracted_options)} options in paragraph")
 
     if guide_url:
         for opt in options:
