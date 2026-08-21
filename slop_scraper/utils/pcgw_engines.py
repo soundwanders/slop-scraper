@@ -168,7 +168,15 @@ def _fetch_page(offset, session, retries=4):
             if response.status_code == 200:
                 payload = response.json()
                 if 'error' in payload:
-                    raise RuntimeError(payload['error'].get('info', 'cargo error'))
+                    info = payload['error'].get('info', 'cargo error')
+                    # A refusal is not a transient failure. PCGamingWiki now
+                    # answers "You don't have permission to run arbitrary Cargo
+                    # queries", and retrying that four more times with backoff
+                    # only spends 30 seconds and sends four more requests to a
+                    # server that has already said no.
+                    if 'permission' in info.lower() or 'denied' in info.lower():
+                        raise PermissionError(info)
+                    raise RuntimeError(info)
                 return payload.get('cargoquery', [])
 
             if response.status_code == 429:
@@ -187,6 +195,8 @@ def _fetch_page(offset, session, retries=4):
                 continue
 
             last = f"HTTP {response.status_code}"
+        except PermissionError:
+            raise
         except Exception as e:
             last = str(e)
         if attempt < retries:
@@ -225,13 +235,45 @@ def fetch_engine_map(force=False, verbose=True):
 
     rows, offset = [], 0
     session = requests.Session()
-    while True:
-        batch = _fetch_page(offset, session)
-        rows.extend(batch)
-        if len(batch) < _PAGE_SIZE:
-            break
-        offset += _PAGE_SIZE
-        time.sleep(0.4)  # be a good citizen
+    try:
+        while True:
+            batch = _fetch_page(offset, session)
+            rows.extend(batch)
+            if len(batch) < _PAGE_SIZE:
+                break
+            offset += _PAGE_SIZE
+            time.sleep(0.4)  # be a good citizen
+    except Exception as e:
+        # A refresh that fails must not erase what we already know.
+        #
+        # PCGamingWiki's Cargo endpoint began answering "You don't have
+        # permission to run arbitrary Cargo queries". With the cache a week
+        # old, every run re-attempted the download, spent ~31s in retries,
+        # raised, and left lookup_engine() with an empty map — so every game
+        # scraped after that point was stored with no engine at all. Twenty
+        # consecutive new games came in as 'Unknown' before anyone noticed,
+        # because a missing engine looks exactly like a game the wiki does not
+        # document.
+        #
+        # An expired cache is stale, not wrong: engines do not change after
+        # release, and the TTL exists to pick up NEWLY documented games, not
+        # to expire facts. Serving it beats serving nothing. This is not the
+        # same as the refusal below to write a PARTIAL map — that would cache
+        # a wrong answer for a week; this reuses a complete one.
+        stale = None
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    stale = json.load(f)
+            except Exception:
+                stale = None
+        if stale:
+            age_days = (time.time() - os.path.getmtime(path)) / 86400
+            print(f"   ⚠️ PCGamingWiki engine refresh failed ({e})")
+            print(f"   📦 Using the cached engine map anyway "
+                  f"({len(stale)} app IDs, {age_days:.0f} days old)")
+            return {int(k): tuple(v) for k, v in stale.items()}
+        raise
 
     # app_id -> (specificity, (family, detail)). Lower specificity wins.
     staged = {}

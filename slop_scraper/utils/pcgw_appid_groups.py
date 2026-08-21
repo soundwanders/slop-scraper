@@ -73,7 +73,15 @@ def _fetch_page(offset, session, retries=4):
             if response.status_code == 200:
                 payload = response.json()
                 if 'error' in payload:
-                    raise RuntimeError(payload['error'].get('info', 'cargo error'))
+                    info = payload['error'].get('info', 'cargo error')
+                    # A refusal is not a transient failure. PCGamingWiki now
+                    # answers "You don't have permission to run arbitrary Cargo
+                    # queries", and retrying that four more times with backoff
+                    # only spends 30 seconds and sends four more requests to a
+                    # server that has already said no.
+                    if 'permission' in info.lower() or 'denied' in info.lower():
+                        raise PermissionError(info)
+                    raise RuntimeError(info)
                 return payload.get('cargoquery', [])
             if response.status_code == 429:
                 try:
@@ -86,6 +94,8 @@ def _fetch_page(offset, session, retries=4):
                     time.sleep(wait)
                 continue
             last = f"HTTP {response.status_code}"
+        except PermissionError:
+            raise
         except Exception as e:
             last = str(e)
         if attempt < retries:
