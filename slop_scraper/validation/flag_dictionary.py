@@ -599,11 +599,15 @@ FLAG_DICTIONARY = {
         'scope': 'Linux, Proton',
     },
 
-    'gamemode': {
+    # Keyed on the executable name, not the full launch string, because
+    # _dictionary_key splits on space: 'gamemoderun %command%' resolves here
+    # via its first token. The stored command is now the working form, so the
+    # effect text no longer has to warn that the bare word is inert.
+    'gamemoderun': {
         'description': 'Run the game under Feral GameMode',
         'effect': 'Applies temporary host optimisations (CPU governor, I/O and process '
-                  'priority) for the game\'s lifetime. The bare word does nothing — '
-                  'Steam needs the wrapper form.',
+                  'priority) for the game\'s lifetime, then restores them on exit. '
+                  'GameMode runs the game, so %command% is what it runs.',
         'usage_example': 'gamemoderun %command%',
         'authority': 'FeralInteractive/gamemode README',
         'scope': 'Linux',
@@ -611,7 +615,7 @@ FLAG_DICTIONARY = {
     'mangohud': {
         'description': 'Show the MangoHud performance overlay',
         'effect': 'Draws FPS, frame timing and CPU/GPU load over Vulkan and OpenGL '
-                  'games. The bare word does nothing — Steam needs the wrapper form.',
+                  'games. MangoHud runs the game, so %command% is what it runs.',
         'usage_example': 'mangohud %command%',
         'authority': 'flightlessmango/MangoHud README',
         'scope': 'Linux',

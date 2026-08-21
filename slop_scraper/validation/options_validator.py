@@ -504,6 +504,35 @@ MALFORMED_COMMANDS = frozenset({
 })
 
 
+# Wrapper tools: programs that RUN the game rather than arguments passed to it.
+#
+# Steam replaces %command% with the game's executable, so the tool has to be
+# written in front of it. Without the placeholder the launch options box gets a
+# bare program name, which Steam appends as an argument to the game — the tool
+# never runs, and nothing reports an error.
+#
+# Kept as data next to MALFORMED_COMMANDS because they are the same kind of
+# fact: a short list of exact strings, read by a human, that the write path
+# consults. WRAPPER_NORMALISED is what a scraper should store when it sees any
+# spelling of the tool in a user's report.
+WRAPPER_COMMANDS = frozenset({
+    'gamemoderun %command%',
+    'mangohud %command%',
+})
+
+WRAPPER_BARE_NAMES = frozenset({
+    'gamemode',
+    'gamemoderun',
+    'mangohud',
+})
+
+WRAPPER_NORMALISED = {
+    'gamemode':    'gamemoderun %command%',   # the binary is gamemoderun
+    'gamemoderun': 'gamemoderun %command%',
+    'mangohud':    'mangohud %command%',
+}
+
+
 def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool, str]:
     """
     Final gate for a scraped launch option COMMAND before database save.
@@ -574,9 +603,21 @@ def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool,
             return False, "Unverified environment variable (cannot be documented accurately)"
         return True, "Environment variable option"
 
-    # Wrapper commands (gamemoderun %command%, mangohud %command%)
-    if command in ('gamemode', 'gamemoderun', 'mangohud'):
-        return True, "Known wrapper command"
+    # Wrapper commands.
+    #
+    # These tools RUN the game rather than being passed to it, so Steam's
+    # %command% placeholder is not optional decoration — it is the entire
+    # mechanism. 'gamemoderun %command%' works; a bare 'gamemode' pasted into
+    # the launch options box does nothing at all.
+    #
+    # The bare names are rejected rather than accepted-and-fixed because this
+    # is the write path: 2,095 games held 'gamemode' as their launch option
+    # for months, and the only reason it kept coming back was that nothing
+    # here ever said no to it.
+    if command in WRAPPER_COMMANDS:
+        return True, "Wrapper command in its working form"
+    if command in WRAPPER_BARE_NAMES:
+        return False, "Wrapper tool name without %command% (inert when pasted)"
 
     # Everything else must be a -flag / +flag / --flag
     if not command.startswith(('-', '+')):

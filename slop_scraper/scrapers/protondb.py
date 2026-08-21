@@ -124,12 +124,12 @@ def fetch_protondb_launch_options(app_id, game_title=None, rate_limit=None, debu
 
                 options.extend([
                     {
-                        'command': 'gamemode',
+                        'command': 'gamemoderun %command%',
                         'description': 'Enable GameMode for Linux performance optimization',
                         'source': 'ProtonDB'
                     },
                     {
-                        'command': 'mangohud',
+                        'command': 'mangohud %command%',
                         'description': 'Enable MangoHud overlay for performance monitoring',
                         'source': 'ProtonDB'
                     }
@@ -244,6 +244,11 @@ def extract_options_from_reports(reports, debug=False):
     except ImportError:
         from validation import is_valid_launch_option
 
+    try:
+        from ..validation.options_validator import WRAPPER_NORMALISED
+    except ImportError:
+        from validation.options_validator import WRAPPER_NORMALISED
+
     env_var_pattern = re.compile(r'\b((?:PROTON|DXVK|VKD3D|WINE|MANGOHUD|PULSE)[A-Z0-9_]*)=([^\s\'"`]{1,60})')
     wrapper_pattern = re.compile(r'\b(gamemoderun|gamemode|mangohud)\b')
     # Anchored: must not continue a word ("90fps-ish" must not yield "-ish")
@@ -277,7 +282,11 @@ def extract_options_from_reports(reports, debug=False):
             _record(m.group(0), high_signal=True)
 
         for m in wrapper_pattern.finditer(text):
-            _record(m.group(1).replace('gamemoderun', 'gamemode'), high_signal=True)
+            # Normalise toward the form that actually works. This used to run
+            # the other way — 'gamemoderun' was rewritten to a bare 'gamemode'
+            # — which is how a launch option that does nothing when pasted
+            # ended up on 2,095 games.
+            _record(WRAPPER_NORMALISED[m.group(1)], high_signal=True)
 
         for m in flag_pattern.finditer(text):
             # Flags are only trustworthy inside a launch-option string
@@ -298,9 +307,9 @@ def extract_options_from_reports(reports, debug=False):
             continue
 
         # Description from the curated table only — never from report prose
-        if cmd == 'gamemode':
+        if cmd == 'gamemoderun %command%':
             desc = 'Enable GameMode for performance optimization'
-        elif cmd == 'mangohud':
+        elif cmd == 'mangohud %command%':
             desc = 'Enable MangoHud overlay for performance monitoring'
         elif '=' in cmd:
             # describe_env_var declines when the value disables the variable,
