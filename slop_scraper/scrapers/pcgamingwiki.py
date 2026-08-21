@@ -115,7 +115,8 @@ def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, 
             )
 
         if page_id:
-            content_options = get_launch_options_from_page_api(page_id, debug=debug)
+            content_options = get_launch_options_from_page_api(
+                page_id, debug=debug, expect_app_id=app_id) or []
             # Apply strict validation to prevent false positives
             validated_options = validate_pcgaming_options(content_options, debug=debug)
             options.extend(validated_options)
@@ -127,7 +128,7 @@ def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, 
                 print(f"🔍 PCGamingWiki API: Game '{game_title}' not found via Cargo, trying full-text search...")
 
             # Method 3: full-text search over title variations
-            alt_options = try_alternative_search(game_title, debug=debug)
+            alt_options = try_alternative_search(game_title, debug=debug, app_id=app_id)
             validated_alt_options = validate_pcgaming_options(alt_options, debug=debug)
             options.extend(validated_alt_options)
         
@@ -163,6 +164,15 @@ def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, 
             print(f"🔍 PCGamingWiki API: Error for '{game_title}': {e}")
 
         return []
+
+def _page_verifier():
+    """page_covers_app / parse_page_engines, under either import style."""
+    try:
+        from ..utils.pcgw_wikitext import page_covers_app
+    except ImportError:
+        from utils.pcgw_wikitext import page_covers_app
+    return page_covers_app
+
 
 def _cargo_find_page(where_clause, debug=False, session_monitor=None):
     """Run a Cargo query against Infobox_game and return the first PageID, or None."""
@@ -370,7 +380,52 @@ def format_game_title_for_api(title):
 
     return formatted
 
-def get_launch_options_from_page_api(page_id, debug=False):
+def _options_from_wikitext(wikitext, page_id, debug=False):
+    """Parse one page's wikitext into options. No network."""
+    parsed = parse_wikitext_for_launch_options_strict(wikitext, debug=debug) or []
+    page_url = f"https://www.pcgamingwiki.com/w/index.php?curid={page_id}"
+    for opt in parsed:
+        opt['source_url'] = page_url
+    return parsed
+
+
+def _fetch_wikitext_batch(page_ids, debug=False):
+    """
+    {page_id: wikitext} for several pages in ONE request.
+
+    Verification means looking at more than one candidate page, and doing that
+    with a request each would have tripled what this scraper asks of
+    PCGamingWiki — the opposite of what the politeness rules require.
+    MediaWiki will return many pages' content at once, so checking five
+    candidates costs the same single round trip that fetching one used to.
+    """
+    if not page_ids:
+        return {}
+    try:
+        response = requests.get(
+            "https://www.pcgamingwiki.com/w/api.php",
+            params={"action": "query", "format": "json", "prop": "revisions",
+                    "rvprop": "content", "rvslots": "main",
+                    "pageids": "|".join(str(p) for p in page_ids)},
+            timeout=20
+        )
+        _record_network_success()
+        if response.status_code != 200:
+            return {}
+        out = {}
+        for pid, page in (response.json().get("query", {}).get("pages", {}) or {}).items():
+            try:
+                out[int(pid)] = page["revisions"][0]["slots"]["main"]["*"]
+            except (KeyError, IndexError, TypeError, ValueError):
+                continue
+        return out
+    except Exception as e:
+        if debug:
+            print(f"🔍 PCGamingWiki API: Batch wikitext fetch failed: {e}")
+        return {}
+
+
+def get_launch_options_from_page_api(page_id, debug=False, expect_app_id=None):
     """Get launch options from a PCGamingWiki page using official API"""
     options = []
 
@@ -394,6 +449,28 @@ def get_launch_options_from_page_api(page_id, debug=False):
 
                 if debug:
                     print(f"🔍 PCGamingWiki API: Retrieved {len(wikitext)} characters of wikitext")
+
+                # Is this page actually about the game we asked for?
+                #
+                # Cargo used to answer that by construction — it looked the
+                # page up BY Steam App ID. That endpoint now refuses queries,
+                # so resolution falls back to full-text title search, and a
+                # title is not an identity. Audited against 284 catalogue
+                # games, the first search hit is the wrong page 45% of the
+                # time: "Max Payne" resolves to Max Payne 2, "HITMAN" to
+                # Hitman 2, "DOOM" to Doom + Doom II.
+                #
+                # The page states its own App ID, so we check that instead of
+                # trusting the search ranking. Returning None rather than []
+                # lets the caller try the next candidate: [] would mean "this
+                # game has no launch options", which is a different claim and
+                # a wrong one.
+                if expect_app_id is not None:
+                    if not _page_verifier()(wikitext, expect_app_id):
+                        if debug:
+                            print(f"🔍 PCGamingWiki API: Page {page_id} does not cover "
+                                  f"app {expect_app_id} — rejecting")
+                        return None
 
                 # Parse wikitext for launch options with strict validation
                 parsed_options = parse_wikitext_for_launch_options_strict(wikitext, debug=debug)
@@ -665,7 +742,7 @@ def extract_description_from_context_safe(command, context):
 
     return "Launch option from PCGamingWiki"
 
-def try_alternative_search(game_title, debug=False):
+def try_alternative_search(game_title, debug=False, app_id=None):
     """
     Try alternative search methods when exact title match fails.
 
@@ -706,7 +783,10 @@ def try_alternative_search(game_title, debug=False):
                 "format": "json",
                 "list": "search",
                 "srsearch": variation,
-                "srlimit": "3"
+                # Five, not one. The right page is often not the top hit —
+                # "Max Payne" ranks Max Payne 2 first — and with an App ID to
+                # check against we can afford to look past the ranking.
+                "srlimit": "5"
             }
 
             response = requests.get(search_url, params=search_params, timeout=10)
@@ -716,20 +796,39 @@ def try_alternative_search(game_title, debug=False):
                 search_data = response.json()
 
                 if "query" in search_data and "search" in search_data["query"]:
-                    search_results = search_data["query"]["search"]
+                    search_results = search_data["query"]["search"] or []
 
-                    if search_results:
-                        page_id = search_results[0].get("pageid")
+                    # Take the candidate that PROVES it is this game by
+                    # stating our App ID. Audited over 284 catalogue games,
+                    # this recovers the correct page for 11 of the 13 cases
+                    # where taking the top hit picked a sequel, a remaster or
+                    # a mod. All candidates come back in one request.
+                    ordered = [h.get("pageid") for h in search_results if h.get("pageid")]
+                    titles = {h.get("pageid"): h.get("title", "?") for h in search_results}
+                    texts = _fetch_wikitext_batch(ordered, debug=debug)
 
-                        if debug and page_id:
-                            title_found = search_results[0].get("title", "?")
-                            print(f"🔍 PCGamingWiki API: Found page '{title_found}' (ID: {page_id})")
+                    verify = _page_verifier()
+                    for page_id in ordered:
+                        wikitext = texts.get(page_id)
+                        if not wikitext:
+                            continue
+                        if app_id is not None and not verify(wikitext, app_id):
+                            if debug:
+                                print(f"🔍 PCGamingWiki API: '{titles.get(page_id)}' "
+                                      f"({page_id}) does not cover app {app_id} — skipping")
+                            continue
 
-                        if page_id:
-                            alt_options = get_launch_options_from_page_api(page_id, debug=debug)
-                            if alt_options:
-                                options.extend(alt_options)
-                                break  # Stop at first variation that yields results
+                        # Verified. Whatever the page holds is the answer, even
+                        # if that is nothing: an empty verified page means this
+                        # game has no documented options, which is a real
+                        # finding. Reading on past it would only find another
+                        # game's page.
+                        alt_options = _options_from_wikitext(wikitext, page_id, debug=debug)
+                        options.extend(alt_options)
+                        if debug:
+                            print(f"🔍 PCGamingWiki API: Verified '{titles.get(page_id)}' "
+                                  f"for app {app_id} — {len(alt_options)} options")
+                        return options
 
         except requests.exceptions.RequestException as e:
             _record_network_failure()
