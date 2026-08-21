@@ -299,27 +299,19 @@ class SlopScraper:
             # metadata is already stored, so the only cost is the scrape
             # itself, and several were added while the Steam Community
             # extractor was silently returning nothing.
-            #
-            # Progress tracking is ignored on purpose: this is a small named
-            # set to be swept, not a campaign to be walked through in chunks,
-            # and a game that was rescanned back when a scraper was broken is
-            # exactly the one worth revisiting.
             empty = [r for r in rows if (r.get('total_options_count') or 0) == 0]
             print(f"🕳️  Gap-fill: {len(empty)} of {len(rows)} games hold zero options")
-            return [{
-                'appid': r['app_id'],
-                'title': r.get('title') or f"App {r['app_id']}",
-                'developer': r.get('developer') or 'Unknown',
-                'publisher': r.get('publisher') or 'Unknown',
-                'release_date': r.get('release_date') or 'Unknown',
-                'engine': r.get('engine'),
-            } for r in empty][:self.max_games]
+            rows = empty
 
         total_candidates = len(rows)
 
         games = []
         for row in rows:
-            if row['app_id'] in done:
+            # Gap-fill ignores rescan progress on purpose: it is a small named
+            # set to be swept, not a campaign walked through in --limit chunks,
+            # and a game rescanned back when a scraper was broken is exactly
+            # the one worth revisiting.
+            if row['app_id'] in done and not self.fill_gaps:
                 continue
             games.append({
                 'appid': row['app_id'],
@@ -336,12 +328,19 @@ class SlopScraper:
         # total_candidates - len(done): the progress file is shared across
         # rescan modes, so under --rescan-engines it holds app_ids that are not
         # in this pool at all and subtracting its length would under-report.
-        already_done = sum(1 for r in rows if r['app_id'] in done)
-        remaining = total_candidates - already_done
-        print(f"🔁 Rescan: {total_candidates} games in DB, "
-              f"{already_done} already re-scanned, {max(0, remaining)} remaining")
-        if not games and total_candidates:
-            print(f"✅ Rescan campaign complete — delete {RESCAN_PROGRESS_FILE} to start a new one")
+        if self.fill_gaps:
+            # The progress-file arithmetic below is meaningless here, because
+            # gap-fill deliberately ignores it. Printing it anyway said
+            # "0 remaining" while handing back 50 games to scrape.
+            print(f"🕳️  Gap-fill: processing {len(games)} of {total_candidates} "
+                  f"games with no options")
+        else:
+            already_done = sum(1 for r in rows if r['app_id'] in done)
+            remaining = total_candidates - already_done
+            print(f"🔁 Rescan: {total_candidates} games in DB, "
+                  f"{already_done} already re-scanned, {max(0, remaining)} remaining")
+            if not games and total_candidates:
+                print(f"✅ Rescan campaign complete — delete {RESCAN_PROGRESS_FILE} to start a new one")
 
         return games
 
