@@ -68,7 +68,8 @@ class SlopScraper:
     def __init__(self, test_mode=False, cache_file=None,
                  rate_limit=None, force_refresh=False, max_games=100,
                  output_dir="./test-output", debug=False, skip_existing=True,
-                 rescan=False, rescan_engines=False, pcgw_recheck=False):
+                 rescan=False, rescan_engines=False, pcgw_recheck=False,
+                 fill_gaps=False):
         
         # Add validation statistics tracking
         self.validation_stats = {
@@ -100,6 +101,9 @@ class SlopScraper:
         # Narrow the rescan to games whose engine maps to a block of
         # engine-specific options. See _get_rescan_games.
         self.rescan_engines = rescan_engines
+        # Narrows the rescan pool to games holding zero options. See
+        # _get_rescan_games.
+        self.fill_gaps = fill_gaps
         self.pcgw_recheck = pcgw_recheck  # Re-scan only games flagged for a PCGamingWiki recheck
 
         # Security monitoring and rate limiting
@@ -290,6 +294,27 @@ class SlopScraper:
                   f"have an engine with documented launch options")
             rows = eligible
 
+        if self.fill_gaps:
+            # Games already judged worth keeping that hold nothing. Their
+            # metadata is already stored, so the only cost is the scrape
+            # itself, and several were added while the Steam Community
+            # extractor was silently returning nothing.
+            #
+            # Progress tracking is ignored on purpose: this is a small named
+            # set to be swept, not a campaign to be walked through in chunks,
+            # and a game that was rescanned back when a scraper was broken is
+            # exactly the one worth revisiting.
+            empty = [r for r in rows if (r.get('total_options_count') or 0) == 0]
+            print(f"🕳️  Gap-fill: {len(empty)} of {len(rows)} games hold zero options")
+            return [{
+                'appid': r['app_id'],
+                'title': r.get('title') or f"App {r['app_id']}",
+                'developer': r.get('developer') or 'Unknown',
+                'publisher': r.get('publisher') or 'Unknown',
+                'release_date': r.get('release_date') or 'Unknown',
+                'engine': r.get('engine'),
+            } for r in empty][:self.max_games]
+
         total_candidates = len(rows)
 
         games = []
@@ -471,7 +496,7 @@ class SlopScraper:
             # discovering new ones — options are added, never overwritten.
             if self.pcgw_recheck:
                 games = self._get_pcgw_recheck_games()
-            elif self.rescan:
+            elif self.rescan or self.fill_gaps:
                 games = self._get_rescan_games()
             else:
                 games = get_steam_game_list(

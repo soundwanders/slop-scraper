@@ -60,6 +60,11 @@ def setup_argument_parser():
                             '(Source, Unity, Unreal, id Tech, Creation, Frostbite). Use after an '
                             'engine-metadata change, when a full rescan would spend most of its '
                             'runtime on games no engine block applies to')
+    parser.add_argument('--fill-gaps', action='store_true',
+                       help='Re-scan only games already in the database that hold zero '
+                            'launch options. Their metadata is already stored, so the '
+                            'cost is the scrape alone, and some were added while a '
+                            'scraper was silently returning nothing.')
     parser.add_argument('--rescan-reset', action='store_true',
                        help='Clear rescan progress tracking and start the rescan campaign over')
     parser.add_argument('--pcgw-recheck', action='store_true',
@@ -483,6 +488,15 @@ def main():
         else:
             print("🔁 Rescan mode: re-processing existing database games, thinnest option counts first")
 
+    if args.fill_gaps:
+        if args.test:
+            print("❌ --fill-gaps requires production mode (it re-processes database games); drop --test")
+            sys.exit(1)
+        if args.rescan or args.pcgw_recheck:
+            print("❌ --fill-gaps, --rescan and --pcgw-recheck are alternative game sources; pick one")
+            sys.exit(1)
+        print("🕳️  Gap-fill mode: only database games holding zero launch options")
+
     if args.pcgw_recheck:
         if args.test:
             print("❌ --pcgw-recheck requires production mode (it re-processes database games); drop --test")
@@ -513,6 +527,7 @@ def main():
         skip_existing=args.skip_existing,  # Pass skip_existing flag
         rescan=args.rescan,  # Re-scan existing database games
         rescan_engines=args.rescan_engines,  # ...narrowed to engines with documented options
+        fill_gaps=args.fill_gaps,            # ...narrowed to games holding zero options
         pcgw_recheck=args.pcgw_recheck  # Re-scan only PCGamingWiki-outage-flagged games
     )
     
