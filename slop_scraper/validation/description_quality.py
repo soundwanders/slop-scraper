@@ -36,6 +36,43 @@ PLACEHOLDER_DESCRIPTIONS = {
 # -bar to the launch options"), not a definition of the flag it belongs to.
 _FLAG_TOKEN = re.compile(r'(?<![\w\-])[+\-][a-zA-Z][a-zA-Z0-9_\-]{2,}')
 
+# Where one flag's description runs into the next flag's entry.
+#
+# Community guides list flags one per line as "-flag - what it does", and when
+# that survives as a single blob of text the scraper takes the whole run. A
+# real case: -forcenovsync came back described as "Disables VSyns, vertical
+# sync (If you need it) -high - Makes TF2 a higher priority on the computer,
+# using more memory, very unstable" — the first clause belongs to it, the rest
+# belongs to -high.
+#
+# The signal is a flag token followed by a definition separator, which is what
+# starts the NEXT entry. A description that merely mentions a flag in passing
+# ("use alongside -novid for a faster start") has no separator after it and is
+# left alone. The existing >=2-other-flags rule does not catch this, because a
+# run-on into a single neighbour names only one.
+_RUN_ON_DEFINITION = re.compile(
+    r'(?:^|\s)(?<![\w\-])[+\-][a-zA-Z][a-zA-Z0-9_\-]{2,}\s+[-–—:]\s+'
+)
+
+
+def truncate_at_next_definition(description: Optional[str]) -> Optional[str]:
+    """
+    Cut a description where the next flag's entry begins.
+
+    Returns the leading clause, or None if nothing precedes the cut (the text
+    was entirely someone else's entry). Text with no run-on is returned as-is.
+    """
+    raw = (description or '').strip()
+    if not raw:
+        return None
+
+    match = _RUN_ON_DEFINITION.search(raw)
+    if not match:
+        return raw
+
+    head = raw[:match.start()].strip(' \t-–—:,;')
+    return head or None
+
 # Third-person present verbs: the sentence states what the flag DOES rather
 # than instructing the reader. The trailing -s is the whole signal — "forces
 # higher quality audio" is a definition, "Force ..." / "Add ..." is an
@@ -84,7 +121,14 @@ _TRAILING_LIST_INDEX = re.compile(r'[)\].]\s+\d{1,3}\s*$')
 
 # The description opens with the VALUE rather than a definition — the parser
 # split "-tickrate 128 (Max tickrate)" at the wrong place and kept the tail.
-_LEADS_WITH_VALUE = re.compile(r'^\d+\s*[\(\[]')
+#
+# The second alternative covers the same split without the bracket: a Garry's
+# Mod guide documents "-particles 512 Lowers the amount of particles", and
+# severing the value left -particles described as "512 Lowers the amount of
+# particles to 512 (minimum)". A leading bare number followed by a word is the
+# value that belongs on the command, not the start of a definition.
+# "1080p" and "16:9" are unaffected — both need whitespace after the digits.
+_LEADS_WITH_VALUE = re.compile(r'^\d+(?:\s*[\(\[]|\s+(?=[A-Za-z]))')
 
 # The text says the option does not do anything. Whatever that is, it is not a
 # description of what the flag does, and an option documented as broken has no
@@ -165,6 +209,13 @@ def acceptable_description(command: str, description: Optional[str]) -> Optional
     like an answer without being one.
     """
     raw = (description or '').strip()
+    if not raw or is_placeholder_description(raw):
+        return None
+
+    # Trim a run-on into the next flag's entry BEFORE judging the text, so the
+    # remaining clause is assessed on its own merits rather than on wording
+    # that was never about this command.
+    raw = truncate_at_next_definition(raw)
     if not raw or is_placeholder_description(raw):
         return None
 

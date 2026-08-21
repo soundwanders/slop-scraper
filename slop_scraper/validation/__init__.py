@@ -31,10 +31,16 @@ from .flag_dictionary import (
     authority_source
 )
 from .source_attribution import honest_source, misattributed, promoted_source
+from .corroboration import (
+    is_corroborated,
+    filter_corroborated,
+    MIN_INDEPENDENT_SIGHTINGS
+)
 from .description_quality import (
     is_junk_description,
     is_placeholder_description,
     acceptable_description,
+    truncate_at_next_definition,
     PLACEHOLDER_DESCRIPTIONS
 )
 
@@ -57,6 +63,10 @@ __all__ = [
     'is_junk_description',
     'is_placeholder_description',
     'acceptable_description',
+    'truncate_at_next_definition',
+    'is_corroborated',
+    'filter_corroborated',
+    'MIN_INDEPENDENT_SIGHTINGS',
     'PLACEHOLDER_DESCRIPTIONS',
     'FLAG_DICTIONARY',
     'lookup_flag',
