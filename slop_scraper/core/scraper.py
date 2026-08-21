@@ -852,6 +852,13 @@ class SlopScraper:
             for reason, count in sorted_reasons[:5]:
                 print(f"     {reason}: {count}")
 
+    # Below this many games, a percentage is an accident of which games came
+    # up, not a measurement. A single generic-only game in a 1-game run read as
+    # "100% 🚨 HIGH - Bug likely still present!", which is the same crying-wolf
+    # problem the old --db-stats check had: an alarm that fires on good data
+    # teaches you to skip the whole report.
+    MIN_DIAGNOSTIC_SAMPLE = 25
+
     def print_scraper_diagnostics(self, stats):
         """Print comprehensive diagnostics specifically for the generic options issue"""
         print("\n" + "="*70)
@@ -862,15 +869,20 @@ class SlopScraper:
         print(f"Games with any options: {stats['games_with_any_options']}")
         print(f"Games with only generic options: {stats['games_with_only_generic_options']}")
         print(f"Games skipped (existing): {stats['games_skipped_existing']}")
+
+        sample = stats['total_games_processed']
+        conclusive = sample >= self.MIN_DIAGNOSTIC_SAMPLE
         
-        if stats['total_games_processed'] > 0:
-            success_rate = (stats['games_with_any_options'] / stats['total_games_processed']) * 100
+        if sample > 0:
+            success_rate = (stats['games_with_any_options'] / sample) * 100
             print(f"Overall success rate: {success_rate:.1f}%")
             
             if stats['games_with_any_options'] > 0:
                 generic_rate = (stats['games_with_only_generic_options'] / stats['games_with_any_options']) * 100
                 print(f"Generic-only rate: {generic_rate:.1f}%", end="")
-                if generic_rate > 50:
+                if not conclusive:
+                    print(f" — {sample} game(s), too small to read anything into")
+                elif generic_rate > 50:
                     print(" 🚨 HIGH - Bug likely still present!")
                 elif generic_rate > 25:
                     print(" ⚠️ MODERATE - Some issues remain")
@@ -883,15 +895,23 @@ class SlopScraper:
         for scraper, data in stats['scraper_success_rates'].items():
             if data['attempts'] > 0:
                 rate = (data['success'] / data['attempts']) * 100
-                status = "✅" if rate > 50 else "⚠️" if rate > 20 else "❌"
+                if not conclusive:
+                    status = "·"
+                else:
+                    status = "✅" if rate > 50 else "⚠️" if rate > 20 else "❌"
                 print(f"  {scraper:<15}: {rate:5.1f}% ({data['success']}/{data['attempts']}) {status}")
             else:
                 print(f"  {scraper:<15}: No attempts")
+
+        if not conclusive:
+            print(f"\n💡 {sample} game(s) is below the {self.MIN_DIAGNOSTIC_SAMPLE}-game "
+                  f"threshold for a verdict — rates shown for information only.")
+            print("="*70)
+            return
         
         print("\n💡 Recommendations:")
         if stats['games_with_only_generic_options'] > stats['games_with_any_options'] * 0.5:
             print("  🚨 HIGH generic-only rate suggests the bug persists")
-            print("  → Check if game_specific.py was properly replaced")
             print("  → Verify engine detection is working")
         elif stats['games_with_only_generic_options'] > 0:
             print("  ⚠️ Some games still have only generic options")
