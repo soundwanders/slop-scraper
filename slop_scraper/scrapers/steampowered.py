@@ -29,32 +29,60 @@ def _prefer_documented(candidate_apps, debug=False):
     25-game sample produced one real launch option and 19 games whose only
     result was the two Linux wrapper tools ProtonDB reports on everything.
 
-    PCGamingWiki's App ID table is the honest signal for "someone has written
-    about this game", and it is already on disk — the same week-cached Cargo
-    projection used for duplicate detection, 21,543 App IDs. No extra request
-    is made for this.
+    PCGamingWiki's engine feed is the signal: every Steam App ID with an
+    Infobox_game row on the wiki, 26,387 of them, already on disk behind a
+    week-long cache. No extra request is made for this.
+
+    It is deliberately NOT the App ID *groups* cache, which is the obvious
+    thing to reach for and is wrong. That projection filters server-side to
+    `Steam_AppID__full LIKE '%,%'` because its job is duplicate detection, so
+    it holds only games published under two or more App IDs. Ordering by it
+    prefers re-releases and bundles, not documented games: Team Fortress 2 has
+    a single App ID and is absent from it, while Portal is present only
+    because it is grouped with 323170. Measured against games whose engine we
+    already sourced from PCGamingWiki, the groups cache contains 34% of them
+    and the engine feed contains 100%.
 
     Ordering, not filtering. Undocumented games still get scraped, just after
     the documented ones, so a `--limit` spends itself where options actually
     exist. If the cache is missing or unreadable the original order is
     returned unchanged; a better queue is not worth a crash.
     """
+    if not candidate_apps:
+        return candidate_apps
+
+    # Read the cache FILE, never fetch_engine_map(). That function refreshes on
+    # a week-old cache, and PCGamingWiki's Cargo endpoint now answers
+    # "You don't have permission to run arbitrary Cargo queries" — so the call
+    # spends ~31s in retries and then fails, on every single run. Queue order
+    # is a convenience; it must never cost a request, a delay, or a failure.
+    # A stale list is entirely adequate for deciding what to scrape first.
     try:
         try:
-            from ..utils.pcgw_appid_groups import fetch_appid_groups
+            from ..utils.paths import cache_path
         except ImportError:
-            from utils.pcgw_appid_groups import fetch_appid_groups
-        documented = fetch_appid_groups(verbose=False)
+            from utils.paths import cache_path
+        import json
+        with open(cache_path('pcgw_engines.json')) as f:
+            documented = json.load(f)
     except Exception as e:
         if debug:
-            print(f"⚠️ PCGamingWiki App ID cache unavailable ({e}) — keeping SteamSpy order")
+            print(f"⚠️ PCGamingWiki engine cache unreadable ({e}) — keeping SteamSpy order")
         return candidate_apps
 
     if not documented:
         return candidate_apps
 
-    known = [a for a in candidate_apps if a['appid'] in documented]
-    rest = [a for a in candidate_apps if a['appid'] not in documented]
+    # The cache is keyed by string App ID; candidates carry ints.
+    known_ids = set()
+    for key in documented:
+        try:
+            known_ids.add(int(key))
+        except (ValueError, TypeError):
+            continue
+
+    known = [a for a in candidate_apps if a['appid'] in known_ids]
+    rest = [a for a in candidate_apps if a['appid'] not in known_ids]
 
     print(f"📚 {len(known)} of {len(candidate_apps)} candidates have a PCGamingWiki page "
           f"— scraping those first")
