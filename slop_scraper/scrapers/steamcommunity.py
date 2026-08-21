@@ -7,12 +7,14 @@ try:
     # Try relative imports first (when run as module)
     from ..utils.security_config import SecureRequestHandler
     from ..validation import LaunchOptionsValidator, ValidationLevel, EngineType
+    from ..validation.corroboration import filter_corroborated
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from utils.security_config import SecureRequestHandler
     from validation import LaunchOptionsValidator, ValidationLevel, EngineType
+    from validation.corroboration import filter_corroborated
 
 def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=None, debug=False, 
                                        test_results=None, test_mode=False, rate_limiter=None, 
@@ -49,6 +51,9 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
     ]
 
     options = []
+    # command (lowercased) -> the distinct guide URLs that listed it. A set, so
+    # one guide mentioning a flag repeatedly still counts once.
+    sightings = {}
     try:
         relevant_guides = []
         response = None
@@ -149,6 +154,9 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                         
                         if extracted_options:
                             options.extend(extracted_options)
+                            for extracted in extracted_options:
+                                key = (extracted.get('command') or '').strip().lower()
+                                sightings.setdefault(key, set()).add(guide['url'])
                             if debug:
                                 print(f"🔍 Steam Community: ✅ Found {len(extracted_options)} validated options")
                         else:
@@ -166,6 +174,14 @@ def fetch_steam_community_launch_options(app_id, game_title=None, rate_limit=Non
                         print(f"🔍 Steam Community: Error processing guide {guide['url']}: {guide_e}")
                     continue
             
+            # A flag that only one guide has ever mentioned is not a finding,
+            # it is an anecdote — see validation/corroboration.py. Applied here
+            # rather than at the database layer on purpose: provenance stamping
+            # treats any re-encounter as confirmation, so a gate placed further
+            # downstream would still let a single-sighting typo heal a hidden
+            # row into the published view.
+            options = filter_corroborated(options, sightings, debug=debug)
+
             # Apply final validation and deduplication
             validated_options = final_validation_and_dedup(options, debug=debug)
             options = validated_options
@@ -333,7 +349,16 @@ def extract_launch_options_clean_and_validated(guide_soup, guide_title, debug=Fa
 
         # Method 2: Extract from paragraphs with explicit launch option context
         if len(options) < 5:  # Process more if we haven't found many
-            paragraphs = guide_content.find_all(['p', 'div', 'li', 'td'])
+            # A child element only counts if it actually carries text. Every
+            # modern guide section ends with <div style="clear: both"></div>,
+            # an empty spacer, and that one element made this list length-1 and
+            # truthy — so the fallback below never fired, the spacer was the
+            # only thing scanned, and the section's real content (direct text
+            # nodes separated by <br>) was never looked at. Guides were being
+            # fetched, scanned and silently discarded: 0 options from pages
+            # that are nothing but launch options.
+            paragraphs = [p for p in guide_content.find_all(['p', 'div', 'li', 'td'])
+                          if p.get_text(strip=True)]
             # The section itself is often a leaf div with direct text
             if not paragraphs:
                 paragraphs = [guide_content]
