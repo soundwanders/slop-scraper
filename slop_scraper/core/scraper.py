@@ -656,6 +656,37 @@ class SlopScraper:
                             game['engine_detail'] = detail
                             game['engine_source'] = engine_source
                             game_pbar.write(f"  🔧 Engine from wiki page: {engine} ({detail})")
+
+                            # The engine block already ran, above, with whatever
+                            # engine was stored then — usually 'Unknown', which
+                            # emits nothing. Learning the engine one step later
+                            # is useless if the flags it unlocks are not
+                            # collected until some future run, so re-run it now
+                            # that we know what the game is.
+                            #
+                            # This is the whole point of the engine work: an
+                            # engine is not a label, it is what decides which
+                            # documented flags apply.
+                            try:
+                                already = 'Game-Specific' in source_options
+                                late = fetch_game_specific_options(
+                                    app_id=app_id, title=title, cache=self.cache,
+                                    engine=engine,
+                                    test_results=getattr(self, 'test_results', None),
+                                    test_mode=self.test_mode
+                                ) or []
+                                seen = {o['command'] for o in all_options}
+                                fresh = [o for o in late if o['command'] not in seen]
+                                if fresh:
+                                    all_options.extend(fresh)
+                                    source_options.setdefault('Game-Specific', []).extend(fresh)
+                                    if not already:
+                                        scraper_stats['scraper_success_rates'][
+                                            'Game-Specific']['success'] += 1
+                                    game_pbar.write(
+                                        f"  🔧 Engine block re-run: +{len(fresh)} options")
+                            except Exception as e:
+                                game_pbar.write(f"  ⚠️ Engine block re-run failed: {e}")
                         elif why.startswith('CONFLICT'):
                             game_pbar.write(f"  ⚠️ Engine {why}")
 
