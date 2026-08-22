@@ -17,7 +17,10 @@ try:
         get_database_stats  # Import stats function
     )
     from ..scrapers.steampowered import get_steam_game_list
-    from ..scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options, pcgamingwiki_needs_recheck
+    from ..scrapers.pcgamingwiki import (fetch_pcgamingwiki_launch_options,
+                                         pcgamingwiki_needs_recheck,
+                                         pcgamingwiki_page_engines)
+    from ..utils.engine_precedence import resolve_engine
     from ..scrapers.steamcommunity import fetch_steam_community_launch_options
     from ..scrapers.game_specific import fetch_game_specific_options, _option_family
     from ..scrapers.protondb import fetch_protondb_launch_options
@@ -39,7 +42,10 @@ except ImportError:
         get_database_stats 
     )
     from scrapers.steampowered import get_steam_game_list
-    from scrapers.pcgamingwiki import fetch_pcgamingwiki_launch_options, pcgamingwiki_needs_recheck
+    from scrapers.pcgamingwiki import (fetch_pcgamingwiki_launch_options,
+                                       pcgamingwiki_needs_recheck,
+                                       pcgamingwiki_page_engines)
+    from utils.engine_precedence import resolve_engine
     from scrapers.steamcommunity import fetch_steam_community_launch_options
     from scrapers.game_specific import fetch_game_specific_options, _option_family
     from scrapers.protondb import fetch_protondb_launch_options
@@ -274,7 +280,8 @@ class SlopScraper:
             while True:
                 response = (
                     self.supabase.table("games")
-                    .select("app_id, title, developer, publisher, release_date, engine, total_options_count")
+                    .select("app_id, title, developer, publisher, release_date, engine, "
+                            "engine_source, total_options_count")
                     .order("total_options_count", desc=False)
                     .range(start, start + page_size - 1)
                     .execute()
@@ -313,14 +320,22 @@ class SlopScraper:
             # the one worth revisiting.
             if row['app_id'] in done and not self.fill_gaps:
                 continue
-            games.append({
+            entry = {
                 'appid': row['app_id'],
                 'name': row['title'],
                 'developer': row.get('developer') or '',
                 'publisher': row.get('publisher') or '',
                 'release_date': row.get('release_date') or '',
                 'engine': row.get('engine') or 'Unknown',
-            })
+            }
+            # Only carry the key when a source actually exists. save_to_database
+            # distinguishes "no engine_source key at all" (a rescan echo, write
+            # the engine straight back) from "key present but empty" (detection
+            # ran and could not account for the label, so write nothing) — and
+            # passing a None would silently turn the first case into the second.
+            if row.get('engine_source'):
+                entry['engine_source'] = row['engine_source']
+            games.append(entry)
             if len(games) >= self.max_games:
                 break
 
@@ -620,6 +635,29 @@ class SlopScraper:
                                 game_pbar.write(f"  ⚠️ PCGamingWiki result unconfirmed (site outage) — flagged for recheck")
                             else:
                                 self._clear_pcgw_recheck(app_id)
+
+                        # The page we just verified also states the engine, and
+                        # it cost nothing extra to read. Until now the engine
+                        # could only come from a bulk table cached for a week —
+                        # and that table can no longer be refreshed, which is
+                        # why games discovered recently arrived as 'Unknown'.
+                        #
+                        # resolve_engine decides whether this beats what is
+                        # already stored. It is written to prefer doing nothing:
+                        # curated labels are untouchable, a disagreement is
+                        # declined rather than guessed at, and a page naming
+                        # several engines is declined outright.
+                        update, why = resolve_engine(
+                            game.get('engine'), game.get('engine_source'),
+                            pcgamingwiki_page_engines())
+                        if update:
+                            engine, detail, engine_source = update
+                            game['engine'] = engine
+                            game['engine_detail'] = detail
+                            game['engine_source'] = engine_source
+                            game_pbar.write(f"  🔧 Engine from wiki page: {engine} ({detail})")
+                        elif why.startswith('CONFLICT'):
+                            game_pbar.write(f"  ⚠️ Engine {why}")
 
                         if pcgaming_options:
                             scraper_stats['scraper_success_rates']['PCGamingWiki']['success'] += 1
