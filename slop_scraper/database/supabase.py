@@ -924,13 +924,19 @@ def save_to_database(game, options, supabase):
         # this choke point keeps raw Steam date strings out of the DB.
         try:
             from ..utils.dates import normalize_release_date
+            from ..utils.text import clean_text
         except ImportError:
             from utils.dates import normalize_release_date
+            from utils.text import clean_text
 
         # Upsert game metadata (safe: Steam API data is authoritative for name/developer/etc.)
         game_data = {
             "app_id": game['appid'],
-            "title": game['name'],
+            # Steam names arrive padded — trailing spaces and invisible
+            # characters that render as nothing and break every exact-match
+            # lookup. Normalized here rather than in a cleanup pass, which
+            # only ever fixed the rows already stored.
+            "title": clean_text(game['name']),
             "developer": game.get('developer', ''),
             "publisher": game.get('publisher', ''),
             "release_date": normalize_release_date(game.get('release_date', '')),
