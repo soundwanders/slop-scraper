@@ -126,10 +126,12 @@ def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, 
         _last_call_needs_recheck = True
         return []
 
+    _set_pace(rate_limit)
+
     if rate_limiter:
         rate_limiter.wait_if_needed("scraping", domain="pcgamingwiki.com")
     elif rate_limit:
-        time.sleep(rate_limit)
+        _pace()
 
     if debug:
         print(f"🔍 PCGamingWiki API: Looking up '{game_title}' (app_id={app_id})")
@@ -207,6 +209,51 @@ def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, 
 
         return []
 
+# Minimum seconds between OUTBOUND requests, not between games.
+#
+# A single lookup now makes up to four requests — two Cargo attempts, a search,
+# and one batched wikitext fetch — and the only sleep was at the top of the
+# lookup. So a run at --rate 2.0 slept 2s and then sent four requests back to
+# back. The scraper believed it was polite; the wiki saw bursts. That showed up
+# as intermittent empty results under sustained load, which read exactly like
+# "this game has no page" and quietly under-reported an audit.
+_pace_interval = 0.0
+_pace_last = 0.0
+
+
+def _set_pace(rate_limit):
+    """Adopt the caller's rate as a floor between individual requests."""
+    global _pace_interval
+    try:
+        _pace_interval = max(0.0, float(rate_limit or 0.0))
+    except (TypeError, ValueError):
+        _pace_interval = 0.0
+
+
+def _pace():
+    """Wait until the configured interval has elapsed since the last request."""
+    global _pace_last
+    if _pace_interval > 0:
+        wait = _pace_interval - (time.time() - _pace_last)
+        if wait > 0:
+            time.sleep(wait)
+    _pace_last = time.time()
+
+
+# Cargo answers "You don't have permission to run arbitrary Cargo queries".
+# That is a policy decision, not a hiccup, so retrying it every game spends two
+# requests per game to be told no twice. After a few consecutive refusals the
+# lookup path is skipped for the rest of the process; it costs nothing to try
+# again next run, and if PCGamingWiki reopens the endpoint the exact-by-App-ID
+# path returns on its own.
+_cargo_refusals = 0
+_CARGO_REFUSAL_LIMIT = 3
+
+
+def _cargo_disabled():
+    return _cargo_refusals >= _CARGO_REFUSAL_LIMIT
+
+
 def _page_verifier():
     """page_covers_app / parse_page_engines, under either import style."""
     try:
@@ -218,7 +265,13 @@ def _page_verifier():
 
 def _cargo_find_page(where_clause, debug=False, session_monitor=None):
     """Run a Cargo query against Infobox_game and return the first PageID, or None."""
+    global _cargo_refusals
+
+    if _cargo_disabled():
+        return None
+
     try:
+        _pace()
         response = requests.get(
             "https://www.pcgamingwiki.com/w/api.php",
             params={
@@ -243,7 +296,23 @@ def _cargo_find_page(where_clause, debug=False, session_monitor=None):
                 print(f"🔍 PCGamingWiki API: Cargo query failed with status {response.status_code}")
             return None
 
-        results = response.json().get("cargoquery") or []
+        payload = response.json()
+
+        # Distinguish "no such game" from "you may not ask". Only the second
+        # is worth giving up on.
+        if isinstance(payload, dict) and 'error' in payload:
+            info = str(payload['error'].get('info', ''))
+            if 'permission' in info.lower() or 'denied' in info.lower():
+                _cargo_refusals += 1
+                if debug or _cargo_refusals == _CARGO_REFUSAL_LIMIT:
+                    print(f"🔍 PCGamingWiki API: Cargo refused ({info.strip()})"
+                          + (" — skipping Cargo for the rest of this run"
+                             if _cargo_disabled() else ""))
+            elif debug:
+                print(f"🔍 PCGamingWiki API: Cargo error: {info}")
+            return None
+
+        results = payload.get("cargoquery") or []
         if not results:
             return None
 
@@ -444,6 +513,7 @@ def _fetch_wikitext_batch(page_ids, debug=False):
     if not page_ids:
         return {}
     try:
+        _pace()
         response = requests.get(
             "https://www.pcgamingwiki.com/w/api.php",
             params={"action": "query", "format": "json", "prop": "revisions",
@@ -481,6 +551,7 @@ def get_launch_options_from_page_api(page_id, debug=False, expect_app_id=None):
             "prop": "wikitext"
         }
 
+        _pace()
         response = requests.get(content_url, params=content_params, timeout=15)
 
         if response.status_code == 200:
@@ -832,6 +903,7 @@ def try_alternative_search(game_title, debug=False, app_id=None):
                 "srlimit": "5"
             }
 
+            _pace()
             response = requests.get(search_url, params=search_params, timeout=10)
             _record_network_success()
 
