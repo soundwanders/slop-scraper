@@ -454,16 +454,34 @@ def _has_non_latin_script(title):
     return False
 
 
+# Words marking an app as something other than a standalone game.
+#
+# Matched on WORD BOUNDARIES. A bare substring test rejected real games:
+# "Arsenal of Democracy" and "Hunted: The Demon's Forge" both contain "demo",
+# and anything with "Test" in a word contains "test". Nine stored games match
+# the old pattern, three of them carrying real launch options — they are in the
+# catalogue only because the filter never saw their name (below).
+#
+# 'playtest' is listed in its own right. It used to be caught by accident, as a
+# substring of "test", and word boundaries correctly stop that: the 'y' before
+# 'test' is a word character, so \btest\b does not match "Playtest".
+# 'test' on its own is deliberately NOT here. Even bounded it rejects the Test
+# Drive series, and it earns nothing now that 'playtest', 'beta' and 'demo'
+# name the pre-release cases directly.
+_NON_GAME_TERMS = (
+    'dlc', 'soundtrack', 'ost', 'demo', 'beta', 'playtest',
+    'adult', 'hentai', 'xxx', 'mature', 'expansion', 'tool', 'software',
+)
+_NON_GAME_RE = re.compile(
+    r'(?i)\b(' + '|'.join(re.escape(t) for t in _NON_GAME_TERMS) + r')\b')
+
+
 def process_candidate_games(candidate_apps, limit, cache, debug, rate_limiter, session_monitor, force_refresh):
     """Process candidate games with quality filtering and metadata fetching"""
 
-    # Quality filtering patterns
-    blocklist_terms = [
-        'dlc', 'soundtrack', 'beta', 'demo', 'test', 'adult', 'hentai',
-        'xxx', 'mature', 'expansion', 'tool', 'software'
-    ]
-
-    blocklist_pattern = re.compile(r'(?i)(' + '|'.join(re.escape(term) for term in blocklist_terms) + ')')
+    # Quality filtering patterns. See _NON_GAME_RE — the rule lives there so
+    # the pre-fetch filter and the official-name check cannot disagree.
+    blocklist_pattern = _NON_GAME_RE
     only_numeric_special = re.compile(r'^[0-9\s\-_+=.,!@#$%^&*()\[\]{}|\\/<>?;:\'"`~]*$')
     
     # High-priority games to process first
@@ -580,6 +598,16 @@ def fetch_game_metadata(app_id, name, cache, debug, rate_limiter, session_monito
     if _has_non_latin_script(official_name):
         if debug:
             print(f"⚠️ Rejecting non-Latin-script title: {official_name!r} ({app_id})")
+        return None
+
+    # Same reasoning, same blind spot: the blocklist in process_candidate_games
+    # only ever saw the discovery source's name. Six Steam Playtest apps are in
+    # the catalogue because their listing name did not carry the word and
+    # nothing re-checked the official one. Steam's own type field does not
+    # exclude them either — a Playtest is type "game".
+    if _NON_GAME_RE.search(official_name):
+        if debug:
+            print(f"⚠️ Rejecting non-game title: {official_name!r} ({app_id})")
         return None
 
     # Extract complete metadata. The engine is carried with the method that
