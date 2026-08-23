@@ -96,6 +96,108 @@ def _record_page_engines(wikitext, debug=False):
         _last_page_engines = []
 
 
+# Resolving a page by NAME used to be Cargo's job (method 2 below). Cargo now
+# refuses every query, so the only path left was full-text search — which ranks
+# by relevance to a title string and returns five hits. For a short or common
+# title the game's own page is not among them:
+#
+#     Portal (app 400) -> Portal 2 Sixense Perceptual Pack, Portal of Evil,
+#                         ZanZarah: The Hidden Portal, Portal Knights, Portal RTX
+#
+# App-ID verification then correctly declined all five and the lookup returned
+# nothing, which is indistinguishable from "this game has no page". Measured
+# across 284 games holding PCGamingWiki options, 102 of them (36%) resolved no
+# page at all — including Portal, Half-Life, Quake, RAGE and HITMAN.
+#
+# MediaWiki can still resolve a title directly. This asks for the page by name,
+# follows redirects, and verifies the App ID exactly as every other path does.
+# Redirects do real work here, because Steam and PCGamingWiki name things
+# differently: "Grand Theft Auto V Legacy" -> "Grand Theft Auto V",
+# "SimCity 4 Deluxe Edition" -> "SimCity 4".
+#
+# Several title variants go in ONE request, so this costs a single call.
+_TRADEMARKS = re.compile(r'[\u2122\u00ae\u00a9]')
+
+
+def _title_variants(game_title):
+    """Spellings of a Steam title worth asking MediaWiki for, most exact first."""
+    seen, out = set(), []
+    for candidate in (
+            game_title,
+            _TRADEMARKS.sub('', game_title),
+            _TRADEMARKS.sub('', game_title).replace('\u2019', "'"),
+            _TRADEMARKS.sub('', game_title).replace('&', 'and'),
+    ):
+        cleaned = re.sub(r'\s+', ' ', candidate).strip()
+        if cleaned and cleaned.lower() not in seen:
+            seen.add(cleaned.lower())
+            out.append(cleaned)
+    return out[:4]
+
+
+def _resolve_page_by_title(game_title, app_id, debug=False):
+    """
+    (page_id, wikitext) for the page named by this title, or (None, None).
+
+    Verified against app_id like every other lookup path — a title that names
+    the wrong game is exactly the failure this repo has removed twice.
+    Returns the wikitext too, so the caller does not re-fetch what we just read.
+    """
+    variants = _title_variants(game_title)
+    if not variants or not app_id:
+        return None, None
+
+    try:
+        _pace()
+        response = requests.get(
+            "https://www.pcgamingwiki.com/w/api.php",
+            params={
+                "action": "query",
+                "format": "json",
+                "prop": "revisions",
+                "rvslots": "main",
+                "rvprop": "content",
+                "redirects": "1",
+                "titles": "|".join(variants),
+            },
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return None, None
+        data = response.json().get('query', {})
+    except Exception as e:
+        if debug:
+            print(f"🔍 PCGamingWiki API: title lookup failed: {e}")
+        return None, None
+
+    # MediaWiki rewrites what we asked for twice over — once normalising the
+    # string, once following redirects — so map our variant to what came back.
+    covers_app = _page_verifier()
+    normalised = {n['from']: n['to'] for n in data.get('normalized', [])}
+    redirected = {r['from']: r['to'] for r in data.get('redirects', [])}
+    by_title = {page['title']: page for page in data.get('pages', {}).values()}
+
+    for variant in variants:
+        resolved = normalised.get(variant, variant)
+        resolved = redirected.get(resolved, resolved)
+        page = by_title.get(resolved)
+        revisions = (page or {}).get('revisions') or []
+        if not revisions:
+            continue
+        wikitext = revisions[0].get('slots', {}).get('main', {}).get('*', '')
+        if not wikitext:
+            continue
+        if covers_app(wikitext, app_id):
+            if debug:
+                print(f"🔍 PCGamingWiki API: title lookup resolved "
+                      f"'{variant}' -> '{resolved}' for app {app_id}")
+            return page.get('pageid'), wikitext
+        if debug:
+            print(f"🔍 PCGamingWiki API: '{resolved}' does not cover app {app_id}")
+
+    return None, None
+
+
 def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, debug=False,
                                     test_results=None, test_mode=False, rate_limiter=None,
                                     session_monitor=None):
@@ -158,7 +260,26 @@ def fetch_pcgamingwiki_launch_options(game_title, app_id=None, rate_limit=None, 
                 debug=debug, session_monitor=session_monitor
             )
 
-        if page_id:
+        # Method 2b: resolve the page by its title through the ordinary
+        # MediaWiki API. This is what replaces Cargo's page-name lookup, and it
+        # runs before full-text search because a name is an answer while a
+        # search is a guess. The wikitext comes back with it, so a hit costs one
+        # request rather than two.
+        title_wikitext = None
+        if not page_id:
+            page_id, title_wikitext = _resolve_page_by_title(
+                game_title, app_id, debug=debug)
+
+        if title_wikitext:
+            _record_page_engines(title_wikitext, debug=debug)
+            content_options = _options_from_wikitext(
+                title_wikitext, page_id, debug=debug) or []
+            validated_options = validate_pcgaming_options(content_options, debug=debug)
+            options.extend(validated_options)
+            if debug:
+                print(f"🔍 PCGamingWiki API: Extracted {len(content_options)} raw, "
+                      f"{len(validated_options)} validated options (title lookup)")
+        elif page_id:
             content_options = get_launch_options_from_page_api(
                 page_id, debug=debug, expect_app_id=app_id) or []
             # Apply strict validation to prevent false positives
