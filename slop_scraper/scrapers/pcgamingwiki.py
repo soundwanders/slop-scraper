@@ -667,6 +667,127 @@ def _is_plausible_launch_option(cmd: str) -> bool:
     return True
 
 
+# PCGamingWiki writes launch options two ways. Most pages put them in prose
+# with <code>-flag</code> markup, which phases 1-3 below handle. A minority use
+# a structured table instead:
+#
+#     ===Launch options===
+#     {{Standard table|Parameter|Description|content=
+#     {{Standard table/row|-width|Sets the horizontal resolution.}}
+#     {{Standard table/row|-windowed|Forces windowed mode.}}
+#     }}
+#
+# Those rows were invisible here. Phase 2 accepts a template only if its NAME
+# looks like a launch-option template, and "Standard table/row" does not match;
+# by the time phase 3 runs, clean_wikitext has stripped the braces. Measured on
+# Grand Theft Auto IV: 42 documented flags, 4 extracted.
+#
+# It is worth reading properly because the second cell is a real description
+# written by a wiki editor, which is exactly the text this project cannot
+# otherwise obtain — see validation/description_quality.py.
+#
+# "Standard table/row" is a GENERIC template used for tables all over a page
+# (save-game locations, API support, middleware). Reading it anywhere would
+# pull in rows that are not launch options at all, so this is scoped to the
+# launch-options section and nowhere else.
+_LAUNCH_SECTION_HEADING = re.compile(
+    r'^=+\s*(?:Launch options?|Command[ -]line arguments?|Command[ -]line parameters?)\s*=+\s*$',
+    re.IGNORECASE | re.MULTILINE)
+_ANY_HEADING = re.compile(r'^=+[^=\n]+=+\s*$', re.MULTILINE)
+
+
+def _launch_options_section(wikitext):
+    """The wikitext between a launch-options heading and the next heading."""
+    m = _LAUNCH_SECTION_HEADING.search(wikitext)
+    if not m:
+        return ''
+    body = wikitext[m.end():]
+    nxt = _ANY_HEADING.search(body)
+    return body[:nxt.start()] if nxt else body
+
+
+def _iter_template_bodies(text, name):
+    """
+    Yield the inside of each {{name...}} call, brace-balanced.
+
+    A regex cannot do this: descriptions routinely contain nested templates
+    ({{code|...}}, {{Refurl|...}}), so matching to the first '}}' truncates the
+    row and can swallow the next one.
+    """
+    needle = '{{' + name
+    i = 0
+    while True:
+        i = text.find(needle, i)
+        if i < 0:
+            return
+        depth, j = 0, i
+        while j < len(text):
+            if text.startswith('{{', j):
+                depth += 1
+                j += 2
+            elif text.startswith('}}', j):
+                depth -= 1
+                j += 2
+                if depth == 0:
+                    break
+            else:
+                j += 1
+        else:
+            return  # unbalanced tail; stop rather than guess
+        yield text[i + 2:j - 2]
+        i = j
+
+
+def _split_template_params(body):
+    """Split a template body on top-level '|' only, ignoring nested braces."""
+    parts, depth, cur = [], 0, []
+    k = 0
+    while k < len(body):
+        if body.startswith('{{', k) or body.startswith('[[', k):
+            depth += 1
+            cur.append(body[k:k + 2])
+            k += 2
+        elif body.startswith('}}', k) or body.startswith(']]', k):
+            depth -= 1
+            cur.append(body[k:k + 2])
+            k += 2
+        elif body[k] == '|' and depth == 0:
+            parts.append(''.join(cur))
+            cur = []
+            k += 1
+        else:
+            cur.append(body[k])
+            k += 1
+    parts.append(''.join(cur))
+    return parts
+
+
+def _options_from_standard_table(wikitext, debug=False):
+    """(command, description) pairs from a launch-options section's table."""
+    section = _launch_options_section(wikitext)
+    if not section:
+        return []
+
+    found = []
+    for body in _iter_template_bodies(section, 'Standard table/row'):
+        params = _split_template_params(body)
+        if len(params) < 2:
+            continue
+        # params[0] is the template name; the flag is the first real cell.
+        command = re.sub(r"<[^>]+>|'{2,}", '', params[1]).strip()
+        if not command.startswith(('-', '+')):
+            continue
+        command = command.split()[0] if command.split() else ''
+        if not command:
+            continue
+        description = clean_wiki_description(params[2], debug=debug) if len(params) > 2 else ''
+        found.append((command, description))
+
+    if debug and found:
+        print(f"🔍 PCGamingWiki: Standard table yielded {len(found)} rows")
+    return found
+
+
 def parse_wikitext_for_launch_options_strict(wikitext, debug=False):
     """
     Parse MediaWiki wikitext for launch options.
@@ -698,6 +819,13 @@ def parse_wikitext_for_launch_options_strict(wikitext, debug=False):
         r'(?<![\w\-])(-[a-zA-Z][a-zA-Z0-9_\-]{1,30}(?:\s+[^\s<\|]{1,20})?)',
         r'(?<![\w\-])(\+[a-zA-Z][a-zA-Z0-9_\-]{1,30}(?:\s+[^\s<\|]{1,20})?)',
     ]
+
+    # Phase 0: the structured launch-options table, read before anything
+    # strips it. It runs first so its editor-written description wins over the
+    # weaker text the later phases infer from surrounding prose.
+    for cmd, desc in _options_from_standard_table(wikitext, debug=debug):
+        if _is_plausible_launch_option(cmd):
+            _add_option(cmd, desc)
 
     # Phase 1: <code>-option</code> and <tt>-option</tt> in raw wikitext
     # PCGamingWiki table cells frequently use <code> markup around options
@@ -763,7 +891,10 @@ def parse_wikitext_for_launch_options_strict(wikitext, debug=False):
     if debug:
         print(f"🔍 PCGamingWiki: Total unique options parsed: {len(options)}")
 
-    return options[:25]
+    # Cap kept as a guard against a page that parses into nonsense, but raised:
+    # a structured table legitimately documents more than 25 flags (Grand Theft
+    # Auto IV has 42), and truncating those silently loses documented options.
+    return options[:60]
 
 def clean_wikitext(wikitext):
     """
