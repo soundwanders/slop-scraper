@@ -60,6 +60,11 @@ def setup_argument_parser():
                             '(Source, Unity, Unreal, id Tech, Creation, Frostbite). Use after an '
                             'engine-metadata change, when a full rescan would spend most of its '
                             'runtime on games no engine block applies to')
+    parser.add_argument('--rescan-pcgw', action='store_true',
+                       help='Narrow --rescan to games already holding a PCGamingWiki option, '
+                            'i.e. games known to have a wiki page. Use after a change to how '
+                            'wiki pages are found or parsed; the default thinnest-first '
+                            'ordering reaches these games last.')
     parser.add_argument('--fill-gaps', action='store_true',
                        help='Re-scan only games already in the database that hold zero '
                             'launch options. Their metadata is already stored, so the '
@@ -488,6 +493,15 @@ def main():
         else:
             print("🔁 Rescan mode: re-processing existing database games, thinnest option counts first")
 
+    if args.rescan_pcgw:
+        if args.test:
+            print("❌ --rescan-pcgw requires production mode (it re-processes database games); drop --test")
+            sys.exit(1)
+        if args.fill_gaps or args.pcgw_recheck:
+            print("❌ --rescan-pcgw, --fill-gaps and --pcgw-recheck are alternative game sources; pick one")
+            sys.exit(1)
+        print("📖 PCGamingWiki rescan mode: only games already holding a wiki-sourced option")
+
     if args.fill_gaps:
         if args.test:
             print("❌ --fill-gaps requires production mode (it re-processes database games); drop --test")
@@ -528,6 +542,7 @@ def main():
         rescan=args.rescan,  # Re-scan existing database games
         rescan_engines=args.rescan_engines,  # ...narrowed to engines with documented options
         fill_gaps=args.fill_gaps,            # ...narrowed to games holding zero options
+        rescan_pcgw=args.rescan_pcgw,        # ...narrowed to games with a known wiki page
         pcgw_recheck=args.pcgw_recheck  # Re-scan only PCGamingWiki-outage-flagged games
     )
     

@@ -75,7 +75,7 @@ class SlopScraper:
                  rate_limit=None, force_refresh=False, max_games=100,
                  output_dir="./test-output", debug=False, skip_existing=True,
                  rescan=False, rescan_engines=False, pcgw_recheck=False,
-                 fill_gaps=False):
+                 fill_gaps=False, rescan_pcgw=False):
         
         # Add validation statistics tracking
         self.validation_stats = {
@@ -110,6 +110,9 @@ class SlopScraper:
         # Narrows the rescan pool to games holding zero options. See
         # _get_rescan_games.
         self.fill_gaps = fill_gaps
+        # Narrows the rescan pool to games already holding a PCGamingWiki
+        # option — i.e. games known to have a wiki page. See _get_rescan_games.
+        self.rescan_pcgw = rescan_pcgw
         self.pcgw_recheck = pcgw_recheck  # Re-scan only games flagged for a PCGamingWiki recheck
 
         # Security monitoring and rate limiting
@@ -242,6 +245,32 @@ class SlopScraper:
         except Exception as e:
             print(f"⚠️ Could not update {RESCAN_PROGRESS_FILE}: {e}")
 
+    def _games_holding_pcgw_options(self):
+        """App IDs holding at least one option whose source is PCGamingWiki."""
+        option_ids = set()
+        start = 0
+        while True:
+            batch = (self.supabase.table('launch_options')
+                     .select('id, source').eq('source', 'PCGamingWiki')
+                     .range(start, start + 999).execute().data) or []
+            option_ids.update(row['id'] for row in batch)
+            if len(batch) < 1000:
+                break
+            start += 1000
+
+        app_ids, start = set(), 0
+        while True:
+            batch = (self.supabase.table('game_launch_options')
+                     .select('game_app_id, launch_option_id')
+                     .range(start, start + 999).execute().data) or []
+            for row in batch:
+                if row['launch_option_id'] in option_ids:
+                    app_ids.add(row['game_app_id'])
+            if len(batch) < 1000:
+                break
+            start += 1000
+        return app_ids
+
     def _get_rescan_games(self):
         """
         Pull games already in the database for re-scanning, thinnest first.
@@ -301,6 +330,31 @@ class SlopScraper:
                   f"have an engine with documented launch options")
             rows = eligible
 
+        if self.rescan_pcgw:
+            # Games already holding a PCGamingWiki option, which is the
+            # evidence that a wiki page for them exists and was readable at
+            # least once. This is the pool that three separate fixes act on —
+            # the launch-options table parser, page resolution by title, and
+            # the raised extraction cap — and thinnest-first ordering is
+            # actively wrong for it: a game benefits BECAUSE its page is rich,
+            # and a rich page means it already holds options, which sorts it
+            # last. Measured: the first such game sits at queue position ~114
+            # of 1,712 under the default ordering.
+            pcgw_games = self._games_holding_pcgw_options()
+            eligible = [r for r in rows if r['app_id'] in pcgw_games]
+            # RICHEST first, reversing the default. The pool is ordered
+            # thinnest-first by the query above, and for this mode that is
+            # backwards: a game gains from these fixes because its wiki page
+            # documents a lot, and a well-documented page means the game
+            # already holds options — which sorts it last. A --limit slice
+            # under the default ordering takes the 25 games least able to
+            # benefit, which is exactly what the first run of this mode did:
+            # 20 games processed, zero options gained.
+            eligible.sort(key=lambda r: -(r.get('total_options_count') or 0))
+            print(f"📖 PCGamingWiki rescan: {len(eligible)} of {len(rows)} games "
+                  f"hold an option sourced from a wiki page (richest first)")
+            rows = eligible
+
         if self.fill_gaps:
             # Games already judged worth keeping that hold nothing. Their
             # metadata is already stored, so the only cost is the scrape
@@ -318,7 +372,7 @@ class SlopScraper:
             # set to be swept, not a campaign walked through in --limit chunks,
             # and a game rescanned back when a scraper was broken is exactly
             # the one worth revisiting.
-            if row['app_id'] in done and not self.fill_gaps:
+            if row['app_id'] in done and not (self.fill_gaps or self.rescan_pcgw):
                 continue
             entry = {
                 'appid': row['app_id'],
@@ -343,7 +397,14 @@ class SlopScraper:
         # total_candidates - len(done): the progress file is shared across
         # rescan modes, so under --rescan-engines it holds app_ids that are not
         # in this pool at all and subtracting its length would under-report.
-        if self.fill_gaps:
+        if self.rescan_pcgw:
+            # Same reasoning as gap-fill: this sweep ignores the progress file,
+            # so reporting "remaining" against it would be meaningless. 105 of
+            # these games are already marked done from earlier campaigns and
+            # are exactly the ones worth revisiting.
+            print(f"📖 PCGamingWiki rescan: processing {len(games)} of "
+                  f"{total_candidates} eligible games")
+        elif self.fill_gaps:
             # The progress-file arithmetic below is meaningless here, because
             # gap-fill deliberately ignores it. Printing it anyway said
             # "0 remaining" while handing back 50 games to scrape.
@@ -510,7 +571,7 @@ class SlopScraper:
             # discovering new ones — options are added, never overwritten.
             if self.pcgw_recheck:
                 games = self._get_pcgw_recheck_games()
-            elif self.rescan or self.fill_gaps:
+            elif self.rescan or self.fill_gaps or self.rescan_pcgw:
                 games = self._get_rescan_games()
             else:
                 games = get_steam_game_list(
