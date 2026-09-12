@@ -63,6 +63,15 @@ except ImportError:
 
 RESCAN_PROGRESS_FILE = state_path('rescan_progress.json')
 
+# One progress file per candidate pool. The targeted modes draw from narrow
+# pools that the general campaign has already walked — 105 of the 287 games
+# --rescan-pcgw selects are marked done by earlier sweeps — so sharing a file
+# would skip precisely the games a targeted sweep exists to revisit. Sharing
+# was the reason these modes ignored progress entirely, which cost a sweep of
+# 100 games that could not be resumed.
+RESCAN_PCGW_PROGRESS_FILE = state_path('rescan_pcgw_progress.json')
+FILL_GAPS_PROGRESS_FILE = state_path('fill_gaps_progress.json')
+
 # Games saved while PCGamingWiki returned an inconclusive empty result (site
 # outage/circuit breaker, not a confirmed "no options on wiki"). skip_existing
 # and the rescan progress file would otherwise never revisit these games, so
@@ -219,31 +228,41 @@ class SlopScraper:
 
     # ---------- Rescan support ----------
 
+    def _progress_file(self):
+        """The progress file belonging to this run's candidate pool."""
+        if self.rescan_pcgw:
+            return RESCAN_PCGW_PROGRESS_FILE
+        if self.fill_gaps:
+            return FILL_GAPS_PROGRESS_FILE
+        return RESCAN_PROGRESS_FILE
+
     def _load_rescan_progress(self):
         """Return the set of app_ids already re-scanned in this campaign."""
         import json
+        path = self._progress_file()
         try:
-            if os.path.exists(RESCAN_PROGRESS_FILE):
-                with open(RESCAN_PROGRESS_FILE) as f:
+            if os.path.exists(path):
+                with open(path) as f:
                     return {int(k) for k in json.load(f)}
         except Exception as e:
-            print(f"⚠️ Could not read {RESCAN_PROGRESS_FILE}: {e}")
+            print(f"⚠️ Could not read {path}: {e}")
         return set()
 
     def _mark_rescanned(self, app_id):
         """Record a completed rescan so interrupted campaigns resume."""
         import json
         from datetime import datetime
+        path = self._progress_file()
         try:
             data = {}
-            if os.path.exists(RESCAN_PROGRESS_FILE):
-                with open(RESCAN_PROGRESS_FILE) as f:
+            if os.path.exists(path):
+                with open(path) as f:
                     data = json.load(f)
             data[str(app_id)] = datetime.now().isoformat(timespec='seconds')
-            with open(RESCAN_PROGRESS_FILE, 'w') as f:
+            with open(path, 'w') as f:
                 json.dump(data, f, indent=1)
         except Exception as e:
-            print(f"⚠️ Could not update {RESCAN_PROGRESS_FILE}: {e}")
+            print(f"⚠️ Could not update {path}: {e}")
 
     def _games_holding_pcgw_options(self):
         """App IDs holding at least one option whose source is PCGamingWiki."""
@@ -368,11 +387,12 @@ class SlopScraper:
 
         games = []
         for row in rows:
-            # Gap-fill ignores rescan progress on purpose: it is a small named
-            # set to be swept, not a campaign walked through in --limit chunks,
-            # and a game rescanned back when a scraper was broken is exactly
-            # the one worth revisiting.
-            if row['app_id'] in done and not (self.fill_gaps or self.rescan_pcgw):
+            # `done` comes from this pool's own progress file, so a game the
+            # general campaign already walked is still eligible here — that was
+            # the point of the targeted modes. What it does skip is a game this
+            # same sweep already finished, so an interrupted sweep resumes
+            # instead of starting over.
+            if row['app_id'] in done:
                 continue
             entry = {
                 'appid': row['app_id'],
@@ -393,30 +413,25 @@ class SlopScraper:
             if len(games) >= self.max_games:
                 break
 
-        # Counted against the candidate pool rather than as
-        # total_candidates - len(done): the progress file is shared across
-        # rescan modes, so under --rescan-engines it holds app_ids that are not
-        # in this pool at all and subtracting its length would under-report.
+        # Counted by intersecting the progress file with this pool rather than
+        # as total_candidates - len(done). --rescan-engines still shares the
+        # general campaign's file, so that file holds app_ids outside this
+        # pool and subtracting its length would over-report what is finished.
+        already_done = sum(1 for r in rows if r['app_id'] in done)
+        remaining = total_candidates - already_done
+
         if self.rescan_pcgw:
-            # Same reasoning as gap-fill: this sweep ignores the progress file,
-            # so reporting "remaining" against it would be meaningless. 105 of
-            # these games are already marked done from earlier campaigns and
-            # are exactly the ones worth revisiting.
-            print(f"📖 PCGamingWiki rescan: processing {len(games)} of "
-                  f"{total_candidates} eligible games")
+            label = "📖 PCGamingWiki rescan"
         elif self.fill_gaps:
-            # The progress-file arithmetic below is meaningless here, because
-            # gap-fill deliberately ignores it. Printing it anyway said
-            # "0 remaining" while handing back 50 games to scrape.
-            print(f"🕳️  Gap-fill: processing {len(games)} of {total_candidates} "
-                  f"games with no options")
+            label = "🕳️  Gap-fill"
         else:
-            already_done = sum(1 for r in rows if r['app_id'] in done)
-            remaining = total_candidates - already_done
-            print(f"🔁 Rescan: {total_candidates} games in DB, "
-                  f"{already_done} already re-scanned, {max(0, remaining)} remaining")
-            if not games and total_candidates:
-                print(f"✅ Rescan campaign complete — delete {RESCAN_PROGRESS_FILE} to start a new one")
+            label = "🔁 Rescan"
+
+        print(f"{label}: {total_candidates} eligible, {already_done} already done, "
+              f"{max(0, remaining)} remaining — processing {len(games)} now")
+        if not games and total_candidates:
+            print(f"✅ Sweep complete — delete {self._progress_file()} "
+                  f"to start a new one")
 
         return games
 
@@ -888,8 +903,12 @@ class SlopScraper:
                         sources_str = ", ".join(f"{k}({len(v)})" for k, v in source_options.items())
                         game_pbar.write(f"   Sources: {sources_str}\n")
 
-                    # Record rescan progress so an interrupted campaign resumes
-                    if self.rescan and not self.test_mode:
+                    # Record progress so an interrupted sweep resumes. Every
+                    # mode that draws from the database records it, each into
+                    # its own pool's file — a targeted sweep is the one most
+                    # likely to be interrupted, being the longest.
+                    if (self.rescan or self.rescan_pcgw or self.fill_gaps) \
+                            and not self.test_mode:
                         self._mark_rescanned(app_id)
                     
                     # Periodically save cache during execution

@@ -470,13 +470,30 @@ def main():
     
     # Rescan mode setup
     if args.rescan_reset:
-        from core.scraper import RESCAN_PROGRESS_FILE
-        if os.path.exists(RESCAN_PROGRESS_FILE):
-            os.remove(RESCAN_PROGRESS_FILE)
-            print(f"🔁 Cleared rescan progress ({RESCAN_PROGRESS_FILE})")
+        # Each pool keeps its own progress file, so the reset has to clear the
+        # one belonging to the mode it was asked alongside. Clearing the
+        # general campaign's file while --rescan-pcgw is what the maintainer
+        # typed would silently leave the sweep's own progress in place.
+        try:
+            from .core.scraper import (RESCAN_PROGRESS_FILE,
+                                       RESCAN_PCGW_PROGRESS_FILE,
+                                       FILL_GAPS_PROGRESS_FILE)
+        except ImportError:
+            from core.scraper import (RESCAN_PROGRESS_FILE,
+                                      RESCAN_PCGW_PROGRESS_FILE,
+                                      FILL_GAPS_PROGRESS_FILE)
+        if args.rescan_pcgw:
+            target = RESCAN_PCGW_PROGRESS_FILE
+        elif args.fill_gaps:
+            target = FILL_GAPS_PROGRESS_FILE
         else:
-            print("🔁 No rescan progress file to clear")
-        if not args.rescan:
+            target = RESCAN_PROGRESS_FILE
+        if os.path.exists(target):
+            os.remove(target)
+            print(f"🔁 Cleared sweep progress ({target})")
+        else:
+            print(f"🔁 No progress file to clear ({target})")
+        if not (args.rescan or args.rescan_pcgw or args.fill_gaps):
             sys.exit(0)
 
     if args.rescan_engines and not args.rescan:
