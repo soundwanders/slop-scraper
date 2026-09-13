@@ -172,7 +172,8 @@ _DELETED_COMMAND_TRACE = re.compile(
     r'^(?:use|add|type|enter|put|append)\s+(?:the\s+)?(?:or|and|to|for|with|[#=])(?=\s|$)'
     r'|\bthe\s+(?:to|for|with|or|and)\b'
     r'|\bthe\s+='
-    r'|\s#\s+-',
+    r'|\s#\s+-'
+    r'|#\s+#',        # "Use -xres # # for ..." — -yres cut from between its two placeholders
     re.IGNORECASE
 )
 
@@ -185,6 +186,28 @@ _NUMBERED_STEP = re.compile(
 
 # A table of values rather than a definition: "1 = TRUE 0 = FALSE ...".
 _VALUE_LEGEND = re.compile(r'^\d+\s*=\s*\S')
+
+# Where to type the flag rather than what it does: "Editing launch options",
+# "Type in in the launch options", "set the 'Target' field of the shortcut",
+# "pass it through a shortcut". Every stored description matching this was an
+# instruction step, and none of the curated entries match it.
+_WHERE_TO_ENTER = re.compile(
+    r"\blaunch\s+options?\b|\bsteam\s+properties\b|\bproperties\s+window\b"
+    r"|\btarget'?\s*field\b|\b(?:the|a)\s+shortcut\b",
+    re.IGNORECASE
+)
+
+# A raw external link, "[https://...", survives only when wikitext was cut
+# mid-link: "Download and install [https://www.nexusmods.com/... this mo".
+_RAW_LINK = re.compile(r'\[https?://')
+
+# The platforms an option works on, taken from a table's platform column:
+# -nosteam documented as "Windows, OS X, Linux".
+_PLATFORM = r'(?:windows|os\s*x|mac\s*os|macos|mac|linux|steamos|steam\s*deck)'
+_PLATFORM_LIST = re.compile(
+    r'^' + _PLATFORM + r'(?:\s*(?:,|/|&|and)\s*(?:and\s+)?' + _PLATFORM + r')*\.?$',
+    re.IGNORECASE
+)
 
 # Text before a mention that makes it an illustration rather than an
 # instruction — "(e.g. DXVK_HUD=fps)".
@@ -265,6 +288,15 @@ def is_junk_description(command: str, description: Optional[str]) -> Tuple[bool,
 
     if _names_itself_mid_sentence(command, raw):
         return True, 'instruction to use the flag, not a definition'
+
+    if _WHERE_TO_ENTER.search(raw):
+        return True, 'says where to enter the flag, not what it does'
+
+    if _RAW_LINK.search(raw):
+        return True, 'cut off inside a wiki link'
+
+    if _PLATFORM_LIST.match(raw):
+        return True, 'a platform list, not a description'
 
     # Wiki list markers introduce instruction steps, except when the marker
     # precedes a real definition whose command was stripped off the front.

@@ -498,6 +498,21 @@ MALFORMED_COMMANDS = frozenset({
     '-resy=',
     '-unskippable-',             # wikitext prose, not a flag
     '-any',                      # tail of a SimCity 4 config-file line, not a flag
+    # Bare English words lifted from the prose of one Steam guide for Drakensang:
+    # The River of Time, none with a description. The corroboration gate refuses
+    # them from guides now; listed so no other source can bring them back.
+    '-install',
+    '-run',
+    '-start',
+    # PCGamingWiki's SPORE page writes a syntax template with bold markup around
+    # the placeholders. Also caught by the markup rule below; listed because the
+    # cleanup matches this list literally.
+    "-r:'''yourwidth'''x'''yourheight'''",
+    # FAudio's CMake build switches (-DXNASONG=ON -DFFMPEG=ON), quoted in a
+    # ProtonDB report about building WMA audio support for Bethesda games.
+    # ProtonDB's flag pattern stops at '=' and kept the switch name.
+    '-dxnasong',
+    '-dffmpeg',
     '-resx=desiredwidth',        # Epic's syntax placeholder taken literally
     '-resy=desiredheight',
     '-malloc=system',            # not Unreal syntax; Unreal uses bare -ansimalloc etc.
@@ -565,6 +580,12 @@ def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool,
     # Truncated captures and placeholder fragments ({path, <path>, ~/[steam)
     if any(ch in command for ch in '<{[>}]'):
         return False, "Contains placeholder/bracket fragment"
+
+    # Wiki bold/italic markup ('' or '''). No flag contains two apostrophes in a
+    # row; a command that does was copied out of wikitext with its formatting,
+    # and reads to anyone who sees it as a broken scrape.
+    if "''" in command:
+        return False, "Contains wiki markup"
 
     # Punctuation grabbed from surrounding prose
     if command[-1] in '.,)]=;:':
