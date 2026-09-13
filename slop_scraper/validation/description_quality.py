@@ -140,12 +140,96 @@ _SELF_NEGATING = re.compile(
 )
 
 
+# A Fixbox's description= names the METHOD of a fix, and on PCGamingWiki the
+# commonest method is "use a command-line argument". Stored against a flag it
+# says nothing: every row in a launch-options catalogue is an argument. Five
+# were published this way — "Use an argument", "Add parameters", "Use
+# command-line parameter", "Set launch options", "Use command line parameter
+# set" — each where the page's section heading said what the flag was for.
+_GENERIC_METHOD = re.compile(
+    r'^(?:use|add|set|try|apply|enter|type|edit)\s+(?:an?\s+|the\s+)?'
+    r'(?:following\s+)?(?:steam\s+|custom\s+)?'
+    r'(?:command[\s-]*line\s+|launch\s+|startup\s+)?'
+    r'(?:argument|parameter|option|flag)s?(?:\s+set)?\.?$',
+    re.IGNORECASE
+)
+
+
+def is_generic_method(text: Optional[str]) -> bool:
+    """True when the text names only the method "use a launch argument"."""
+    return bool(_GENERIC_METHOD.match((text or '').strip()))
+
+
+# The hole the retired `desc.replace(command, '')` bug left in a sentence. The
+# parser stopped doing this, but rows written before the fix never get
+# re-judged, and this gate is the only thing the cleanup can judge them by:
+#
+#   "Use # -yres # for custom window resolution."   (-xres cut out)
+#   "Add or -dx11 to the launch options"            (-d3d11 cut out)
+#   "Use the =x command line argument"              (-hz cut out)
+#   "Use the to launch modded version ..."          (-mod:X cut out)
+_DELETED_COMMAND_TRACE = re.compile(
+    r'^(?:use|add|type|enter|put|append)\s+(?:the\s+)?(?:or|and|to|for|with|[#=])(?=\s|$)'
+    r'|\bthe\s+(?:to|for|with|or|and)\b'
+    r'|\bthe\s+='
+    r'|\s#\s+-',
+    re.IGNORECASE
+)
+
+# A step lifted out of a numbered procedure with the number written out —
+# "4. Use the command line argument ...", "Method №1. Launch parameters
+# through Steam". The wiki's own '#' list marker is handled separately below.
+# "3.5 GB" is unaffected: the number must be followed by a dot AND a space.
+_NUMBERED_STEP = re.compile(
+    r'^(?:\d{1,2}\.\s|(?:method|step)\s*(?:№|no\.?|#)?\s*\d)', re.IGNORECASE)
+
+# A table of values rather than a definition: "1 = TRUE 0 = FALSE ...".
+_VALUE_LEGEND = re.compile(r'^\d+\s*=\s*\S')
+
+# Text before a mention that makes it an illustration rather than an
+# instruction — "(e.g. DXVK_HUD=fps)".
+_EXAMPLE_LEAD = re.compile(r'(?:\(|e\.g\.?,?|i\.e\.?,?|for example,?)\s*$', re.IGNORECASE)
+
+
+def _names_itself_mid_sentence(command: str, description: str) -> bool:
+    """
+    The description uses the command inside the sentence: "Use -availablevidmem
+    XXXX.0", "Run the game with the -forcehighpoly". That instructs the reader
+    to use the flag instead of saying what it does, and the command column
+    already carries the flag. The PCGamingWiki extractor refuses these as it
+    scrapes; this is the same judgement, somewhere the cleanup can apply it.
+
+    A bracketed example is the exception. "Show the DXVK performance HUD
+    overlay (e.g. DXVK_HUD=fps)" is a definition illustrating itself.
+    """
+    if not command:
+        return False
+    pattern = r'(?<![\w\-+])' + re.escape(command) + r'(?![\w\-])'
+    for m in re.finditer(pattern, description):
+        if m.start() == 0:
+            continue
+        if _EXAMPLE_LEAD.search(description[:m.start()]):
+            continue
+        return True
+    return False
+
+
+def _alnum(text: str) -> str:
+    return re.sub(r'[\W_]+', '', text.lower())
+
+
 def _is_circular(command: str, description: str) -> bool:
     """
     "Use the -nomovie" restates the command and adds nothing. Only circular if
     removing the boilerplate and the command leaves essentially nothing, so
     genuinely informative text starting with "Use" survives.
     """
+    # A heading that is only the flag's own name — "Windowed" above +windowed —
+    # restates it as surely as "Use the +windowed" does, just without the
+    # punctuation and in a different case.
+    if _alnum(description) and _alnum(description) == _alnum(command):
+        return True
+
     residue = _CIRCULAR_PREFIX.sub('', description.strip(), count=1)
     residue = residue.replace(command, '')
     residue = re.sub(r'[\s\.\-–—:,"\']+', '', residue)
@@ -166,6 +250,21 @@ def is_junk_description(command: str, description: Optional[str]) -> Tuple[bool,
 
     if _is_circular(command, raw):
         return True, 'circular — restates the command'
+
+    if is_generic_method(raw):
+        return True, 'names the method (a launch argument), not what the flag does'
+
+    if _DELETED_COMMAND_TRACE.search(raw):
+        return True, 'the command was cut out of the sentence'
+
+    if _NUMBERED_STEP.match(raw):
+        return True, 'numbered instruction step, not a description'
+
+    if _VALUE_LEGEND.match(raw):
+        return True, 'value legend, not a definition'
+
+    if _names_itself_mid_sentence(command, raw):
+        return True, 'instruction to use the flag, not a definition'
 
     # Wiki list markers introduce instruction steps, except when the marker
     # precedes a real definition whose command was stripped off the front.

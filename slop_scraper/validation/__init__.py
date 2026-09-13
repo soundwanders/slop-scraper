@@ -40,6 +40,7 @@ from .description_quality import (
     is_junk_description,
     is_placeholder_description,
     acceptable_description,
+    is_generic_method,
     truncate_at_next_definition,
     PLACEHOLDER_DESCRIPTIONS
 )
@@ -63,6 +64,7 @@ __all__ = [
     'is_junk_description',
     'is_placeholder_description',
     'acceptable_description',
+    'is_generic_method',
     'truncate_at_next_definition',
     'is_corroborated',
     'filter_corroborated',

@@ -835,6 +835,12 @@ def _iter_template_bodies(text, name):
     ({{code|...}}, {{Refurl|...}}), so matching to the first '}}' truncates the
     row and can swallow the next one.
     """
+    for _, body in _iter_template_spans(text, name):
+        yield body
+
+
+def _iter_template_spans(text, name):
+    """(start offset, body) for each {{name...}} call, brace-balanced."""
     needle = '{{' + name
     i = 0
     while True:
@@ -855,7 +861,7 @@ def _iter_template_bodies(text, name):
                 j += 1
         else:
             return  # unbalanced tail; stop rather than guess
-        yield text[i + 2:j - 2]
+        yield i, text[i + 2:j - 2]
         i = j
 
 
@@ -909,6 +915,126 @@ def _options_from_standard_table(wikitext, debug=False):
     return found
 
 
+# A {{Fixbox}} is how PCGamingWiki documents a workaround:
+#
+#     ===Remove the save limit===
+#     {{Fixbox|description=Use an argument|ref=...|fix=
+#     Use the <code>-unlimitedsaves</code> command line argument.
+#     }}
+#
+# The sentence around the flag never says what it does — it is always some
+# form of "use this argument". What it does is what the box is FOR, and the
+# page says that twice: in description= (usually the method, sometimes the goal
+# itself, "Enable Direct3D 11") and in the heading above (the goal, "Remove the
+# save limit"). Both are written by an editor, about this fix, on this page,
+# which is what makes them usable where text inferred from prose is not.
+#
+# Until this existed the parser took description= only from boxes containing no
+# nested template, and with no judgement of what it said — which is how "Use an
+# argument" was published as a definition, and why the same page could be read
+# differently depending on whether a box happened to cite a {{Refurl}}.
+#
+# Two guards keep a box's text off the wrong flag:
+#   - the box documents ONE flag, or alternatives for one written side by side
+#     ("<code>-d3d11</code> or <code>-dx11</code>"). "-windowed -noborder" says
+#     what the pair does together, which is not what either does alone.
+#   - the heading is used only when the box's method IS the argument. When
+#     description= names a tool ("Use the Widescreen Fix"), the flag is a step
+#     in using that tool and the heading describes the tool's result.
+_FLAG_IN_CODE = re.compile(r'<(code|tt|kbd)>([^<]{1,80})</\1>')
+_METHOD_VERB = re.compile(
+    r'^(?:use|install|download|edit|apply|modify|delete|rename|replace|create|'
+    r'copy|move|extract|open)\b', re.IGNORECASE)
+_ALTERNATIVE_GAP = re.compile(r'^\s*(?:,|/|or|,\s*or)?\s*$', re.IGNORECASE)
+# Feature subsections only. A level-2 heading ("==Video==") names a whole
+# category, which is not a description of any one fix inside it.
+_SUBSECTION_HEADING = re.compile(r'^===+[^=\n]+=+\s*$', re.MULTILINE)
+
+
+def _plain(text):
+    """Wikitext to readable text, keeping link labels ([[A|B]] -> B)."""
+    text = re.sub(r'<ref[^>]*>.*?</ref>|<ref[^>]*/>', '', text or '', flags=re.DOTALL)
+    text = re.sub(r'\[\[(?:[^\]|]*\|)?([^\]]*)\]\]', r'\1', text)
+    text = re.sub(r'\[https?://\S+\s+([^\]]*)\]', r'\1', text)
+    text = re.sub(r"\{\{[^{}]*\}\}|<[^>]+>|'{2,}", '', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+
+def _fixbox_flags(fix_text):
+    """
+    The flags a box documents, or None when they are not one flag.
+
+    Several flags qualify only as alternatives: one per code tag, separated by
+    nothing but "or", a comma or a slash.
+    """
+    spans = []
+    for m in _FLAG_IN_CODE.finditer(fix_text):
+        tokens = [t for t in m.group(2).split()
+                  if t.startswith(('-', '+')) and _is_plausible_launch_option(t)]
+        if tokens:
+            spans.append((m.start(), m.end(), tokens))
+
+    flags, seen = [], set()
+    for _, _, tokens in spans:
+        for t in tokens:
+            if t.lower() not in seen:
+                seen.add(t.lower())
+                flags.append(t)
+    if len(flags) <= 1:
+        return flags
+
+    if any(len(tokens) != 1 for _, _, tokens in spans):
+        return None
+    for (_, end, _), (start, _, _) in zip(spans, spans[1:]):
+        if not _ALTERNATIVE_GAP.match(fix_text[end:start]):
+            return None
+    return flags
+
+
+def _options_from_fixboxes(wikitext, debug=False):
+    """(command, description) for flags a {{Fixbox}} says the purpose of."""
+    try:
+        from ..validation import (acceptable_description, clean_option_description,
+                                  is_generic_method)
+    except ImportError:
+        from validation import (acceptable_description, clean_option_description,
+                                is_generic_method)
+
+    headings = [(m.start(), m.group(0)) for m in _SUBSECTION_HEADING.finditer(wikitext)]
+    found = []
+    for start, body in _iter_template_spans(wikitext, 'Fixbox'):
+        named = {}
+        for param in _split_template_params(body)[1:]:
+            if '=' in param:
+                key, value = param.split('=', 1)
+                named[key.strip().lower()] = value
+        flags = _fixbox_flags(named.get('fix', ''))
+        if not flags:
+            continue
+
+        method = _plain(named.get('description', ''))
+        if is_generic_method(method):
+            heading = next((h for pos, h in reversed(headings) if pos < start), '')
+            candidate = _plain(heading.strip().strip('='))
+            if _LAUNCH_SECTION_HEADING.match(heading.strip()) or is_generic_method(candidate):
+                continue
+        elif _METHOD_VERB.match(method):
+            continue
+        else:
+            candidate = method
+
+        # Judged exactly as the write path will judge it, so a candidate that
+        # would be stored as NULL leaves the flag to the later phases instead.
+        for flag in flags:
+            description = acceptable_description(flag, clean_option_description(candidate))
+            if description:
+                found.append((flag, description))
+
+    if debug and found:
+        print(f"🔍 PCGamingWiki: Fixboxes yielded {len(found)} described flags")
+    return found
+
+
 def parse_wikitext_for_launch_options_strict(wikitext, debug=False):
     """
     Parse MediaWiki wikitext for launch options.
@@ -945,6 +1071,13 @@ def parse_wikitext_for_launch_options_strict(wikitext, debug=False):
     # strips it. It runs first so its editor-written description wins over the
     # weaker text the later phases infer from surrounding prose.
     for cmd, desc in _options_from_standard_table(wikitext, debug=debug):
+        if _is_plausible_launch_option(cmd):
+            _add_option(cmd, desc)
+
+    # Phase 0b: flags inside a {{Fixbox}}, described by what the box is for.
+    # Before phase 1, which would otherwise claim the flag first with the
+    # surrounding "use this argument" sentence — text the gate rightly refuses.
+    for cmd, desc in _options_from_fixboxes(wikitext, debug=debug):
         if _is_plausible_launch_option(cmd):
             _add_option(cmd, desc)
 
@@ -1086,6 +1219,11 @@ def extract_description_from_context_safe(command, context):
         block_text = block.group(1)
         if command not in block_text:
             continue
+        if block_text.split('|', 1)[0].strip().lower().startswith('fixbox'):
+            # A Fixbox's description= is about the whole fix, not this flag.
+            # _options_from_fixboxes reads it with the guards that make that
+            # safe; read here without them, it published "Use an argument".
+            break
         desc_match = re.search(r'description\s*=\s*([^|}]{5,150})', block_text)
         if desc_match:
             desc = clean_wiki_description(desc_match.group(1).strip())
