@@ -497,6 +497,7 @@ MALFORMED_COMMANDS = frozenset({
     '-resx=',                    # same, '=' kept — also caught by the punctuation rule
     '-resy=',
     '-unskippable-',             # wikitext prose, not a flag
+    '-any',                      # tail of a SimCity 4 config-file line, not a flag
     '-resx=desiredwidth',        # Epic's syntax placeholder taken literally
     '-resy=desiredheight',
     '-malloc=system',            # not Unreal syntax; Unreal uses bare -ansimalloc etc.

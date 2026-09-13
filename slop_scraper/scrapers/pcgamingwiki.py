@@ -941,11 +941,35 @@ def _options_from_standard_table(wikitext, debug=False):
 #   - the heading is used only when the box's method IS the argument. When
 #     description= names a tool ("Use the Widescreen Fix"), the flag is a step
 #     in using that tool and the heading describes the tool's result.
+#
+# Those two were not enough. The first reheal run wrote six descriptions this
+# way and four were wrong, each for a reason the page's own structure shows:
+#   - +gl_overbright got a Mesa environment-variable fix, because the flag
+#     appeared only in a Notes example of a whole Wine command line
+#   - +fs_cachepath got "Preserve texture cache between sessions", a fix that
+#     is creating folders under %LOCALAPPDATA%
+#   - -any, which is not a flag at all but the tail of a config-file line
+#     (<code>partialRule "Fast card" -any</code>), was created as an option
+#   - -cfg got "Skip intro videos", true of -cfg "playOpeningLogo=false" and not
+#     of the bare -cfg the command column stores
+# So the box must also be a fix the flag carries on its own: the flag sits in
+# the steps rather than the notes, it OPENS its code tag with at most a number
+# or placeholder after it, and no step downloads, installs, copies or edits
+# anything else.
 _FLAG_IN_CODE = re.compile(r'<(code|tt|kbd)>([^<]{1,80})</\1>')
 _METHOD_VERB = re.compile(
     r'^(?:use|install|download|edit|apply|modify|delete|rename|replace|create|'
     r'copy|move|extract|open)\b', re.IGNORECASE)
 _ALTERNATIVE_GAP = re.compile(r'^\s*(?:,|/|or|,\s*or)?\s*$', re.IGNORECASE)
+# Where a box's steps stop and its caveats begin.
+_FIX_NOTES = re.compile(r"'''\s*Notes?\s*'''", re.IGNORECASE)
+# A step that does something other than pass an argument.
+_OTHER_ACTION = re.compile(
+    r'\b(?:download|install|copy|extract|delete|rename|replace|edit|modify|'
+    r'registry|environment variable|make a folder|create a folder)\b|\{\{\s*p\s*\|',
+    re.IGNORECASE)
+# What may follow the flag in its code tag: a number, or a placeholder for one.
+_PLAIN_VALUE = re.compile(r'^(?:\d+(?:\.\d+)?|#|X+(?:\.\d+)?|<[^>]+>)$', re.IGNORECASE)
 # Feature subsections only. A level-2 heading ("==Video==") names a whole
 # category, which is not a description of any one fix inside it.
 _SUBSECTION_HEADING = re.compile(r'^===+[^=\n]+=+\s*$', re.MULTILINE)
@@ -962,17 +986,26 @@ def _plain(text):
 
 def _fixbox_flags(fix_text):
     """
-    The flags a box documents, or None when they are not one flag.
+    The flags a box documents, or None when the box is not about them alone.
 
     Several flags qualify only as alternatives: one per code tag, separated by
     nothing but "or", a comma or a slash.
     """
+    steps = _FIX_NOTES.split(fix_text, 1)[0]
+    if _OTHER_ACTION.search(steps):
+        return None
+
     spans = []
-    for m in _FLAG_IN_CODE.finditer(fix_text):
-        tokens = [t for t in m.group(2).split()
+    for m in _FLAG_IN_CODE.finditer(steps):
+        parts = m.group(2).split()
+        tokens = [t for t in parts
                   if t.startswith(('-', '+')) and _is_plausible_launch_option(t)]
-        if tokens:
-            spans.append((m.start(), m.end(), tokens))
+        if not tokens:
+            continue
+        if len(tokens) == 1 and (parts[0] != tokens[0] or len(parts) > 2
+                                 or not all(_PLAIN_VALUE.match(p) for p in parts[1:])):
+            return None
+        spans.append((m.start(), m.end(), tokens))
 
     flags, seen = [], set()
     for _, _, tokens in spans:
@@ -986,7 +1019,7 @@ def _fixbox_flags(fix_text):
     if any(len(tokens) != 1 for _, _, tokens in spans):
         return None
     for (_, end, _), (start, _, _) in zip(spans, spans[1:]):
-        if not _ALTERNATIVE_GAP.match(fix_text[end:start]):
+        if not _ALTERNATIVE_GAP.match(steps[end:start]):
             return None
     return flags
 
@@ -1012,6 +1045,8 @@ def _options_from_fixboxes(wikitext, debug=False):
         if not flags:
             continue
 
+        if _OTHER_ACTION.search(named.get('description', '')):
+            continue
         method = _plain(named.get('description', ''))
         if is_generic_method(method):
             heading = next((h for pos, h in reversed(headings) if pos < start), '')
