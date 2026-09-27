@@ -690,9 +690,26 @@ def format_game_title_for_api(title):
 
     return formatted
 
-def _options_from_wikitext(wikitext, page_id, debug=False):
-    """Parse one page's wikitext into options. No network."""
+def _options_from_wikitext(wikitext, page_id, debug=False, structured_only=True):
+    """
+    Parse one page's wikitext into options. No network.
+
+    Only flags the page PRESENTS as flags are kept: a table row, a Fixbox, or a
+    code span the flag opens (structured_flag_commands). A flag met only in
+    running prose — "-any" was the tail of a config-file line in SimCity 4's
+    page — is not documentation of a launch option, and the bulk backfill has
+    refused those since it was written. The live scraper now holds the same
+    line, so a rescan cannot add what the backfill would refuse.
+    structured_only=False is for callers that count the refusals themselves.
+    """
     parsed = parse_wikitext_for_launch_options_strict(wikitext, debug=debug) or []
+    if structured_only:
+        structured = structured_flag_commands(wikitext)
+        kept = [o for o in parsed if str(o.get('command') or '').strip().lower() in structured]
+        if debug and len(kept) < len(parsed):
+            dropped = sorted({o['command'] for o in parsed} - {o['command'] for o in kept})
+            print(f"🔍 PCGamingWiki: prose-only mentions not kept: {dropped}")
+        parsed = kept
     page_url = f"https://www.pcgamingwiki.com/w/index.php?curid={page_id}"
     for opt in parsed:
         opt['source_url'] = page_url
@@ -785,12 +802,9 @@ def get_launch_options_from_page_api(page_id, debug=False, expect_app_id=None):
                         return None
                     _record_page_engines(wikitext, debug=debug)
 
-                # Parse wikitext for launch options with strict validation
-                parsed_options = parse_wikitext_for_launch_options_strict(wikitext, debug=debug)
-                page_url = f"https://www.pcgamingwiki.com/w/index.php?curid={page_id}"
-                for opt in parsed_options:
-                    opt['source_url'] = page_url
-                options.extend(parsed_options)
+                # The same parse, and the same structured-only rule, as every
+                # other path that reads a page.
+                options.extend(_options_from_wikitext(wikitext, page_id, debug=debug))
 
     except Exception as e:
         if debug:
