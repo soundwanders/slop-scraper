@@ -701,17 +701,34 @@ def _is_curated(command: str) -> bool:
     return bool(curated_description(command))
 
 
+def _is_documented_elsewhere(command: str) -> bool:
+    """
+    True when the flag's text is this project's own documentation rather than
+    anything a page says: a curated dictionary entry, or a Proton/Wine variable
+    described from its reader's docs (metadata_tagging.describe_env_var).
+    """
+    try:
+        from ..validation import describe_env_var
+    except ImportError:
+        from validation import describe_env_var
+    return _is_curated(command) or bool(describe_env_var(command))
+
+
 def _link_description(option: dict) -> Optional[str]:
     """
     This game's own text for the flag, or None.
 
-    None for a flag in the curated dictionary: the shared row carries the
-    vendor's text, which is true on every game and is not to be displaced by a
-    page's paraphrase. `link_description`, when present, is this page's text
-    kept by a planner that had to withhold it from a shared row.
+    None when the text is documentation rather than the page's own words — a
+    curated dictionary entry, or a Proton/Wine variable described from its
+    reader's docs. The shared row carries that text, true on every game. A link
+    description claims "this game's page says so", and ProtonDB's scraper never
+    takes text from a report: 115 links were given the variable's documented
+    wording beside a ProtonDB citation that says no such thing.
+    `link_description`, when present, is this page's text kept by a planner
+    that had to withhold it from a shared row.
     """
     command = option.get('command', '')
-    if _is_curated(command):
+    if _is_documented_elsewhere(command):
         return None
     text = option['link_description'] if 'link_description' in option else option.get('description')
     return _gated_description(command, text)
