@@ -382,6 +382,9 @@ def is_junk_description(command: str, description: Optional[str]) -> Tuple[bool,
     if _ENDS_MID_CLAUSE.search(raw):
         return True, 'cut off mid-clause'
 
+    if raw.count('(') > raw.count(')') or raw.count('[') > raw.count(']'):
+        return True, 'cut off inside a bracket'
+
     # Wiki list markers introduce instruction steps, except when the marker
     # precedes a real definition whose command was stripped off the front.
     if raw[:1] in '#*':

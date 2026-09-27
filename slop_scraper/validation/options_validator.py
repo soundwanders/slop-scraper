@@ -742,6 +742,11 @@ def clean_option_description(description: str, min_length: int = 12) -> Optional
     # Trim trailing punctuation and dangling function words ("Use the -x by")
     words = text.rstrip(' .,:;-–—(').split(' ')
     while words and words[-1].lower().strip('.,:;()') in _DANGLING_WORDS:
+        # A word that CLOSES a bracket ends a complete clause. Max Payne 3's
+        # -stereo, "Force 3D stereo support [0–1] (1 is on).", lost "on)" and
+        # then "is" to this loop and was stored as "... [0–1] (1".
+        if words[-1].rstrip('.,:;').endswith((')', ']')):
+            break
         # "use" dangles when a cut instruction ends on it, not when a sentence
         # does: "Restricts the amount of available memory the game can use."
         # was stored as "... the game can".
