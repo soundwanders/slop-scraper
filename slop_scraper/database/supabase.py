@@ -657,11 +657,9 @@ def _vetted_description(option: dict) -> Optional[str]:
     description straight back.
     """
     try:
-        from ..validation import (clean_option_description, acceptable_description,
-                                  curated_description)
+        from ..validation import curated_description
     except ImportError:
-        from validation import (clean_option_description, acceptable_description,
-                                curated_description)
+        from validation import curated_description
 
     command = option.get('command', '')
 
@@ -672,8 +670,141 @@ def _vetted_description(option: dict) -> Optional[str]:
     if curated:
         return curated
 
-    cleaned = clean_option_description(option.get('description', ''))
-    return acceptable_description(command, cleaned)
+    return _gated_description(command, option.get('description', ''))
+
+
+def _gated_description(command: str, text: Optional[str]) -> Optional[str]:
+    """Scraped text through the description gate, with no dictionary override."""
+    try:
+        from ..validation import clean_option_description, acceptable_description
+    except ImportError:
+        from validation import clean_option_description, acceptable_description
+    return acceptable_description(command, clean_option_description(text or ''))
+
+
+# ------------------------------------------------------------ link evidence
+#
+# One command is one launch_options row, shared by every game it is linked to,
+# so its description and citation were whichever page was scraped first —
+# Max Payne 3's -stereo read "Enables stereo audio support" from another
+# game's page while its own page says "Force 3D stereo support". Since
+# migrations/009, the link carries what ITS OWN source says for that game:
+# description, source, source_url and last_verified_at. The table refuses a
+# link description or date without a source_url, so they always travel
+# together.
+
+def _is_curated(command: str) -> bool:
+    try:
+        from ..validation import curated_description
+    except ImportError:
+        from validation import curated_description
+    return bool(curated_description(command))
+
+
+def _link_description(option: dict) -> Optional[str]:
+    """
+    This game's own text for the flag, or None.
+
+    None for a flag in the curated dictionary: the shared row carries the
+    vendor's text, which is true on every game and is not to be displaced by a
+    page's paraphrase. `link_description`, when present, is this page's text
+    kept by a planner that had to withhold it from a shared row.
+    """
+    command = option.get('command', '')
+    if _is_curated(command):
+        return None
+    text = option['link_description'] if 'link_description' in option else option.get('description')
+    return _gated_description(command, text)
+
+
+def _link_evidence(option: dict) -> Optional[dict]:
+    """What a live read of this game's source says for its link, or None."""
+    source = option.get('source')
+    url = (option.get('source_url') or '').strip()
+    if source not in _SCRAPED_VERIFICATION_METHODS or not url:
+        return None
+    return {'source': source, 'source_url': url, 'description': _link_description(option)}
+
+
+def _same_source(a: Optional[str], b: Optional[str]) -> bool:
+    return (a or '').strip().rstrip('/') == (b or '').strip().rstrip('/') != ''
+
+
+def _link_changes(current: dict, evidence: Optional[dict], now: str) -> dict:
+    """
+    What to write to an existing link, given a fresh read of its game's source.
+
+    A link with no citation takes this one. A link citing this same page is
+    re-dated, and gains a description only if it had none. A link citing a
+    different page is left alone: its evidence is that page, and this read
+    says nothing about it.
+    """
+    if not evidence:
+        return {}
+    if not (current.get('source_url') or '').strip():
+        changes = {'source': evidence['source'], 'source_url': evidence['source_url'],
+                   'last_verified_at': now}
+        if evidence['description']:
+            changes['description'] = evidence['description']
+        return changes
+    if not _same_source(current['source_url'], evidence['source_url']):
+        return {}
+    changes = {'last_verified_at': now}
+    if evidence['description'] and not (current.get('description') or '').strip():
+        changes['description'] = evidence['description']
+    return changes
+
+
+_LINK_COLUMNS = 'launch_option_id, source, source_url, description, last_verified_at'
+
+
+def _links_for_game(supabase, app_id) -> tuple:
+    """
+    ({option_id: link row}, has_link_columns) for one game.
+
+    Falls back to the bare link when migrations/009 is not applied, so a scrape
+    never breaks for want of it — it simply records no link evidence.
+    """
+    try:
+        rows = (supabase.table("game_launch_options").select(_LINK_COLUMNS)
+                .eq("game_app_id", app_id).execute().data) or []
+        return {r['launch_option_id']: r for r in rows}, True
+    except Exception:
+        pass
+    try:
+        rows = (supabase.table("game_launch_options").select("launch_option_id")
+                .eq("game_app_id", app_id).execute().data) or []
+        return {r['launch_option_id']: r for r in rows}, False
+    except Exception:
+        # Unreadable: save links bare. An upsert of only the key columns leaves
+        # an existing link's evidence untouched, so nothing is lost.
+        return {}, False
+
+
+def _save_link(supabase, app_id, option_id, option: dict, existing: dict, link_columns: bool) -> None:
+    """Create or refresh one game-option link, with its own evidence when there is some."""
+    import datetime
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    evidence = _link_evidence(option) if link_columns else None
+    current = existing.get(option_id)
+
+    if current is None:
+        row = {"game_app_id": app_id, "launch_option_id": option_id}
+        if evidence:
+            row.update({'source': evidence['source'], 'source_url': evidence['source_url'],
+                        'last_verified_at': now})
+            if evidence['description']:
+                row['description'] = evidence['description']
+        supabase.table("game_launch_options").upsert(
+            row, on_conflict="game_app_id,launch_option_id").execute()
+        existing[option_id] = row
+        return
+
+    changes = _link_changes(current, evidence, now)
+    if changes:
+        (supabase.table("game_launch_options").update(changes)
+         .eq("game_app_id", app_id).eq("launch_option_id", option_id).execute())
+        current.update(changes)
 
 
 def _verification_method_for_source(source: str) -> str:
@@ -713,6 +844,15 @@ def _touch_launch_option_verification(supabase, option_id: int, option: dict, ex
     source = option.get('source', 'Unknown')
     update_fields = {}
 
+    # The shared row's date and description describe ITS OWN cited page. A
+    # different game's page re-confirming the flag is recorded on that game's
+    # link (_save_link), not here: "Last re-checked against its source" next
+    # to page A is not true because page B was read. A row with no citation
+    # yet takes this one below, so this read is its source.
+    cited = (existing.get('source_url') or '').strip()
+    url = (option.get('source_url') or '').strip()
+    own_source = not cited or (bool(url) and _same_source(cited, url))
+
     # Freshness is claimed only for a LIVE re-read.
     #
     # The site renders last_verified_at as "Last checked <date>", titled "Last
@@ -726,7 +866,7 @@ def _touch_launch_option_verification(supabase, option_id: int, option: dict, ex
     # It also overwrote verification_method, so a row genuinely re-confirmed on
     # a wiki page could be relabelled 'curated' by the next static re-emission.
     # Static sources now leave both columns as they are.
-    if source in _SCRAPED_VERIFICATION_METHODS:
+    if source in _SCRAPED_VERIFICATION_METHODS and own_source:
         update_fields["last_verified_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         update_fields["verification_method"] = _SCRAPED_VERIFICATION_METHODS[source]
 
@@ -747,9 +887,11 @@ def _touch_launch_option_verification(supabase, option_id: int, option: dict, ex
             if demoted and demoted != label:
                 update_fields["source"] = demoted
 
+    # The dictionary's text is true on every game, so it fills from any read;
+    # a page's text fills only the row that cites that page.
     if not (existing.get('description') or '').strip():
         fresh_description = _vetted_description(option)
-        if fresh_description:
+        if fresh_description and (own_source or _is_curated(option.get('command', ''))):
             update_fields["description"] = fresh_description
 
     if not update_fields:
@@ -942,7 +1084,8 @@ def save_to_database(game, options, supabase):
     - Quality gate: only save if at least one non-generic option is present.
     - Games: upsert on app_id (safe to refresh metadata from Steam API).
     - Launch options: select-then-insert — never overwrite an existing description.
-    - Junction: upsert on (game_app_id, launch_option_id) — idempotent.
+    - Junction: upsert on (game_app_id, launch_option_id) — idempotent. A
+      link records its own game's evidence (migrations/009): see _save_link.
     """
     import time
 
@@ -1026,6 +1169,7 @@ def save_to_database(game, options, supabase):
 
         success_count = 0
         error_count = 0
+        existing_links, link_columns = _links_for_game(supabase, game['appid'])
 
         for option in meaningful:
             try:
@@ -1036,10 +1180,8 @@ def save_to_database(game, options, supabase):
                     error_count += 1
                     continue
 
-                supabase.table("game_launch_options").upsert(
-                    {"game_app_id": game['appid'], "launch_option_id": option_id},
-                    on_conflict="game_app_id,launch_option_id"
-                ).execute()
+                _save_link(supabase, game['appid'], option_id, option,
+                           existing_links, link_columns)
 
                 success_count += 1
 
