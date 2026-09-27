@@ -174,7 +174,12 @@ class LaunchOptionsValidator:
             
             # Common patterns
             'standard_flags': [
-                r'^-[a-zA-Z][a-zA-Z0-9_\-]{1,30}$',      # Standard flags
+                # Standard flags. The limit was 30 until 2026-09-26: Helheim
+                # Hassle documents 42- and 58-character event flags in a wiki
+                # table, and refusing them here let a prose pass publish them
+                # cut short. The scrapers' own prose patterns keep their
+                # shorter caps, so only structured sources reach this length.
+                r'^-[a-zA-Z][a-zA-Z0-9_\-]{1,62}$',
                 r'^-force-[a-zA-Z0-9\-]{3,20}$',         # Unity force options
                 r'^-no[a-zA-Z]{2,15}$',                   # Disable options
                 r'^-USEALLAVAILABLECORES$',               # Unreal specific
@@ -472,6 +477,7 @@ _DANGLING_WORDS = {
     'the', 'a', 'an', 'by', 'using', 'use', 'with', 'to', 'of', 'and', 'or',
     'in', 'on', 'at', 'for', 'from', 'via', 'see', 'run', 'is', 'as',
 }
+_MODAL_VERBS = {'can', 'cannot', 'could', 'will', 'would', 'should', 'must', 'may', 'might'}
 
 
 # Commands that are not launch options at all — parser artefacts, bare console
@@ -513,6 +519,17 @@ MALFORMED_COMMANDS = frozenset({
     # ProtonDB's flag pattern stops at '=' and kept the switch name.
     '-dxnasong',
     '-dffmpeg',
+    # Alan Wake's American Nightmare's table writes "-hX | Screen height (e.g.
+    # -h720)": X is where the number goes, glued to the flag. Stored literally
+    # it is a command that does nothing, and the page's own example says so.
+    '-hx',
+    '-wx',
+    # Helheim Hassle's event flags cut to the prose pattern's length cap. The
+    # page documents -thisishalloweenthisishalloweenhalloweenhalloweenhalloween
+    # and -merrychristmashohofatherchristmassayhello; these prefixes do
+    # nothing. The cut itself is fixed in the parser.
+    '-thisishalloweenthisishalloweenh',
+    '-merrychristmashohofatherchristm',
     '-resx=desiredwidth',        # Epic's syntax placeholder taken literally
     '-resy=desiredheight',
     '-malloc=system',            # not Unreal syntax; Unreal uses bare -ansimalloc etc.
@@ -577,8 +594,15 @@ def is_valid_launch_option(command: str, description: str = None) -> Tuple[bool,
     if any(ind in command for ind in _PATH_INDICATORS):
         return False, "Contains filesystem path"
 
-    # Truncated captures and placeholder fragments ({path, <path>, ~/[steam)
-    if any(ch in command for ch in '<{[>}]'):
+    # Truncated captures and placeholder fragments ({path, <path>, ~/[steam).
+    #
+    # Parentheses joined the set on 2026-09-15: a wiki table documents Tunnel
+    # Rats' listener flag as "-listener='''(HWND)X'''", and with the value
+    # welded on it reads as a command. No real flag carries parentheses —
+    # verified against every stored command and every curated dictionary key,
+    # none of which contains one — so the whole class goes rather than that
+    # string.
+    if any(ch in command for ch in '<{[>}]()'):
         return False, "Contains placeholder/bracket fragment"
 
     # Wiki bold/italic markup ('' or '''). No flag contains two apostrophes in a
@@ -718,6 +742,12 @@ def clean_option_description(description: str, min_length: int = 12) -> Optional
     # Trim trailing punctuation and dangling function words ("Use the -x by")
     words = text.rstrip(' .,:;-–—(').split(' ')
     while words and words[-1].lower().strip('.,:;()') in _DANGLING_WORDS:
+        # "use" dangles when a cut instruction ends on it, not when a sentence
+        # does: "Restricts the amount of available memory the game can use."
+        # was stored as "... the game can".
+        if (words[-1].lower().strip('.,:;()') == 'use' and len(words) > 1
+                and words[-2].lower() in _MODAL_VERBS):
+            break
         words.pop()
     text = ' '.join(words).rstrip(' .,:;-–—(').strip()
 

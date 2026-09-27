@@ -509,6 +509,54 @@ _HTML_TAG = re.compile(
 )
 
 
+# Two inline templates carry words the sentence needs. Stripped along with
+# every other template they left holes that still read as prose — "Press to
+# bring up the editor", "Toggle profile with , and see", "Enables for taking
+# screen shots" — four published rows, from {{key|F11}} and {{key|F10}}. A key
+# template is the key's name (several keys are a chord); {{code|X}} is X.
+_KEY_TEMPLATE = re.compile(r'\{\{\s*key\s*\|([^{}]*)\}\}', re.IGNORECASE)
+_CODE_TEMPLATE = re.compile(r'\{\{\s*code\s*\|([^{}|]*)\}\}', re.IGNORECASE)
+# {{file|.CFG}} names a file or extension, and stripping it left Far Cry 2's
+# -exec documented as working on "files with a extension".
+_FILE_TEMPLATE = re.compile(r'\{\{\s*file\s*\|([^{}|]*)\}\}', re.IGNORECASE)
+
+
+def _render_inline_templates(text):
+    text = _KEY_TEMPLATE.sub(
+        lambda m: '+'.join(p.strip() for p in m.group(1).split('|') if p.strip()), text or '')
+    text = _FILE_TEMPLATE.sub(lambda m: m.group(1).strip(), text)
+    return _CODE_TEMPLATE.sub(lambda m: m.group(1).strip(), text)
+
+
+_POINTER_SENTENCE = re.compile(
+    r'(?:^|(?<=[.!?])\s+)[^.!?]*\b(?:here|this (?:article|page|guide|link|thread|post|video))\b'
+    r'[^.!?]*[.!?]?\s*$',
+    re.IGNORECASE)
+
+
+def _drop_pointer_sentence(text):
+    """Remove a trailing "see here" sentence; '' if pointing was all it did."""
+    if not text:
+        return text
+    return _POINTER_SENTENCE.sub('', text).strip()
+
+
+def _command_cell(text):
+    """
+    A table's command cell as plain text, for reading the VALUE after a flag.
+
+    Unlike _plain(), <placeholder> tokens survive. Red Dead Redemption 2 writes
+    "-processPriorityClass <class>_PRIORITY_CLASS"; stripped as though <class>
+    were an HTML tag, what was left looked like a concrete value, and a genuine
+    description of the flag was withheld.
+    """
+    text = re.sub(r'<ref[^>]*>.*?</ref>|<ref[^>]*/>', '', text or '', flags=re.DOTALL)
+    text = _render_inline_templates(text)
+    text = _HTML_TAG.sub('', text)
+    text = re.sub(r"\{\{[^{}]*\}\}|'{2,}", '', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+
 def clean_wiki_description(description, debug=False):
     """
     Clean wiki description text to remove markup and artifacts
@@ -518,6 +566,7 @@ def clean_wiki_description(description, debug=False):
 
     # Strip wiki list markers (#, *, :) left over from numbered instructions
     description = re.sub(r'^[\s#*:;]+', '', description)
+    description = _render_inline_templates(description)
 
     # Remove HTML/XML tags — but only ones that are actually tags.
     #
@@ -534,9 +583,19 @@ def clean_wiki_description(description, debug=False):
     # placeholders they are.
     description = _HTML_TAG.sub('', description)
     
-    # Remove wiki markup
-    description = re.sub(r'\{\{[^}]*\}\}', '', description)  # Templates
-    description = re.sub(r'\[\[[^]]*\]\]', '', description)  # Links
+    # Links carry the words the sentence is made of, so they are RENDERED, not
+    # removed. Deleting them wrote "Set quality (0–1)" where Grand Theft Auto V
+    # says "Set [[FXAA]] quality (0–1)", and "Enable Nvidia (0–1)" for
+    # [[TXAA]] — sentences that still read as sentences with the subject gone.
+    # _plain() has always kept labels; this is the same rule, applied on the
+    # path the table readers use.
+    description = re.sub(r'\[\[(?:[^\]|]*\|)?([^\]]*)\]\]', r'\1', description)
+    # An external link renders as its label too: "[https://… this article by
+    # Microsoft]" is how a wiki cites one, and dropped whole it left the raw URL
+    # behind, which the quality gate then refused as a cut-off link.
+    description = re.sub(r'\[https?://\S+\s+([^\]]*)\]', r'\1', description)
+    # Templates go last, so the ones that carry words have already rendered.
+    description = re.sub(r'\{\{[^}]*\}\}', '', description)
     description = re.sub(r"'''?([^']*?)'''?", r'\1', description)  # Bold/italic
     description = re.sub(r'<ref[^>]*>.*?</ref>', '', description, flags=re.DOTALL)  # References
     description = re.sub(r'<ref[^>]*/?>', '', description)  # Self-closing refs
@@ -569,9 +628,28 @@ def clean_wiki_description(description, debug=False):
     # Clean up whitespace
     description = re.sub(r'\s+', ' ', description).strip()
 
-    # If description is too long or contains artifacts, truncate/clean
-    if len(description) > 200:
-        description = description[:200] + "..."
+    # A final sentence that only POINTS somewhere is dropped. Rendering a link
+    # as its label is right for "Set [[FXAA]] quality", but a label that is a
+    # pointer renders as a pointer to nothing — the site shows plain text, and
+    # the link it pointed at is gone. Braid's -universe ended "... explanation
+    # of the mod system is located here", Grand Theft Auto V's -keyboardLocal
+    # "... see this article by Microsoft". The sentences before it stand.
+    description = _drop_pointer_sentence(description)
+
+    # A long description is cut at a SENTENCE, or not stored at all.
+    #
+    # This used to be `description[:200] + "..."`, which cut mid-word and then
+    # lost the ellipsis to the trailing-punctuation trim, so Grand Theft Auto
+    # V's -uilanguage was about to be published as "... korean, chinese,
+    # chinesesimp, japanese, mexican (for Mexica". That is the same cut-off
+    # shape the quality gate exists to refuse, manufactured by us.
+    #
+    # Nothing stored today is anywhere near this: the longest description in
+    # the catalogue is 132 characters, so this only ever fires on a genuinely
+    # long wiki cell.
+    if len(description) > 300:
+        cut = description.rfind('. ', 0, 300)
+        description = description[:cut + 1] if cut > 60 else ""
     
     # Remove descriptions that are just artifacts
     artifact_patterns = [
@@ -811,8 +889,21 @@ def _is_plausible_launch_option(cmd: str) -> bool:
 # (save-game locations, API support, middleware). Reading it anywhere would
 # pull in rows that are not launch options at all, so this is scoped to the
 # launch-options section and nowhere else.
+# PCGamingWiki usually writes this heading as a LINK to its glossary:
+#
+#     ===[[Glossary:Command line arguments|Command line arguments]]===
+#
+# Matching only the plain spelling found the section on 17 of 470 cached pages.
+# Every page whose launch options are in a raw table — Counter-Strike: Global
+# Offensive, Dota 2, both Command & Conquer entries, Tunnel Rats — writes the
+# linked form, so the section they live in was invisible, and with it the
+# editor-written descriptions beside each flag. The optional link prefix and
+# the trailing wildcard also pick up "Command line arguments / Launch Options"
+# and "Launch options (Linux)".
 _LAUNCH_SECTION_HEADING = re.compile(
-    r'^=+\s*(?:Launch options?|Command[ -]line arguments?|Command[ -]line parameters?)\s*=+\s*$',
+    r'^=+\s*(?:\[\[[^\]|]*\|)?\s*'
+    r'(?:Launch options?|Command[ -]line arguments?|Command[ -]line parameters?)'
+    r'[^=\n]*=+\s*$',
     re.IGNORECASE | re.MULTILINE)
 _ANY_HEADING = re.compile(r'^=+[^=\n]+=+\s*$', re.MULTILINE)
 
@@ -889,6 +980,51 @@ def _split_template_params(body):
     return parts
 
 
+# A value written after a flag decides what its description is about.
+#
+# A PLACEHOLDER — "-fpsClamp N", "-xres [number]", "-exec filename" — stands
+# for any value, so the row describes the flag. A CONCRETE value does not.
+# Saints Row IV's table has one row per language ("-localize_language us |
+# Set language to English", "... fr | Set language to French"), Planet Zoo
+# documents "-watchdog 0" as "Disable loading watchdog", and Atari 50 lists
+# "--display 1080p" and "--display 720p". The command column stores the bare
+# flag, so with the value dropped each of those was about to publish one
+# value's meaning as the flag's: -localize_language "sets the language to
+# English".
+#
+# The description survives when the documented form was the flag alone, a
+# placeholder, or 1 — the switched-on form of a boolean, which IS the flag's
+# meaning ("-GameProfile_GodMode 1 | Enables god mode"). Anything else is
+# stored without one, and the source link says the rest. Storing the valued
+# form as its own row (so "-watchdog 0" is pasteable) is a separate decision.
+_PLACEHOLDER_WORDS = {'x', 'y', 'n', 'flag', 'filename', 'file', 'number', 'num',
+                      'value', 'path', 'name', 'id', 'level'}
+
+
+def _is_placeholder(token):
+    token = token.strip('\'"`')
+    if not token or token in ('#', '$'):
+        return True
+    # "<class>_PRIORITY_CLASS", "<width>x<height>": a placeholder with text
+    # around it is still a placeholder.
+    if re.search(r'<\w+>', token):
+        return True
+    if re.fullmatch(r'[\[<(].*[\]>)]', token):
+        return True
+    if token.lower() in _PLACEHOLDER_WORDS:
+        return True
+    return bool(re.fullmatch(r'[A-Z]{1,5}', token)
+                or re.fullmatch(r'X+(?:\.\d+)?', token, re.IGNORECASE))
+
+
+def _value_is_specific(values):
+    """True when the tokens after a flag name one particular value."""
+    concrete = [v for v in values if not _is_placeholder(v)]
+    if not concrete:
+        return False
+    return not (len(concrete) == 1 and concrete[0].lower() in ('1', 'true', 'on'))
+
+
 def _options_from_standard_table(wikitext, debug=False):
     """(command, description) pairs from a launch-options section's table."""
     section = _launch_options_section(wikitext)
@@ -907,11 +1043,141 @@ def _options_from_standard_table(wikitext, debug=False):
         command = command.split()[0] if command.split() else ''
         if not command:
             continue
-        description = clean_wiki_description(params[2], debug=debug) if len(params) > 2 else ''
+        cell = params[2] if len(params) > 2 else ''
+        # A cell documenting each VALUE on its own line —
+        #   +showfps_enabled {{code|X}} | {{code|1}} Enables a simple FPS
+        #   counter ... <br/>{{code|2}} Enables a large debug graph ...
+        # describes no single meaning of the bare flag the command column
+        # stores. Flattened, it was published as one run-on sentence.
+        entries = re.split(r'<br\s*/?>', cell)
+        if sum(1 for e in entries if re.match(r'\s*\{\{\s*code\s*\|', e)) >= 2:
+            description = ''
+        elif _value_is_specific(_command_cell(params[1]).split()[1:]):
+            description = ''
+        else:
+            description = clean_wiki_description(cell, debug=debug) if cell else ''
         found.append((command, description))
 
     if debug and found:
         print(f"🔍 PCGamingWiki: Standard table yielded {len(found)} rows")
+    return found
+
+
+# The THIRD way PCGamingWiki writes launch options: a raw MediaWiki table.
+#
+#     ===[[Glossary:Command line arguments|Command line arguments]]===
+#     {| class="wikitable"
+#     ! Command !! Result
+#     |-
+#     | -nospeedtree || Disables SpeedTree.
+#     |-
+#     | -freq x OR -refresh x || Sets refresh rate / frequency.
+#
+# Same value as the {{Standard table}} form — the second cell is a description
+# an editor wrote — and just as invisible to the rest of the parser, which
+# reads the template in phase 0 and needs <code> markup or prose after that.
+# Measured on the pages this repo has cached: Tunnel Rats documents 14 flags
+# this way and we stored nine of them, undescribed, from prose.
+#
+# Scoped to the launch-options section like the template reader, and further
+# required to LOOK like a launch-option table: at least two rows whose first
+# cell opens with a flag. A page's other tables — save locations, API support,
+# middleware, system requirements — cannot satisfy that.
+_TABLE_ROW_SEPARATOR = re.compile(r'^\s*\|-.*$', re.MULTILINE)
+# "-nod3d9ex or -disable_d3d9ex", "-freq x OR -refresh x", "-a, -b".
+_CELL_ALTERNATIVES = re.compile(r'\s+or\s+|\s*,\s*', re.IGNORECASE)
+
+
+def _iter_pipe_tables(text):
+    """Each {| ... |} block, brace-balanced so a nested table cannot truncate one."""
+    i = 0
+    while True:
+        i = text.find('{|', i)
+        if i < 0:
+            return
+        depth, j = 0, i
+        while j < len(text):
+            if text.startswith('{|', j):
+                depth += 1
+                j += 2
+            elif text.startswith('|}', j):
+                depth -= 1
+                j += 2
+                if depth == 0:
+                    break
+            else:
+                j += 1
+        else:
+            return  # unbalanced tail; stop rather than guess
+        yield text[i:j]
+        i = j
+
+
+def _pipe_table_rows(body):
+    """(first cell, second cell) for each data row, however the row is written."""
+    rows = []
+    for chunk in _TABLE_ROW_SEPARATOR.split(body):
+        cells = []
+        for line in chunk.split('\n'):
+            line = line.strip()
+            # '!' is a header row, '|+' a caption, '{|' and '|}' the table itself.
+            if not line.startswith('|') or line.startswith(('|}', '|+')):
+                continue
+            cells.extend(line[1:].split('||'))
+        if len(cells) >= 2:
+            rows.append((cells[0], cells[1]))
+    return rows
+
+
+def _cell_flags(cell):
+    """
+    The flags a command cell documents, or [] when it documents none.
+
+    Alternatives are separated ("-freq x OR -refresh x" is two flags, each
+    doing what the row says). Flags written side by side are NOT: "-windowed
+    -w # -h $ -noborder" says what that combination does together, which is not
+    what any one of them does alone. Same judgement as _fixbox_flags.
+    """
+    text = _plain(cell).strip()
+    if not text.startswith(('-', '+')):
+        return []
+    flags = []
+    for part in _CELL_ALTERNATIVES.split(text):
+        tokens = part.split()
+        if not tokens or not tokens[0].startswith(('-', '+')):
+            return []
+        # A value placeholder may follow the flag ("-xres [number]", "-heapsize
+        # #", "-resolution X Y"); another flag may not.
+        if any(token.startswith(('-', '+')) for token in tokens[1:]):
+            return []
+        if not _is_plausible_launch_option(tokens[0]):
+            return []
+        flags.append(tokens[0])
+    return flags
+
+
+def _options_from_pipe_table(wikitext, debug=False):
+    """(command, description) pairs from a raw table in the launch-options section."""
+    section = _launch_options_section(wikitext)
+    if not section:
+        return []
+
+    found = []
+    for body in _iter_pipe_tables(section):
+        rows = [(cell, description) for cell, description in _pipe_table_rows(body)
+                if _cell_flags(cell)]
+        if len(rows) < 2:
+            continue
+        for cell, description_cell in rows:
+            description = clean_wiki_description(description_cell, debug=debug)
+            if any(_value_is_specific(part.split()[1:])
+                   for part in _CELL_ALTERNATIVES.split(_command_cell(cell))):
+                description = ''
+            for flag in _cell_flags(cell):
+                found.append((flag, description))
+
+    if debug and found:
+        print(f"🔍 PCGamingWiki: Pipe table yielded {len(found)} rows")
     return found
 
 
@@ -956,6 +1222,16 @@ def _options_from_standard_table(wikitext, debug=False):
 # the steps rather than the notes, it OPENS its code tag with at most a number
 # or placeholder after it, and no step downloads, installs, copies or edits
 # anything else.
+#
+# That was still a list of things a step may not do, and the next reheal found
+# two more it did not name:
+#   - -nohomedir got "Fixing the game shortcut" — a fix that REMOVES the flag
+#   - -widescreen got "Manually patch 16:9 resolutions" — a hex edit whose last
+#     step launches with the flag
+# So every step is now held to what it MAY do instead: carry the flag, or be
+# part of getting it into Steam's launch options or a shortcut (right-click,
+# Properties, close and relaunch). Anything else makes the box a larger fix
+# the flag is one ingredient of.
 _FLAG_IN_CODE = re.compile(r'<(code|tt|kbd)>([^<]{1,80})</\1>')
 _METHOD_VERB = re.compile(
     r'^(?:use|install|download|edit|apply|modify|delete|rename|replace|create|'
@@ -965,9 +1241,19 @@ _ALTERNATIVE_GAP = re.compile(r'^\s*(?:,|/|or|,\s*or)?\s*$', re.IGNORECASE)
 _FIX_NOTES = re.compile(r"'''\s*Notes?\s*'''", re.IGNORECASE)
 # A step that does something other than pass an argument.
 _OTHER_ACTION = re.compile(
-    r'\b(?:download|install|copy|extract|delete|rename|replace|edit|modify|'
+    r'\b(?:download|install|copy|extract|delete|remove|rename|replace|edit|modify|'
     r'registry|environment variable|make a folder|create a folder)\b|\{\{\s*p\s*\|',
     re.IGNORECASE)
+# The steps a box may have besides the one carrying the flag.
+_LAUNCH_STEP = re.compile(
+    r'\bright[\s-]?click|\bproperties\b|\blibrary\b|\bgeneral\s+tab\b'
+    r'|\blaunch\s+options?\b|\bcommand[\s-]*line\s+(?:arguments?|parameters?)\b'
+    r'|\b(?:press|click)\s+ok\b|\bclose\b|\brelaunch\b|\brestart\b'
+    r'|\b(?:launch|run|start|play)\s+(?:the\s+)?game\b'
+    r'|\bwhen\s+(?:the\s+)?game\s+(?:is\s+)?(?:launched|started|run)\b',
+    re.IGNORECASE)
+# A caveat line inside the steps ({{ii}}, {{--}}, {{++}}), not a step.
+_NOTE_LINE = re.compile(r'^\s*\{\{\s*(?:ii|--|\+\+|mm)\s*\}\}', re.IGNORECASE)
 # What may follow the flag in its code tag: a number, or a placeholder for one.
 _PLAIN_VALUE = re.compile(r'^(?:\d+(?:\.\d+)?|#|X+(?:\.\d+)?|<[^>]+>)$', re.IGNORECASE)
 # Feature subsections only. A level-2 heading ("==Video==") names a whole
@@ -978,6 +1264,7 @@ _SUBSECTION_HEADING = re.compile(r'^===+[^=\n]+=+\s*$', re.MULTILINE)
 def _plain(text):
     """Wikitext to readable text, keeping link labels ([[A|B]] -> B)."""
     text = re.sub(r'<ref[^>]*>.*?</ref>|<ref[^>]*/>', '', text or '', flags=re.DOTALL)
+    text = _render_inline_templates(text)
     text = re.sub(r'\[\[(?:[^\]|]*\|)?([^\]]*)\]\]', r'\1', text)
     text = re.sub(r'\[https?://\S+\s+([^\]]*)\]', r'\1', text)
     text = re.sub(r"\{\{[^{}]*\}\}|<[^>]+>|'{2,}", '', text)
@@ -994,6 +1281,15 @@ def _fixbox_flags(fix_text):
     steps = _FIX_NOTES.split(fix_text, 1)[0]
     if _OTHER_ACTION.search(steps):
         return None
+    for line in steps.splitlines():
+        if _NOTE_LINE.match(line):
+            continue
+        if any(t.startswith(('-', '+')) for m in _FLAG_IN_CODE.finditer(line)
+               for t in m.group(2).split()):
+            continue
+        text = _plain(re.sub(r'^[\s#*:;]+', '', line))
+        if text and not _LAUNCH_STEP.search(text):
+            return None
 
     spans = []
     for m in _FLAG_IN_CODE.finditer(steps):
@@ -1004,6 +1300,10 @@ def _fixbox_flags(fix_text):
             continue
         if len(tokens) == 1 and (parts[0] != tokens[0] or len(parts) > 2
                                  or not all(_PLAIN_VALUE.match(p) for p in parts[1:])):
+            return None
+        # "-watchdog 0": the box's purpose is what THAT value does, and the
+        # command column will hold the bare flag. See _value_is_specific.
+        if _value_is_specific(parts[1:]):
             return None
         spans.append((m.start(), m.end(), tokens))
 
@@ -1070,6 +1370,60 @@ def _options_from_fixboxes(wikitext, debug=False):
     return found
 
 
+def structured_flag_commands(wikitext, debug=False):
+    """
+    The flags a page presents AS flags, lowercased.
+
+    Phase 3 of the parser below reads prose near a "command line" heading, and
+    that is the loosest thing it does: a config-file fragment on the SimCity 4
+    page (`partialRule "Fast card" -any`) became a published option that way.
+    For an ordinary scrape that risk is bounded — the game was already being
+    read, and a human sees the diff. For a sweep over hundreds of games that
+    were never scraped this way it is not, so the backfill links only what this
+    returns:
+
+      * a row of the page's launch-options table, in either syntax
+      * a flag a {{Fixbox}} documents, under the guards in _fixbox_flags
+      * a flag that OPENS a <code>/<tt>/<kbd> span or a {{code|...}} template
+
+    The last one is the distinction that matters. `<code>-nomovies</code>` is
+    the page calling `-nomovies` a flag; `<code>partialRule "Fast card"
+    -any</code>` is the page quoting a line of a config file that happens to
+    contain a dash.
+    """
+    found = set()
+
+    for command, _ in _options_from_standard_table(wikitext, debug=debug):
+        found.add(command.strip().lower())
+
+    for command, _ in _options_from_pipe_table(wikitext, debug=debug):
+        found.add(command.strip().lower())
+
+    for command, _ in _options_from_fixboxes(wikitext, debug=debug):
+        found.add(command.strip().lower())
+
+    spans = [match.group(1) for tag in ('code', 'tt', 'kbd')
+             for match in re.finditer(rf'<{tag}>([^<]{{1,80}})</{tag}>', wikitext)]
+    # {{code|-console}} is the template spelling of the same thing, and pages
+    # use it just as often — Half-Life documents -console and -nosierra that
+    # way. The "opens the span" rule still applies, which is what keeps
+    # +gl_overbright out: its span opens with MESA_EXTENSION_OVERRIDE=, because
+    # the page is quoting a whole Wine command line, not naming a flag.
+    spans += [match.group(1) for match in _CODE_TEMPLATE.finditer(wikitext)]
+
+    for span in spans:
+        span = span.strip()
+        if not span.startswith(('-', '+')):
+            continue
+        for token in span.split():
+            if token.startswith(('-', '+')) and _is_plausible_launch_option(token):
+                found.add(token.lower())
+
+    if debug:
+        print(f"🔍 PCGamingWiki: {len(found)} flags in structured markup")
+    return found
+
+
 def parse_wikitext_for_launch_options_strict(wikitext, debug=False):
     """
     Parse MediaWiki wikitext for launch options.
@@ -1097,15 +1451,30 @@ def parse_wikitext_for_launch_options_strict(wikitext, debug=False):
     # Anchored so a match can't start mid-word: prose like "free-to-play" or
     # URL slugs like "team-fortress-2" produced junk matches (-to-play, -fortress-2)
     # when the leading '-' was preceded by a word character.
+    #
+    # Anchored at the end too, so a flag longer than the cap is skipped rather
+    # than cut. Unanchored, Helheim Hassle's table flag
+    # -merrychristmashohofatherchristmassayhello — refused by the save gate's
+    # length limit in phase 0a — was picked up again here as
+    # -merrychristmashohofatherchristm and published with the table's
+    # description: a flag that does nothing, presented as documented.
     launch_option_patterns = [
-        r'(?<![\w\-])(-[a-zA-Z][a-zA-Z0-9_\-]{1,30}(?:\s+[^\s<\|]{1,20})?)',
-        r'(?<![\w\-])(\+[a-zA-Z][a-zA-Z0-9_\-]{1,30}(?:\s+[^\s<\|]{1,20})?)',
+        r'(?<![\w\-])(-[a-zA-Z][a-zA-Z0-9_\-]{1,30}(?![\w\-])(?:\s+[^\s<\|]{1,20})?)',
+        r'(?<![\w\-])(\+[a-zA-Z][a-zA-Z0-9_\-]{1,30}(?![\w\-])(?:\s+[^\s<\|]{1,20})?)',
     ]
 
     # Phase 0: the structured launch-options table, read before anything
     # strips it. It runs first so its editor-written description wins over the
     # weaker text the later phases infer from surrounding prose.
     for cmd, desc in _options_from_standard_table(wikitext, debug=debug):
+        if _is_plausible_launch_option(cmd):
+            _add_option(cmd, desc)
+
+    # Phase 0a: the same table written as raw wiki markup rather than as the
+    # template. Read here, beside its sibling, and for the same reason: the
+    # description in the second cell is an editor's, and the later phases would
+    # claim the flag first with whatever prose surrounds it.
+    for cmd, desc in _options_from_pipe_table(wikitext, debug=debug):
         if _is_plausible_launch_option(cmd):
             _add_option(cmd, desc)
 
@@ -1127,9 +1496,20 @@ def parse_wikitext_for_launch_options_strict(wikitext, debug=False):
             context_end = min(len(wikitext), match.end() + 300)
             context = wikitext[context_start:context_end]
             # A single code tag can hold several options (e.g. "-window -noborder")
-            for token in candidate.split():
+            tokens = candidate.split()
+            for index, token in enumerate(tokens):
                 if token.startswith(('-', '+')) and _is_plausible_launch_option(token):
-                    desc = extract_description_from_context_safe(token, context)
+                    values = []
+                    for following in tokens[index + 1:]:
+                        if following.startswith(('-', '+')):
+                            break
+                        values.append(following)
+                    # The prose around "<code>--display 1080p</code>" is about
+                    # 1080p, not about --display. See _value_is_specific.
+                    if _value_is_specific(values):
+                        desc = 'Launch option from PCGamingWiki'
+                    else:
+                        desc = extract_description_from_context_safe(token, context)
                     _add_option(token, desc)
 
     # Phase 2: scan inside template blocks before they are stripped

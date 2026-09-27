@@ -251,8 +251,10 @@ def extract_options_from_reports(reports, debug=False):
 
     env_var_pattern = re.compile(r'\b((?:PROTON|DXVK|VKD3D|WINE|MANGOHUD|PULSE)[A-Z0-9_]*)=([^\s\'"`]{1,60})')
     wrapper_pattern = re.compile(r'\b(gamemoderun|gamemode|mangohud)\b')
-    # Anchored: must not continue a word ("90fps-ish" must not yield "-ish")
-    flag_pattern = re.compile(r'(?<![\w\-])(-[a-zA-Z][a-zA-Z0-9_\-]{2,30})\b')
+    # Anchored: must not continue a word ("90fps-ish" must not yield "-ish").
+    # Anchored at the end as well: \b let a flag over the cap be cut at an
+    # inner hyphen and recorded as a shorter flag that does not exist.
+    flag_pattern = re.compile(r'(?<![\w\-])(-[a-zA-Z][a-zA-Z0-9_\-]{1,29}[a-zA-Z0-9_])(?![\w\-])')
 
     # command -> {'count', 'high_signal'}
     found = {}

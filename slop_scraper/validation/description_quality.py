@@ -128,7 +128,12 @@ _TRAILING_LIST_INDEX = re.compile(r'[)\].]\s+\d{1,3}\s*$')
 # particles to 512 (minimum)". A leading bare number followed by a word is the
 # value that belongs on the command, not the start of a definition.
 # "1080p" and "16:9" are unaffected — both need whitespace after the digits.
-_LEADS_WITH_VALUE = re.compile(r'^\d+(?:\s*[\(\[]|\s+(?=[A-Za-z]))')
+# The same split with a placeholder instead of a number: Unity's manual
+# documents "-monitor N | Run Standalone Player on the specified monitor", and
+# a guide quoting it left -monitor described as "N Run Standalone Player ...".
+_LEADS_WITH_VALUE = re.compile(
+    r'^\d+(?:\s*[\(\[]|\s+(?=[A-Za-z]))'
+    r'|^[NXY#]\s+(?=[A-Z][a-z])')
 
 # The text says the option does not do anything. Whatever that is, it is not a
 # description of what the flag does, and an option documented as broken has no
@@ -146,8 +151,10 @@ _SELF_NEGATING = re.compile(
 # were published this way — "Use an argument", "Add parameters", "Use
 # command-line parameter", "Set launch options", "Use command line parameter
 # set" — each where the page's section heading said what the flag was for.
+# The verb is optional: Valheim's page titles a box just "Command line
+# parameter", which says exactly as little.
 _GENERIC_METHOD = re.compile(
-    r'^(?:use|add|set|try|apply|enter|type|edit)\s+(?:an?\s+|the\s+)?'
+    r'^(?:(?:use|add|set|try|apply|enter|type|edit)\s+)?(?:an?\s+|the\s+)?'
     r'(?:following\s+)?(?:steam\s+|custom\s+)?'
     r'(?:command[\s-]*line\s+|launch\s+|startup\s+)?'
     r'(?:argument|parameter|option|flag)s?(?:\s+set)?\.?$',
@@ -212,6 +219,45 @@ _PLATFORM_LIST = re.compile(
 # Text before a mention that makes it an illustration rather than an
 # instruction — "(e.g. DXVK_HUD=fps)".
 _EXAMPLE_LEAD = re.compile(r'(?:\(|e\.g\.?,?|i\.e\.?,?|for example,?)\s*$', re.IGNORECASE)
+
+# A hole where an inline template was stripped. PCGamingWiki writes key names
+# as {{key|F11}}, and removing the template left a sentence that still parses:
+# "Press to bring up the editor", "Toggle profile with , and see",
+# "Enables for taking screen shots", "(toggled with )". Each was published.
+_TEMPLATE_HOLE = re.compile(
+    r'\(\s*\)|\b(?:press|hold|with)\s+(?:to\b|[,.)])|\b(?:enables|disables)\s+for\b',
+    re.IGNORECASE)
+
+# Two entries run together with the break between them lost: a table cell that
+# documents each value on its own line, flattened — "Enables a simple FPS
+# counter at the top-right of the screen Enables a large debug graph ...".
+# The second clause is about a different value, so the whole is not a
+# description of the flag.
+_RUN_ON_REPEAT = re.compile(r'^([A-Z][a-z]+\s+\w+)\b.*?[a-z0-9]\s+\1\b')
+
+# A guide's table header scraped as the start of the first row:
+# "Commands Description Forces VRChat to launch in desktop mode ...".
+_TABLE_HEADER = re.compile(
+    r'^(?:commands?|parameters?|arguments?|options?|flags?)\s+(?:and\s+)?descriptions?\b',
+    re.IGNORECASE)
+
+# A guide author talking to the reader rather than documenting anything.
+_GUIDE_CHATTER = re.compile(
+    r'\bthanks?\s+(?:you\s+)?for\s+reading\b|\bcopy\s+(?:and|&)\s+paste\s+this\b',
+    re.IGNORECASE)
+
+# Ends by pointing at something the reader cannot see: "Run the game at 30 FPS
+# instead of 60 FPS using one of these solutions" — the solutions were the
+# rest of the wiki box.
+_DANGLING_REFERENCE = re.compile(
+    r'\b(?:one\s+of\s+)?(?:these|the\s+following|the\s+below)'
+    r'(?:\s+(?:solutions|methods|steps|options|fixes|ways))?\s*:?\s*$',
+    re.IGNORECASE)
+
+# Stops mid-clause: "Restricts the amount of available memory the game can".
+# The page said "can use." — the cleaner trimmed "use" as a dangling word.
+_ENDS_MID_CLAUSE = re.compile(
+    r'\b(?:can|could|will|would|should|must|may|might|to|the|an?)\.?\s*$', re.IGNORECASE)
 
 
 def _names_itself_mid_sentence(command: str, description: str) -> bool:
@@ -297,6 +343,24 @@ def is_junk_description(command: str, description: Optional[str]) -> Tuple[bool,
 
     if _PLATFORM_LIST.match(raw):
         return True, 'a platform list, not a description'
+
+    if _TEMPLATE_HOLE.search(raw):
+        return True, 'a stripped template left a hole in the sentence'
+
+    if _RUN_ON_REPEAT.match(raw):
+        return True, 'two entries run together'
+
+    if _TABLE_HEADER.match(raw):
+        return True, 'starts with a table header'
+
+    if _GUIDE_CHATTER.search(raw):
+        return True, "a guide author's aside, not a description"
+
+    if _DANGLING_REFERENCE.search(raw):
+        return True, 'points at text that is not there'
+
+    if _ENDS_MID_CLAUSE.search(raw):
+        return True, 'cut off mid-clause'
 
     # Wiki list markers introduce instruction steps, except when the marker
     # precedes a real definition whose command was stripped off the front.
