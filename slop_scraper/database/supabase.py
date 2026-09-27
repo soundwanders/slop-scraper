@@ -903,7 +903,8 @@ def _touch_launch_option_verification(supabase, option_id: int, option: dict, ex
         pass
 
 
-def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
+def _get_or_create_launch_option(supabase, option: dict, found: Optional[dict] = None,
+                                 veto=None) -> Optional[int]:
     """
     Return the id for a launch option, inserting it only if it doesn't exist.
 
@@ -952,7 +953,16 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
 
         if existing.data:
             option_id = existing.data[0]['id']
+            # Judged BEFORE the row is touched: a source that may not link this
+            # flag to this game must not stamp or fill the shared row either.
+            refusal = veto(existing.data[0]) if veto else None
+            if refusal:
+                if found is not None:
+                    found['refused'] = refusal
+                return None
             _touch_launch_option_verification(supabase, option_id, option, existing.data[0])
+            if found is not None:
+                found['row'] = existing.data[0]
             return option_id
     except Exception:
         # source_url column may not exist yet (migration 002 not run) — retry
@@ -1076,6 +1086,93 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     return None
 
 
+_GAME_TEXT_FIELDS = ('title', 'developer', 'publisher', 'release_date')
+_NO_ENGINE = ('', 'unknown', 'none', 'null')
+
+
+def _stored_game(supabase, app_id) -> tuple:
+    """
+    (stored games row or None, whether that answer can be trusted).
+
+    (None, True) means the game is new. (None, False) means the read failed,
+    and the caller must write as if a good row might exist.
+    """
+    try:
+        rows = (supabase.table("games")
+                .select("app_id, title, developer, publisher, release_date, "
+                        "engine, engine_detail, engine_source")
+                .eq("app_id", app_id).limit(1).execute().data) or []
+        return (rows[0] if rows else None), True
+    except Exception:
+        return None, False
+
+
+def _game_row_changes(stored: Optional[dict], proposed: dict, engine_known: bool = True) -> dict:
+    """
+    The fields to write for one game — only ever moving it forward.
+
+    A rescan builds its game from the stored row and so re-proposes it. That is
+    how 449 games lost engine_detail: the rescan record carried engine and
+    engine_source but no detail, and the upsert wrote the missing detail as
+    NULL over "id Tech 5", "Unreal Engine 3" and the rest. The rules now:
+
+      text fields  written only when non-empty; a blank never replaces a value.
+      engine       'Unknown' is written only for a new game. A named engine is
+                   written only with a source, and only where nothing is known,
+                   or where it is the same engine with a better-ranked source
+                   (utils/engine_precedence.py). A different engine is never
+                   written here: resolve_engine decides that upstream, and a
+                   disagreement is declined, not guessed.
+      detail       travels with its engine, and fills a missing one; never
+                   written as NULL.
+
+    For a new game (stored None) this is simply the non-empty proposal.
+    """
+    try:
+        from ..utils.engine_precedence import ENGINE_SOURCE_RANK
+    except ImportError:
+        from utils.engine_precedence import ENGINE_SOURCE_RANK
+
+    def rank(source):
+        return ENGINE_SOURCE_RANK.get((source or '').strip().lower(), 0)
+
+    changes = {}
+    if stored is None:
+        changes['app_id'] = proposed['app_id']
+    for key in _GAME_TEXT_FIELDS:
+        value = proposed.get(key)
+        if isinstance(value, str):
+            value = value.strip()
+        if value and (stored is None or stored.get(key) != value):
+            changes[key] = value
+
+    if 'engine' not in proposed or not engine_known:
+        return changes
+
+    new_engine = (proposed.get('engine') or '').strip()
+    new_source = proposed.get('engine_source')
+    new_detail = proposed.get('engine_detail')
+    old_engine = ((stored or {}).get('engine') or '').strip()
+
+    if new_engine.lower() in _NO_ENGINE:
+        if stored is None:
+            changes['engine'] = 'Unknown'
+        return changes
+    if not new_source:
+        return changes          # no provenance: never written (see save_to_database)
+
+    if stored is None or old_engine.lower() in _NO_ENGINE:
+        changes.update({'engine': new_engine, 'engine_source': new_source})
+        if new_detail:
+            changes['engine_detail'] = new_detail
+    elif old_engine == new_engine:
+        if rank(new_source) > rank(stored.get('engine_source')):
+            changes['engine_source'] = new_source
+        if new_detail and not stored.get('engine_detail'):
+            changes['engine_detail'] = new_detail
+    return changes
+
+
 def save_to_database(game, options, supabase):
     """
     Save game and launch options to Supabase.
@@ -1107,7 +1204,9 @@ def save_to_database(game, options, supabase):
             from utils.dates import normalize_release_date
             from utils.text import clean_text
 
-        # Upsert game metadata (safe: Steam API data is authoritative for name/developer/etc.)
+        # Candidate metadata. What is actually written is decided by
+        # _game_row_changes against the stored row: nothing here may blank a
+        # stored value or replace a better-sourced engine.
         game_data = {
             "app_id": game['appid'],
             # Steam names arrive padded — trailing spaces and invisible
@@ -1156,12 +1255,23 @@ def save_to_database(game, options, supabase):
             # clobbered by this save either.
             pass
 
-        res = supabase.table("games").upsert(
-            game_data,
-            on_conflict="app_id"
-        ).execute()
+        stored_game, stored_known = _stored_game(supabase, game['appid'])
+        res = None
+        if stored_game is not None:
+            changes = _game_row_changes(stored_game, game_data)
+            if changes:
+                res = (supabase.table("games").update(changes)
+                       .eq("app_id", game['appid']).execute())
+        else:
+            # A new game — or an unreadable one, in which case only non-empty
+            # text is sent and the engine is left alone rather than risk
+            # replacing a better one we could not see.
+            res = supabase.table("games").upsert(
+                _game_row_changes(None, game_data, engine_known=stored_known),
+                on_conflict="app_id"
+            ).execute()
 
-        if hasattr(res, 'error') and res.error:
+        if res is not None and hasattr(res, 'error') and res.error:
             print(f"⚠️ Error saving game {game['name']}: {res.error}")
             return
 
@@ -1170,10 +1280,42 @@ def save_to_database(game, options, supabase):
         success_count = 0
         error_count = 0
         existing_links, link_columns = _links_for_game(supabase, game['appid'])
+        try:
+            from ..scrapers.game_specific import _option_family
+            from ..validation.link_guard import link_refusal
+        except ImportError:
+            from scrapers.game_specific import _option_family
+            from validation.link_guard import link_refusal
+        # Links are judged against the engine the row actually holds after this
+        # save, never an unsourced guess that was deliberately not written.
+        if stored_game is not None:
+            effective_engine = changes.get('engine') or stored_game.get('engine')
+        else:
+            effective_engine = game_data.get('engine') if game_data.get('engine_source') else None
+        game_family = _option_family(effective_engine)
+
+        def veto(row, command):
+            # An existing link is refreshed, not re-judged.
+            if row.get('id') in existing_links:
+                return None
+            return link_refusal(command, row.get('source'), game_family, game['appid'])
 
         for option in meaningful:
             try:
-                option_id = _get_or_create_launch_option(supabase, option)
+                # The stored row's source decides its engine family: a flag
+                # found in a guide binds to the row an engine block created. A
+                # new row takes this option's own source.
+                refusal = veto({'source': option.get('source')}, option['command'])
+                found = {}
+                option_id = None
+                if not refusal:
+                    option_id = _get_or_create_launch_option(
+                        supabase, option, found,
+                        veto=lambda row, command=option['command']: veto(row, command))
+                    refusal = found.get('refused')
+                if refusal:
+                    print(f"🚫 Not linking '{option['command']}' to {game['name']}: {refusal}")
+                    continue
 
                 if option_id is None:
                     print(f"⚠️ Could not get/create option '{option['command']}'")
