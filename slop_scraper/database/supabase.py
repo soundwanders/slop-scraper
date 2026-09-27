@@ -711,18 +711,49 @@ def _touch_launch_option_verification(supabase, option_id: int, option: dict, ex
     import datetime
 
     source = option.get('source', 'Unknown')
-    update_fields = {
-        "last_verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "verification_method": _verification_method_for_source(source),
-    }
+    update_fields = {}
+
+    # Freshness is claimed only for a LIVE re-read.
+    #
+    # The site renders last_verified_at as "Last checked <date>", titled "Last
+    # re-checked against its source". That is true when a scraper just fetched
+    # a page and found the option on it. It is not true when game_specific.py
+    # re-emits a flag from its hardcoded engine list — nothing was fetched, and
+    # this used to stamp today's date anyway. -force-low-power-device, shown on
+    # 1,126 game pages, read "Last checked Sep 13" because a discovery run
+    # re-emitted the Unity block that day; nobody re-read Unity's manual.
+    #
+    # It also overwrote verification_method, so a row genuinely re-confirmed on
+    # a wiki page could be relabelled 'curated' by the next static re-emission.
+    # Static sources now leave both columns as they are.
+    if source in _SCRAPED_VERIFICATION_METHODS:
+        update_fields["last_verified_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        update_fields["verification_method"] = _SCRAPED_VERIFICATION_METHODS[source]
 
     if option.get('source_url') and not existing.get('source_url'):
         update_fields["source_url"] = option['source_url']
+        # The label was chosen while the row had no citation to check it
+        # against. Now it has one, so it meets the insert path's rule: a vendor
+        # name stays only if the URL is that vendor's. -benchmark kept "Epic
+        # Games Documentation" for weeks after gaining a PCGamingWiki URL here.
+        # Demote-only, as on insert.
+        try:
+            from ..validation import honest_source
+        except ImportError:
+            from validation import honest_source
+        label = existing.get('source')
+        if label:
+            demoted = honest_source(label, option['source_url'])
+            if demoted and demoted != label:
+                update_fields["source"] = demoted
 
     if not (existing.get('description') or '').strip():
         fresh_description = _vetted_description(option)
         if fresh_description:
             update_fields["description"] = fresh_description
+
+    if not update_fields:
+        return
 
     try:
         supabase.table("launch_options").update(update_fields).eq("id", option_id).execute()
@@ -775,7 +806,7 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
 
     # 1. Try to find an existing record first
     try:
-        existing = _find("id, command, source_url, description")
+        existing = _find("id, command, source_url, description, source")
 
         if existing.data:
             option_id = existing.data[0]['id']
@@ -843,7 +874,11 @@ def _get_or_create_launch_option(supabase, option: dict) -> Optional[int]:
     }
     verification_fields = {
         "source_url": source_url,
-        "last_verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        # A date only when a live page was just read; see
+        # _touch_launch_option_verification. The method is always recorded,
+        # so a static-list row still names how it got here and stays published.
+        "last_verified_at": (datetime.datetime.now(datetime.timezone.utc).isoformat()
+                             if source in _SCRAPED_VERIFICATION_METHODS else None),
         "verification_method": _verification_method_for_source(source),
     }
 
