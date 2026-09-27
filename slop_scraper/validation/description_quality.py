@@ -92,6 +92,16 @@ _NON_ANSWERS = {
 }
 
 
+# A PCGamingWiki fix box titled only as a fix: F.E.A.R. 3's -d3d9 was
+# published as "Possible solutions", the title of a box listing it beside a
+# driver update. Says nothing about any flag.
+_FIX_TITLE = re.compile(
+    r'^(?:possible|other|alternative|general|known|suggested)?\s*'
+    r'(?:solutions?|fix(?:es)?|workarounds?)\.?$',
+    re.IGNORECASE
+)
+
+
 def is_placeholder_description(text: Optional[str]) -> bool:
     """True for a scraper's own generic filler (never overwrite NULL with it)."""
     return (text or '').strip().rstrip('.').lower() in PLACEHOLDER_DESCRIPTIONS
@@ -274,6 +284,13 @@ def _names_itself_mid_sentence(command: str, description: str) -> bool:
     if not command:
         return False
     pattern = r'(?<![\w\-+])' + re.escape(command) + r'(?![\w\-])'
+    # A console-style name is also written without its sigil: DOOM's
+    # +jobs_numThreads was published as "Use jobs_numthreads X in the in-game
+    # console". Only for names with an underscore — an identifier no sentence
+    # uses as a word, unlike "windowed" in "Runs the game windowed".
+    bare = command.lstrip('+-')
+    if command[:1] in '+-' and '_' in bare:
+        pattern = (r'(?i)(?<![\w\-+])[+\-]?' + re.escape(bare) + r'(?![\w\-])')
     for m in re.finditer(pattern, description):
         if m.start() == 0:
             continue
@@ -316,6 +333,9 @@ def is_junk_description(command: str, description: Optional[str]) -> Tuple[bool,
 
     if raw.lower().rstrip('.') in _NON_ANSWERS:
         return True, 'non-answer'
+
+    if _FIX_TITLE.match(raw):
+        return True, "a fix box's title, not what the flag does"
 
     if _is_circular(command, raw):
         return True, 'circular — restates the command'
