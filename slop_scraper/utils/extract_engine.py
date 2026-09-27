@@ -454,68 +454,20 @@ def extract_engine_with_provenance(game_info: Dict, app_id: int = None):
 # Batch processing function for updating existing database
 def update_unknown_engines_batch(supabase_client, limit: int = 100):
     """
-    Batch update games with 'Unknown' engines in the database
+    Retired: refuses to run.
+
+    It wrote games.engine from keyword detection over title, developer and
+    publisher, with no engine_source — the inference that labelled EA's Peggle
+    "Frostbite" and every counter-strike title "Source". An engine decides which
+    engine-specific flags a game is given, so an unsourced guess is worse than
+    'Unknown'. Engines are learned from PCGamingWiki pages through
+    utils/engine_precedence.resolve_engine, which records where each came from.
+    Kept only so existing imports do not break.
     """
-    try:
-        # Get games with Unknown engines
-        response = supabase_client.table("games")\
-            .select("app_id, title, developer, publisher")\
-            .eq("engine", "Unknown")\
-            .limit(limit)\
-            .execute()
-        
-        if not response.data:
-            print("No games with Unknown engines found")
-            return
-        
-        detector = EngineDetector()
-        updated_count = 0
-        
-        print(f"Processing {len(response.data)} games with Unknown engines...")
-        
-        for game in response.data:
-            app_id = game['app_id']
-            title = game['title']
-            
-            print(f"Processing: {title} (App ID: {app_id})")
-            
-            # Create game_info dict from database data
-            game_info = {
-                'name': title,
-                'developers': [game['developer']] if game['developer'] else [],
-                'publishers': [game['publisher']] if game['publisher'] else []
-            }
-            
-            # Try to get fresh Steam API data
-            fresh_engine = get_fresh_steam_data_engine(app_id)
-            if fresh_engine != 'Unknown':
-                detected_engine = fresh_engine
-            else:
-                # Use  detection on existing data
-                detected_engine = detector.detect_engine_comprehensive(game_info, app_id)
-            
-            if detected_engine != 'Unknown':
-                # Update database
-                update_response = supabase_client.table("games")\
-                    .update({"engine": detected_engine})\
-                    .eq("app_id", app_id)\
-                    .execute()
-                
-                if update_response.data:
-                    print(f"  ✅ Updated to: {detected_engine}")
-                    updated_count += 1
-                else:
-                    print(f"  ❌ Failed to update database")
-            else:
-                print(f"  ⚠️ Still unknown")
-            
-            # Rate limiting
-            time.sleep(0.5)
-        
-        print(f"\n📊 Updated {updated_count}/{len(response.data)} games")
-        
-    except Exception as e:
-        print(f"Error in batch update: {e}")
+    print("⚠️ update_unknown_engines_batch is retired: it wrote engines with no source. "
+          "Engines are learned from wiki pages during scrapes and backfills instead.")
+    return 0
+
 
 def get_fresh_steam_data_engine(app_id: int) -> str:
     """Get fresh engine data from Steam API"""
