@@ -734,6 +734,29 @@ def authority_source(command: str) -> Optional[str]:
     return match[1] if match else None
 
 
+# JVM options are the one place letter case carries meaning (-Xmx4G is a heap
+# size, -xmx4g is nothing), matching database/supabase.py's rule.
+_CASE_SENSITIVE = re.compile(r'^-(Xm[sx]|XX:|D[a-z]+\.)', re.ASCII)
+_LOWER_KEYS = None
+
+
+def _entry_key(candidate: str) -> Optional[str]:
+    """
+    The dictionary key for this exact flag, matched the way the save path
+    matches commands: exactly, then ignoring case. A page writing -DX11 binds
+    to the stored -dx11 row, and has to find -dx11's entry too, or the row's
+    documented text is treated as missing.
+    """
+    global _LOWER_KEYS
+    if candidate in FLAG_DICTIONARY:
+        return candidate
+    if _CASE_SENSITIVE.match(candidate):
+        return None
+    if _LOWER_KEYS is None:
+        _LOWER_KEYS = {key.lower(): key for key in FLAG_DICTIONARY}
+    return _LOWER_KEYS.get(candidate.lower())
+
+
 def _dictionary_key(command: str) -> Optional[str]:
     """
     Match a stored command to a dictionary entry.
@@ -750,15 +773,16 @@ def _dictionary_key(command: str) -> Optional[str]:
     if not command:
         return None
     command = command.strip()
-    if command in FLAG_DICTIONARY:
-        return command
+    key = _entry_key(command)
+    if key:
+        return key
 
     # "-w 1920" -> "-w";  "+set r_customwidth 1920" -> "+set r_customwidth"
     parts = command.split(' ')
     for take in range(len(parts) - 1, 0, -1):
-        candidate = ' '.join(parts[:take])
-        if candidate in FLAG_DICTIONARY:
-            return candidate
+        key = _entry_key(' '.join(parts[:take]))
+        if key:
+            return key
 
     # "-ResX=1920" -> "-ResX";  "-malloc=system" -> "-malloc"
     #
@@ -768,11 +792,11 @@ def _dictionary_key(command: str) -> Optional[str]:
     # an entry describing PROTON_NO_ESYNC=1 says nothing true about =0.
     if '=' in command:
         candidate, value = command.split('=', 1)
-        entry = FLAG_DICTIONARY.get(candidate)
-        if entry is not None:
-            allowed = entry.get('documented_values')
+        key = _entry_key(candidate)
+        if key is not None:
+            allowed = FLAG_DICTIONARY[key].get('documented_values')
             if allowed is None or value in allowed:
-                return candidate
+                return key
 
     return None
 
