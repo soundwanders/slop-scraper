@@ -71,6 +71,12 @@ RESCAN_PROGRESS_FILE = state_path('rescan_progress.json')
 # 100 games that could not be resumed.
 RESCAN_PCGW_PROGRESS_FILE = state_path('rescan_pcgw_progress.json')
 FILL_GAPS_PROGRESS_FILE = state_path('fill_gaps_progress.json')
+RESCAN_SOURCES_PROGRESS_FILE = state_path('rescan_sources_progress.json')
+
+# Option sources that can only be re-read by scraping them again: a guide or a
+# report per game, with no bulk API. PCGamingWiki pages are re-read in bulk by
+# backfill_wiki_options.py --verify; engine blocks are static.
+COMMUNITY_SOURCES = ('Steam Community', 'Steam Community Guides', 'ProtonDB')
 
 # Games saved while PCGamingWiki returned an inconclusive empty result (site
 # outage/circuit breaker, not a confirmed "no options on wiki"). skip_existing
@@ -84,7 +90,7 @@ class SlopScraper:
                  rate_limit=None, force_refresh=False, max_games=100,
                  output_dir="./test-output", debug=False, skip_existing=True,
                  rescan=False, rescan_engines=False, pcgw_recheck=False,
-                 fill_gaps=False, rescan_pcgw=False):
+                 fill_gaps=False, rescan_pcgw=False, rescan_sources=False):
         
         # Add validation statistics tracking
         self.validation_stats = {
@@ -122,6 +128,10 @@ class SlopScraper:
         # Narrows the rescan pool to games already holding a PCGamingWiki
         # option — i.e. games known to have a wiki page. See _get_rescan_games.
         self.rescan_pcgw = rescan_pcgw
+        # Narrows the rescan pool to games holding a Steam Community or
+        # ProtonDB option, and runs only those two scrapers. See
+        # _get_rescan_games.
+        self.rescan_sources = rescan_sources
         self.pcgw_recheck = pcgw_recheck  # Re-scan only games flagged for a PCGamingWiki recheck
 
         # Security monitoring and rate limiting
@@ -230,6 +240,8 @@ class SlopScraper:
 
     def _progress_file(self):
         """The progress file belonging to this run's candidate pool."""
+        if self.rescan_sources:
+            return RESCAN_SOURCES_PROGRESS_FILE
         if self.rescan_pcgw:
             return RESCAN_PCGW_PROGRESS_FILE
         if self.fill_gaps:
@@ -263,6 +275,32 @@ class SlopScraper:
                 json.dump(data, f, indent=1)
         except Exception as e:
             print(f"⚠️ Could not update {path}: {e}")
+
+    def _games_holding_source_options(self, sources):
+        """{app_id: how many of its options come from these sources}."""
+        option_ids = set()
+        for source in sources:
+            start = 0
+            while True:
+                batch = (self.supabase.table('launch_options')
+                         .select('id, source').eq('source', source)
+                         .range(start, start + 999).execute().data) or []
+                option_ids.update(row['id'] for row in batch)
+                if len(batch) < 1000:
+                    break
+                start += 1000
+        counts, start = {}, 0
+        while True:
+            batch = (self.supabase.table('game_launch_options')
+                     .select('game_app_id, launch_option_id')
+                     .range(start, start + 999).execute().data) or []
+            for row in batch:
+                if row['launch_option_id'] in option_ids:
+                    counts[row['game_app_id']] = counts.get(row['game_app_id'], 0) + 1
+            if len(batch) < 1000:
+                break
+            start += 1000
+        return counts
 
     def _games_holding_pcgw_options(self):
         """App IDs holding at least one option whose source is PCGamingWiki."""
@@ -374,6 +412,18 @@ class SlopScraper:
                   f"hold an option sourced from a wiki page (richest first)")
             rows = eligible
 
+        if self.rescan_sources:
+            # Games holding an option only a scrape of Steam Community or
+            # ProtonDB can re-read. Most such links have no per-game evidence
+            # yet (migrations/009), and re-reading the guide or report that
+            # found them is the only way to record it. Most-affected first.
+            held = self._games_holding_source_options(COMMUNITY_SOURCES)
+            eligible = [r for r in rows if r['app_id'] in held]
+            eligible.sort(key=lambda r: -held[r['app_id']])
+            print(f"👥 Source re-check: {len(eligible)} of {len(rows)} games hold an option "
+                  f"from Steam Community or ProtonDB")
+            rows = eligible
+
         if self.fill_gaps:
             # Games already judged worth keeping that hold nothing. Their
             # metadata is already stored, so the only cost is the scrape
@@ -420,7 +470,9 @@ class SlopScraper:
         already_done = sum(1 for r in rows if r['app_id'] in done)
         remaining = total_candidates - already_done
 
-        if self.rescan_pcgw:
+        if self.rescan_sources:
+            label = "👥 Source re-check"
+        elif self.rescan_pcgw:
             label = "📖 PCGamingWiki rescan"
         elif self.fill_gaps:
             label = "🕳️  Gap-fill"
@@ -586,7 +638,7 @@ class SlopScraper:
             # discovering new ones — options are added, never overwritten.
             if self.pcgw_recheck:
                 games = self._get_pcgw_recheck_games()
-            elif self.rescan or self.fill_gaps or self.rescan_pcgw:
+            elif self.rescan or self.fill_gaps or self.rescan_pcgw or self.rescan_sources:
                 games = self._get_rescan_games()
             else:
                 games = get_steam_game_list(
@@ -629,152 +681,156 @@ class SlopScraper:
                     
                     game_pbar.write(f"\n📋 Processing {title} (App ID: {app_id})")
                     
-                    # 1. Game-specific options
-                    try:
-                        game_pbar.write(f"  🔍 Checking game-specific options...")
-                        scraper_stats['scraper_success_rates']['Game-Specific']['attempts'] += 1
+                    # A source re-check reads only Steam Community and ProtonDB:
+                    # engine blocks are static, and PCGamingWiki is re-read in bulk
+                    # by backfill_wiki_options.py --verify.
+                    if not self.rescan_sources:
+                        # 1. Game-specific options
+                        try:
+                            game_pbar.write(f"  🔍 Checking game-specific options...")
+                            scraper_stats['scraper_success_rates']['Game-Specific']['attempts'] += 1
                         
-                        if self.session_monitor:
-                            self.session_monitor.start_scraper_timing("Game-specific")
+                            if self.session_monitor:
+                                self.session_monitor.start_scraper_timing("Game-specific")
                         
-                        game_specific_options = fetch_game_specific_options(
-                            app_id=app_id,
-                            title=title,
-                            cache=self.cache,
-                            engine=game.get('engine'),
-                            test_results=getattr(self, 'test_results', None),
-                            test_mode=self.test_mode
-                        )
+                            game_specific_options = fetch_game_specific_options(
+                                app_id=app_id,
+                                title=title,
+                                cache=self.cache,
+                                engine=game.get('engine'),
+                                test_results=getattr(self, 'test_results', None),
+                                test_mode=self.test_mode
+                            )
                         
-                        if self.session_monitor:
-                            elapsed = self.session_monitor.end_scraper_timing("Game-specific")
-                            timing_info = f" ({elapsed:.1f}s)"
-                        else:
-                            timing_info = ""
-                        
-                        if game_specific_options:
-                            scraper_stats['scraper_success_rates']['Game-Specific']['success'] += 1
-                            source_options['Game-Specific'] = game_specific_options
-                            all_options.extend(game_specific_options)
-                            
-                            # Check if only generic/universal options (this was the bug)
-                            generic_commands = {'-windowed', '-fullscreen'}
-                            problematic_commands = {'-fps_max', '-nojoy', '-nosplash'}
-                            
-                            commands = {opt['command'] for opt in game_specific_options}
-                            only_generic = commands.issubset(generic_commands)
-                            has_problematic = bool(commands & problematic_commands)
-                            
-                            if only_generic:
-                                game_pbar.write(f"  ⚠️ Only universal options found (this is normal for unrecognized engines)")
-                            elif has_problematic:
-                                game_pbar.write(f"  🚨 WARNING: Found old problematic generic options!")
-                        
-                        game_pbar.write(f"  ✅ Game-specific: {len(game_specific_options)} options found{timing_info}")
-                        
-                    except Exception as e:
-                        game_pbar.write(f"  ❌ Game-specific: Error - {e}")
-
-                    # 2. PCGamingWiki
-                    try:
-                        game_pbar.write(f"  🔍 Searching PCGamingWiki...")
-                        scraper_stats['scraper_success_rates']['PCGamingWiki']['attempts'] += 1
-                        
-                        if self.session_monitor:
-                            self.session_monitor.start_scraper_timing("PCGamingWiki")
-                        
-                        pcgaming_options = fetch_pcgamingwiki_launch_options(
-                            title,
-                            app_id=app_id,
-                            rate_limit=self.rate_limit,
-                            debug=self.debug,
-                            test_results=getattr(self, 'test_results', None),
-                            test_mode=self.test_mode,
-                            rate_limiter=self.rate_limiter,
-                            session_monitor=self.session_monitor
-                        )
-                        
-                        if self.session_monitor:
-                            elapsed = self.session_monitor.end_scraper_timing("PCGamingWiki")
-                            timing_info = f" ({elapsed:.1f}s)"
-                        else:
-                            timing_info = ""
-
-                        # An empty result during an outage isn't a confirmed
-                        # "no options" — flag the game so --pcgw-recheck can
-                        # retarget it once PCGamingWiki is back up. A confident
-                        # result (whether or not options were found) clears
-                        # any prior flag for this game.
-                        if not self.test_mode:
-                            if pcgamingwiki_needs_recheck():
-                                self._flag_pcgw_recheck(app_id, title)
-                                game_pbar.write(f"  ⚠️ PCGamingWiki result unconfirmed (site outage) — flagged for recheck")
+                            if self.session_monitor:
+                                elapsed = self.session_monitor.end_scraper_timing("Game-specific")
+                                timing_info = f" ({elapsed:.1f}s)"
                             else:
-                                self._clear_pcgw_recheck(app_id)
+                                timing_info = ""
+                        
+                            if game_specific_options:
+                                scraper_stats['scraper_success_rates']['Game-Specific']['success'] += 1
+                                source_options['Game-Specific'] = game_specific_options
+                                all_options.extend(game_specific_options)
+                            
+                                # Check if only generic/universal options (this was the bug)
+                                generic_commands = {'-windowed', '-fullscreen'}
+                                problematic_commands = {'-fps_max', '-nojoy', '-nosplash'}
+                            
+                                commands = {opt['command'] for opt in game_specific_options}
+                                only_generic = commands.issubset(generic_commands)
+                                has_problematic = bool(commands & problematic_commands)
+                            
+                                if only_generic:
+                                    game_pbar.write(f"  ⚠️ Only universal options found (this is normal for unrecognized engines)")
+                                elif has_problematic:
+                                    game_pbar.write(f"  🚨 WARNING: Found old problematic generic options!")
+                        
+                            game_pbar.write(f"  ✅ Game-specific: {len(game_specific_options)} options found{timing_info}")
+                        
+                        except Exception as e:
+                            game_pbar.write(f"  ❌ Game-specific: Error - {e}")
 
-                        # The page we just verified also states the engine, and
-                        # it cost nothing extra to read. Until now the engine
-                        # could only come from a bulk table cached for a week —
-                        # and that table can no longer be refreshed, which is
-                        # why games discovered recently arrived as 'Unknown'.
-                        #
-                        # resolve_engine decides whether this beats what is
-                        # already stored. It is written to prefer doing nothing:
-                        # curated labels are untouchable, a disagreement is
-                        # declined rather than guessed at, and a page naming
-                        # several engines is declined outright.
-                        update, why = resolve_engine(
-                            game.get('engine'), game.get('engine_source'),
-                            pcgamingwiki_page_engines())
-                        if update:
-                            engine, detail, engine_source = update
-                            game['engine'] = engine
-                            game['engine_detail'] = detail
-                            game['engine_source'] = engine_source
-                            game_pbar.write(f"  🔧 Engine from wiki page: {engine} ({detail})")
+                        # 2. PCGamingWiki
+                        try:
+                            game_pbar.write(f"  🔍 Searching PCGamingWiki...")
+                            scraper_stats['scraper_success_rates']['PCGamingWiki']['attempts'] += 1
+                        
+                            if self.session_monitor:
+                                self.session_monitor.start_scraper_timing("PCGamingWiki")
+                        
+                            pcgaming_options = fetch_pcgamingwiki_launch_options(
+                                title,
+                                app_id=app_id,
+                                rate_limit=self.rate_limit,
+                                debug=self.debug,
+                                test_results=getattr(self, 'test_results', None),
+                                test_mode=self.test_mode,
+                                rate_limiter=self.rate_limiter,
+                                session_monitor=self.session_monitor
+                            )
+                        
+                            if self.session_monitor:
+                                elapsed = self.session_monitor.end_scraper_timing("PCGamingWiki")
+                                timing_info = f" ({elapsed:.1f}s)"
+                            else:
+                                timing_info = ""
 
-                            # The engine block already ran, above, with whatever
-                            # engine was stored then — usually 'Unknown', which
-                            # emits nothing. Learning the engine one step later
-                            # is useless if the flags it unlocks are not
-                            # collected until some future run, so re-run it now
-                            # that we know what the game is.
+                            # An empty result during an outage isn't a confirmed
+                            # "no options" — flag the game so --pcgw-recheck can
+                            # retarget it once PCGamingWiki is back up. A confident
+                            # result (whether or not options were found) clears
+                            # any prior flag for this game.
+                            if not self.test_mode:
+                                if pcgamingwiki_needs_recheck():
+                                    self._flag_pcgw_recheck(app_id, title)
+                                    game_pbar.write(f"  ⚠️ PCGamingWiki result unconfirmed (site outage) — flagged for recheck")
+                                else:
+                                    self._clear_pcgw_recheck(app_id)
+
+                            # The page we just verified also states the engine, and
+                            # it cost nothing extra to read. Until now the engine
+                            # could only come from a bulk table cached for a week —
+                            # and that table can no longer be refreshed, which is
+                            # why games discovered recently arrived as 'Unknown'.
                             #
-                            # This is the whole point of the engine work: an
-                            # engine is not a label, it is what decides which
-                            # documented flags apply.
-                            try:
-                                already = 'Game-Specific' in source_options
-                                late = fetch_game_specific_options(
-                                    app_id=app_id, title=title, cache=self.cache,
-                                    engine=engine,
-                                    test_results=getattr(self, 'test_results', None),
-                                    test_mode=self.test_mode
-                                ) or []
-                                seen = {o['command'] for o in all_options}
-                                fresh = [o for o in late if o['command'] not in seen]
-                                if fresh:
-                                    all_options.extend(fresh)
-                                    source_options.setdefault('Game-Specific', []).extend(fresh)
-                                    if not already:
-                                        scraper_stats['scraper_success_rates'][
-                                            'Game-Specific']['success'] += 1
-                                    game_pbar.write(
-                                        f"  🔧 Engine block re-run: +{len(fresh)} options")
-                            except Exception as e:
-                                game_pbar.write(f"  ⚠️ Engine block re-run failed: {e}")
-                        elif why.startswith('CONFLICT'):
-                            game_pbar.write(f"  ⚠️ Engine {why}")
+                            # resolve_engine decides whether this beats what is
+                            # already stored. It is written to prefer doing nothing:
+                            # curated labels are untouchable, a disagreement is
+                            # declined rather than guessed at, and a page naming
+                            # several engines is declined outright.
+                            update, why = resolve_engine(
+                                game.get('engine'), game.get('engine_source'),
+                                pcgamingwiki_page_engines())
+                            if update:
+                                engine, detail, engine_source = update
+                                game['engine'] = engine
+                                game['engine_detail'] = detail
+                                game['engine_source'] = engine_source
+                                game_pbar.write(f"  🔧 Engine from wiki page: {engine} ({detail})")
 
-                        if pcgaming_options:
-                            scraper_stats['scraper_success_rates']['PCGamingWiki']['success'] += 1
-                            source_options['PCGamingWiki'] = pcgaming_options
-                            all_options.extend(pcgaming_options)
+                                # The engine block already ran, above, with whatever
+                                # engine was stored then — usually 'Unknown', which
+                                # emits nothing. Learning the engine one step later
+                                # is useless if the flags it unlocks are not
+                                # collected until some future run, so re-run it now
+                                # that we know what the game is.
+                                #
+                                # This is the whole point of the engine work: an
+                                # engine is not a label, it is what decides which
+                                # documented flags apply.
+                                try:
+                                    already = 'Game-Specific' in source_options
+                                    late = fetch_game_specific_options(
+                                        app_id=app_id, title=title, cache=self.cache,
+                                        engine=engine,
+                                        test_results=getattr(self, 'test_results', None),
+                                        test_mode=self.test_mode
+                                    ) or []
+                                    seen = {o['command'] for o in all_options}
+                                    fresh = [o for o in late if o['command'] not in seen]
+                                    if fresh:
+                                        all_options.extend(fresh)
+                                        source_options.setdefault('Game-Specific', []).extend(fresh)
+                                        if not already:
+                                            scraper_stats['scraper_success_rates'][
+                                                'Game-Specific']['success'] += 1
+                                        game_pbar.write(
+                                            f"  🔧 Engine block re-run: +{len(fresh)} options")
+                                except Exception as e:
+                                    game_pbar.write(f"  ⚠️ Engine block re-run failed: {e}")
+                            elif why.startswith('CONFLICT'):
+                                game_pbar.write(f"  ⚠️ Engine {why}")
 
-                        game_pbar.write(f"  ✅ PCGamingWiki: {len(pcgaming_options)} options found{timing_info}")
+                            if pcgaming_options:
+                                scraper_stats['scraper_success_rates']['PCGamingWiki']['success'] += 1
+                                source_options['PCGamingWiki'] = pcgaming_options
+                                all_options.extend(pcgaming_options)
 
-                    except Exception as e:
-                        game_pbar.write(f"  ❌ PCGamingWiki: Error - {e}")
+                            game_pbar.write(f"  ✅ PCGamingWiki: {len(pcgaming_options)} options found{timing_info}")
+
+                        except Exception as e:
+                            game_pbar.write(f"  ❌ PCGamingWiki: Error - {e}")
 
                     # 3. Steam Community
                     try:
@@ -907,8 +963,8 @@ class SlopScraper:
                     # mode that draws from the database records it, each into
                     # its own pool's file — a targeted sweep is the one most
                     # likely to be interrupted, being the longest.
-                    if (self.rescan or self.rescan_pcgw or self.fill_gaps) \
-                            and not self.test_mode:
+                    if (self.rescan or self.rescan_pcgw or self.fill_gaps
+                            or self.rescan_sources) and not self.test_mode:
                         self._mark_rescanned(app_id)
                     
                     # Periodically save cache during execution

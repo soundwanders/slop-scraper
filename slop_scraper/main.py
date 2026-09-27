@@ -70,6 +70,10 @@ def setup_argument_parser():
                             'launch options. Their metadata is already stored, so the '
                             'cost is the scrape alone, and some were added while a '
                             'scraper was silently returning nothing.')
+    parser.add_argument('--rescan-sources', action='store_true',
+                       help='Re-check only games holding a Steam Community or ProtonDB option, '
+                            'running only those two scrapers. Records each link\'s own evidence '
+                            'and adds only what passes the save gate; never overwrites')
     parser.add_argument('--rescan-reset', action='store_true',
                        help='Clear rescan progress tracking and start the rescan campaign over')
     parser.add_argument('--pcgw-recheck', action='store_true',
@@ -477,12 +481,16 @@ def main():
         try:
             from .core.scraper import (RESCAN_PROGRESS_FILE,
                                        RESCAN_PCGW_PROGRESS_FILE,
-                                       FILL_GAPS_PROGRESS_FILE)
+                                       FILL_GAPS_PROGRESS_FILE,
+                                       RESCAN_SOURCES_PROGRESS_FILE)
         except ImportError:
             from core.scraper import (RESCAN_PROGRESS_FILE,
                                       RESCAN_PCGW_PROGRESS_FILE,
-                                      FILL_GAPS_PROGRESS_FILE)
-        if args.rescan_pcgw:
+                                      FILL_GAPS_PROGRESS_FILE,
+                                      RESCAN_SOURCES_PROGRESS_FILE)
+        if args.rescan_sources:
+            target = RESCAN_SOURCES_PROGRESS_FILE
+        elif args.rescan_pcgw:
             target = RESCAN_PCGW_PROGRESS_FILE
         elif args.fill_gaps:
             target = FILL_GAPS_PROGRESS_FILE
@@ -493,7 +501,7 @@ def main():
             print(f"🔁 Cleared sweep progress ({target})")
         else:
             print(f"🔁 No progress file to clear ({target})")
-        if not (args.rescan or args.rescan_pcgw or args.fill_gaps):
+        if not (args.rescan or args.rescan_pcgw or args.fill_gaps or args.rescan_sources):
             sys.exit(0)
 
     if args.rescan_engines and not args.rescan:
@@ -518,6 +526,17 @@ def main():
             print("❌ --rescan-pcgw, --fill-gaps and --pcgw-recheck are alternative game sources; pick one")
             sys.exit(1)
         print("📖 PCGamingWiki rescan mode: only games already holding a wiki-sourced option")
+
+    if args.rescan_sources:
+        if args.test:
+            print("❌ --rescan-sources requires production mode (it re-processes database games); drop --test")
+            sys.exit(1)
+        if args.rescan or args.rescan_pcgw or args.fill_gaps or args.pcgw_recheck:
+            print("❌ --rescan-sources, --rescan, --rescan-pcgw, --fill-gaps and --pcgw-recheck "
+                  "are alternative game sources; pick one")
+            sys.exit(1)
+        print("👥 Source re-check mode: Steam Community and ProtonDB only, for games holding "
+              "an option from them")
 
     if args.fill_gaps:
         if args.test:
@@ -560,6 +579,7 @@ def main():
         rescan_engines=args.rescan_engines,  # ...narrowed to engines with documented options
         fill_gaps=args.fill_gaps,            # ...narrowed to games holding zero options
         rescan_pcgw=args.rescan_pcgw,        # ...narrowed to games with a known wiki page
+        rescan_sources=args.rescan_sources,  # ...narrowed to Steam Community / ProtonDB holders
         pcgw_recheck=args.pcgw_recheck  # Re-scan only PCGamingWiki-outage-flagged games
     )
     
